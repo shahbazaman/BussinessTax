@@ -17,12 +17,14 @@ const razorpay = new Razorpay({
 router.post('/create-order', auth, async (req, res) => {
   try {
     const { amount, currency } = req.body; 
-    
-    const options = {
-      amount: Math.round(Number(amount) * 100), 
-      currency: currency || "INR", // Ensure this matches your Razorpay Dashboard setting
-      receipt: `receipt_${Date.now()}`,
-    };
+    const finalAmount = Math.round(Number(amount) * 100);
+console.log("SENDING TO RAZORPAY:", finalAmount); // Check your Render logs for this!
+
+const options = {
+  amount: finalAmount,
+  currency: currency || "INR",
+  receipt: `receipt_${Date.now()}`,
+};
 
     const order = await razorpay.orders.create(options);
     res.json(order);

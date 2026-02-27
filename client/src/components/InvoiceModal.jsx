@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { X, Search, Trash2, ShoppingCart, CreditCard, Landmark, CheckCircle, Download } from 'lucide-react';
-import { X, Search, Trash2, ShoppingCart, CreditCard, Landmark, CheckCircle } from 'lucide-react';
-import api from '../utils/api';
+import api from '../utils/api.js';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom'; // Add this
 // ─── Helper: resets all form state back to initial values ───────────────────
