@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Landmark, Receipt, ArrowUpRight, ArrowDownRight, Calculator } from 'lucide-react';
 import api from '../utils/api';
 const TaxReports = () => {

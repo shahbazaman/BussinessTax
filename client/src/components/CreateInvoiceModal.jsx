@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { X, Plus, Trash2, Percent, Globe, User } from 'lucide-react';
 
 const CreateInvoiceModal = ({ isOpen, onClose, onRefresh }) => {
@@ -15,7 +15,7 @@ const CreateInvoiceModal = ({ isOpen, onClose, onRefresh }) => {
     if (isOpen) {
       const fetchClients = async () => {
         try {
-          const { data } = await axios.get('/clients'); //hi
+          const { data } = await api.get('/clients'); //hi
           setClients(data);
         } catch (err) {
           console.error("Error fetching clients", err);
@@ -44,7 +44,7 @@ const CreateInvoiceModal = ({ isOpen, onClose, onRefresh }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/invoices', { //hi
+      await api.post('/invoices', { //hi
         clientName, // This is now sourced from your selection
         items,
         taxRate: Number(taxRate),

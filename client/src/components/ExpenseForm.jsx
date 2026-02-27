@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../utils/api';
 import { Landmark, Receipt, Calendar } from 'lucide-react';
 
 const ExpenseForm = ({ onRefresh }) => {
@@ -16,7 +16,7 @@ const ExpenseForm = ({ onRefresh }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/expenses', expense); //hi
+      await api.post('/expenses', expense); //hi
       alert('Expense logged!');
       onRefresh(); // To update the profit chart on Dashboard
       setExpense({ title: '', amount: '', category: 'Software', currency: 'USD', date: new Date().toISOString().split('T')[0] });
