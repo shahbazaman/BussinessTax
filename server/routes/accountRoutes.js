@@ -1,9 +1,10 @@
 import express from 'express';
 import mongoose from 'mongoose'; 
 import Account from '../models/Account.js';
-import protect from '../middleware/authMiddleware.js'; // You named it 'protect' here
+import protect from '../middleware/authMiddleware.js'; 
 import Transaction from '../models/Transaction.js';
-import {updatePassword} from '../controllers/authController.js';
+import { updatePassword } from '../controllers/authController.js';
+
 const router = express.Router();
 
 // 1. Get All Accounts
@@ -20,6 +21,11 @@ router.get('/', protect, async (req, res) => {
 router.post('/', protect, async (req, res) => {
   try {
     const { bankName, balance, accountType, accountNumber } = req.body;
+    
+    // Check if account number already exists for this user to avoid duplicates
+    const existing = await Account.findOne({ accountNumber, userId: req.user._id });
+    if (existing) return res.status(400).json({ message: "Account number already exists" });
+
     const newAccount = new Account({
       userId: req.user._id,
       bankName,
@@ -27,6 +33,7 @@ router.post('/', protect, async (req, res) => {
       accountType,
       accountNumber
     });
+    
     await newAccount.save();
     res.status(201).json(newAccount);
   } catch (err) {
@@ -34,13 +41,13 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
-// 3. Get Internal Transfers
+// 3. Get Internal Transfers (Specific to Account Activity)
 router.get('/transactions', protect, async (req, res) => {
   try {
     const transactions = await Transaction.find({ userId: req.user._id })
       .populate('fromAccount', 'bankName')
       .populate('toAccount', 'bankName')
-      .sort({ timestamp: -1 });
+      .sort({ createdAt: -1 }); // Using createdAt instead of timestamp for schema consistency
 
     res.json(transactions);
   } catch (err) {
@@ -48,7 +55,7 @@ router.get('/transactions', protect, async (req, res) => {
   }
 });
 
-// 4. Perform Transfer (The Transactional Version)
+// 4. Perform Transfer (ACID Transactional)
 router.post('/transfer', protect, async (req, res) => {
   const { fromId, toId, amount, description } = req.body;
   const transferAmount = Number(amount);
@@ -82,14 +89,15 @@ router.post('/transfer', protect, async (req, res) => {
       fromAccount: fromId,
       toAccount: toId,
       amount: transferAmount,
-      description: description || `Transfer from ${fromAcc.bankName} to ${toAcc.bankName}`,
+      description: description || `Internal Transfer`,
+      type: 'Transfer', // Added type for easier filtering in frontend
       status: 'Completed'
     });
 
     await transactionRecord.save({ session });
     await session.commitTransaction();
     
-    res.json({ message: 'Transfer successful' });
+    res.json({ message: 'Transfer successful', newBalance: fromAcc.balance });
 
   } catch (err) {
     await session.abortTransaction();
@@ -99,15 +107,25 @@ router.post('/transfer', protect, async (req, res) => {
   }
 });
 
-// 5. Delete Account
+// 5. Delete Account (Safety Check: Don't delete if balance > 0)
 router.delete('/:id', protect, async (req, res) => {
   try {
-    const account = await Account.findOneAndDelete({ _id: req.params.id, userId: req.user._id });
+    const account = await Account.findOne({ _id: req.params.id, userId: req.user._id });
+    
     if (!account) return res.status(404).json({ message: "Account not found" });
-    res.json({ message: "Account deleted" });
+    
+    if (account.balance > 0) {
+      return res.status(400).json({ message: "Cannot delete account with remaining balance. Transfer funds first." });
+    }
+
+    await Account.findByIdAndDelete(req.params.id);
+    res.json({ message: "Account deleted successfully" });
   } catch (err) {
     res.status(500).json({ message: "Server Error" });
   }
 });
+
+// Auth Helper
 router.put('/update-password', protect, updatePassword);
+
 export default router;
