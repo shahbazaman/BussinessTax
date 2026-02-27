@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Landmark, Receipt, ArrowUpRight, ArrowDownRight, Calculator } from 'lucide-react';
-
+import api from '../utils/api';
 const TaxReports = () => {
   const [invoices, setInvoices] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -11,8 +11,8 @@ const TaxReports = () => {
     const fetchData = async () => {
       try {
         const [invRes, expRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/invoices'),
-          axios.get('http://localhost:5000/api/expenses')
+          api.get('/invoices'),
+          api.get('/expenses')
         ]);
         setInvoices(invRes.data);
         setExpenses(expRes.data);

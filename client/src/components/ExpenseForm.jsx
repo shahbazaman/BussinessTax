@@ -16,7 +16,7 @@ const ExpenseForm = ({ onRefresh }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/expenses', expense);
+      await axios.post('/expenses', expense); //hi
       alert('Expense logged!');
       onRefresh(); // To update the profit chart on Dashboard
       setExpense({ title: '', amount: '', category: 'Software', currency: 'USD', date: new Date().toISOString().split('T')[0] });

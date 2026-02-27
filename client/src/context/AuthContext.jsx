@@ -17,14 +17,14 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const register = async (userData) => {
-    const { data } = await axios.post('http://localhost:5000/api/auth/register', userData);
+    const { data } = await axios.post('auth/register', userData); //hi
     setUser(data);
     localStorage.setItem('userInfo', JSON.stringify(data));
     axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
     return data;
   };
 const login = async (email, password) => {
-    const { data } = await axios.post('http://localhost:5000/api/auth/login', { email, password });
+    const { data } = await axios.post('auth/login', { email, password }); //hi
     setUser(data);
     localStorage.setItem('userInfo', JSON.stringify(data));
     localStorage.setItem('token', data.token); // Add this for App.jsx sync!

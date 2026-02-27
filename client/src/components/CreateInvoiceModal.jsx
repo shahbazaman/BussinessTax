@@ -15,7 +15,7 @@ const CreateInvoiceModal = ({ isOpen, onClose, onRefresh }) => {
     if (isOpen) {
       const fetchClients = async () => {
         try {
-          const { data } = await axios.get('http://localhost:5000/api/clients');
+          const { data } = await axios.get('/clients'); //hi
           setClients(data);
         } catch (err) {
           console.error("Error fetching clients", err);
@@ -44,7 +44,7 @@ const CreateInvoiceModal = ({ isOpen, onClose, onRefresh }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/invoices', {
+      await axios.post('/invoices', { //hi
         clientName, // This is now sourced from your selection
         items,
         taxRate: Number(taxRate),

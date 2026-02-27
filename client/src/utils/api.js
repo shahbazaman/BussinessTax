@@ -1,14 +1,14 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
+  // This looks for the Vercel variable, or falls back to localhost for dev
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
 });
 
-// Automatically add token to headers
+// Automatically attach the token to every request if it exists
 api.interceptors.request.use((config) => {
-  const userInfo = localStorage.getItem('userInfo');
-  if (userInfo) {
-    const { token } = JSON.parse(userInfo);
+  const token = localStorage.getItem('token');
+  if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
