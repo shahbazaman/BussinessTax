@@ -160,7 +160,45 @@ const updateStatus = async (id, newStatus) => {
     setEditingId(null);
     setFormData({ customerName: '', amount: '', dueDate: '', clientId: '', status: 'Pending' });
   };
+const initiatePayment = async (invoice) => {
+  try {
+    // 1. Create order on your backend
+    const { data: order } = await api.post('/payments/create-order', {
+      amount: invoice.amount,
+      currency: currency // Uses the currency from your state
+    });
 
+    // 2. Configure Razorpay Options
+    const options = {
+      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+      amount: order.amount,
+      currency: order.currency,
+      name: "BusinessTax Ledger",
+      description: `Payment for Invoice: ${invoice._id.slice(-6)}`,
+      order_id: order.id,
+      handler: async (response) => {
+        try {
+          // 3. Verify payment on backend
+          await api.post('/payments/verify', response);
+          toast.success("Payment successful!");
+          fetchData(); // Refresh the list to show "Paid" status
+        } catch (err) {
+          toast.error("Payment verification failed");
+        }
+      },
+      prefill: {
+        name: invoice.customerName,
+      },
+      theme: { color: "#0f172a" }, // Matches your slate-900 theme
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  } catch (err) {
+    console.error("Payment Error:", err);
+    toast.error("Could not initiate payment");
+  }
+};
 const downloadPDF = (invoice) => {
   try {
     const doc = new jsPDF();
@@ -374,7 +412,11 @@ const downloadPDF = (invoice) => {
                         <td className="px-8 py-6">
                           <div className="flex justify-end gap-2">
                             {inv.status === 'Pending' && (
-                              <button className="p-3 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-600 hover:text-white transition-all">
+                              <button 
+                                onClick={() => initiatePayment(inv)} // ADD THIS LINE
+                                className="p-3 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
+                                title="Pay Now"
+                              >
                                 <CreditCard size={18} />
                               </button>
                             )}

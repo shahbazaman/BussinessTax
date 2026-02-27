@@ -8,7 +8,7 @@ import expenseRoutes from './routes/expenseRoutes.js';
 import clientRoutes from './routes/clientRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import accountRoutes from './routes/accountRoutes.js';
-// import paymentRoutes from './routes/paymentRoutes.js'; 
+import paymentRoutes from './routes/paymentRoutes.js'; 
 import employeeRoutes from './routes/employeeRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
@@ -27,7 +27,7 @@ app.use(cors({
 }));
 app.use(express.json()); 
 
-// app.use('/api/payments', paymentRoutes); 
+app.use('/api/payments', paymentRoutes); 
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/invoices', invoiceRoutes);
