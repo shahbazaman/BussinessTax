@@ -21,7 +21,10 @@ connectDB();
 const app = express();
 
 // Middleware
-app.use(cors()); 
+app.use(cors({
+  origin: process.env.FRONTEND_URL, // This will be your Vercel URL
+  credentials: true
+}));
 app.use(express.json()); 
 
 // app.use('/api/payments', paymentRoutes); 
@@ -37,7 +40,7 @@ app.use('/api/transactions', transactionRoutes);
 app.get('/', (req, res) => {
   res.send('BusinessTax API is running...');
 });
-
+app.get('/health', (req, res) => res.status(200).send('Server is running'));
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
