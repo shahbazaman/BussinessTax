@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { jsPDF } from 'jspdf';
+import { X, Search, Trash2, ShoppingCart, CreditCard, Landmark, CheckCircle, Download } from 'lucide-react';
 import { X, Search, Trash2, ShoppingCart, CreditCard, Landmark, CheckCircle } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
@@ -68,7 +70,17 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     ]);
     setSearchQuery('');
   };
-
+const downloadReceipt = () => {
+    const doc = new jsPDF();
+    doc.setFont("helvetica", "bold");
+    doc.text("PAYMENT RECEIPT", 105, 20, { align: "center" });
+    doc.setFont("helvetica", "normal");
+    doc.text(`Invoice ID: #${savedInvoiceId.slice(-6).toUpperCase()}`, 20, 40);
+  doc.text(`Status: PAID`, 20, 50);
+  doc.text(`Total Amount: ${totalAmount}`, 20, 60);
+  doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 70);
+  doc.savedoc.save(`Receipt_${savedInvoiceId.slice(-6)}.pdf`);
+};
   // ── Confirm Purchase / Save Invoice ──────────────────────────────────────
   // After saving: shows success toast, refreshes dashboard, auto-closes modal
   const handleSubmit = async (e) => {
@@ -99,12 +111,6 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
       // Toast for successful save
       toast.success(`✅ ${type} invoice saved successfully!`);
       onRefresh();
-
-      setTimeout(() => {
-      handleClose();
-      navigate('/'); // Or whatever your main route is
-    }, 2000);
-
     } catch (err) {
       console.error(err);
       toast.error(
@@ -117,6 +123,11 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
   const handleRazorpayPayment = async () => {
     // Guard 1: Keys not yet configured (pre-hosting)
     const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+    // Inside handleRazorpayPayment function
+const { data: order } = await api.post('/payments/order', { 
+  amount: totalAmount,
+  currency: 'INR' // Change to 'USD' if your Razorpay account is international
+});
     if (!razorpayKey) {
       toast.info(
         '💳 Razorpay keys not configured yet. Add VITE_RAZORPAY_KEY_ID to your .env after hosting.',
@@ -148,7 +159,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     setPaymentLoading(true);
     try {
       // Step 1: Create backend order
-      const { data: order } = await api.post('/payments/order', { amount: totalAmount });
+      const { data: order } = await api.post('/create-order', { amount: totalAmount ,currency: 'INR'});
 
       // Step 2: Open Razorpay checkout
       const selectedClient = clients.find((c) => c._id === invoiceData.clientId);
@@ -411,13 +422,19 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
 
           {/* ── Payment success indicator ── */}
           {paymentDone && (
-            <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3">
-              <CheckCircle size={18} className="text-blue-500 shrink-0" />
-              <p className="text-blue-700 text-xs font-black">
-                Payment verified! Records updated. Closing modal...
-              </p>
-            </div>
-          )}
+  <div className="flex flex-col gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4">
+    <div className="flex items-center gap-3">
+       <CheckCircle size={18} className="text-blue-500 shrink-0" />
+       <p className="text-blue-700 text-xs font-black">Payment Verified!</p>
+    </div>
+    <button 
+      onClick={downloadReceipt}
+      className="bg-blue-600 text-white text-[10px] font-bold py-2 px-4 rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-all"
+    >
+      <Download size={14} /> DOWNLOAD RECEIPT
+    </button>
+  </div>
+)}
 
         </form>
 

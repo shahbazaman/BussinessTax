@@ -14,15 +14,13 @@ const razorpay = new Razorpay({
 });
 
 // --- 1. Create Order ---
-// @desc    Create a Razorpay Order
-// @route   POST /api/payments/order
-router.post('/order', auth, async (req, res) => {
+router.post('/create-order', auth, async (req, res) => {
   try {
-    const { amount, currency = "INR" } = req.body;
-
+    const { amount, currency } = req.body; 
+    
     const options = {
-      amount: Math.round(Number(amount) * 100), // Ensure integer subunits
-      currency,
+      amount: Math.round(Number(amount) * 100), 
+      currency: currency || "INR", // Ensure this matches your Razorpay Dashboard setting
       receipt: `receipt_${Date.now()}`,
     };
 

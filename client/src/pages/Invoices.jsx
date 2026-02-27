@@ -18,7 +18,7 @@ const Invoices = () => {
   const [currency, setCurrency] = useState('USD');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-
+  const [accounts, setAccounts] = useState([]);
   const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
 
@@ -30,23 +30,25 @@ const Invoices = () => {
     status: 'Pending'
   });
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [invRes, clientRes, profileRes] = await Promise.all([
-        api.get('/invoices'),
-        api.get('/clients'),
-        api.get('/auth/profile')
-      ]);
-      setInvoices(invRes.data);
-      setClients(clientRes.data);
-      setCurrency(profileRes.data.currency || 'USD');
-    } catch (err) {
-      toast.error("Cloud synchronization failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+ const fetchData = async () => {
+  setLoading(true);
+  try {
+    const [invRes, clientRes, profileRes, accRes] = await Promise.all([
+      api.get('/invoices'),
+      api.get('/clients'),
+      api.get('/auth/profile'),
+      api.get('/accounts') // Fetching your bank accounts
+    ]);
+    setInvoices(invRes.data);
+    setClients(clientRes.data);
+    setCurrency(profileRes.data.currency || 'USD');
+    setAccounts(accRes.data); // Store accounts in state
+  } catch (err) {
+    toast.error("Cloud synchronization failed");
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchData();
@@ -162,40 +164,48 @@ const updateStatus = async (id, newStatus) => {
   };
 const initiatePayment = async (invoice) => {
   try {
-    // 1. Create order on your backend
+    // 1. Check if an account exists to receive funds
+    if (accounts.length === 0) {
+      return toast.error("❌ No bank account found. Please add an account in the Dashboard first.");
+    }
+
+    // Use the first account as default
+    const targetAccountId = accounts[0]._id;
+
+    // 2. Create Razorpay Order
     const { data: order } = await api.post('/payments/create-order', {
       amount: invoice.amount,
-      currency: currency // Uses the currency from your state
+      currency: currency 
     });
 
-    // 2. Configure Razorpay Options
     const options = {
       key: import.meta.env.VITE_RAZORPAY_KEY_ID,
       amount: order.amount,
       currency: order.currency,
       name: "BusinessTax Ledger",
-      description: `Payment for Invoice: ${invoice._id.slice(-6)}`,
+      description: `Invoice #${invoice._id.slice(-6).toUpperCase()}`,
       order_id: order.id,
       handler: async (response) => {
         try {
-          // 3. Verify payment on backend
-          await api.post('/payments/verify', response);
-          toast.success("Payment successful!");
-          fetchData(); // Refresh the list to show "Paid" status
+          // 3. Verify and pass the accountId to update balance
+          await api.post('/payments/verify', {
+            ...response,
+            invoiceId: invoice._id,
+            accountId: targetAccountId 
+          });
+          toast.success("Payment verified! Balance updated.");
+          fetchData();
         } catch (err) {
-          toast.error("Payment verification failed");
+          toast.error("Verification failed");
         }
       },
-      prefill: {
-        name: invoice.customerName,
-      },
-      theme: { color: "#0f172a" }, // Matches your slate-900 theme
+      prefill: { name: invoice.customerName },
+      theme: { color: "#0f172a" },
     };
 
     const rzp = new window.Razorpay(options);
     rzp.open();
   } catch (err) {
-    console.error("Payment Error:", err);
     toast.error("Could not initiate payment");
   }
 };
