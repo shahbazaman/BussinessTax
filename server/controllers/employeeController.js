@@ -1,6 +1,6 @@
 import Employee from '../models/Employee.js';
 import Transaction from '../models/Transaction.js';
-
+import Account from '../models/Account.js';
 export const getEmployees = async (req, res) => {
   try {
     const employees = await Employee.find({ user: req.user.id });
@@ -37,27 +37,38 @@ export const deleteEmployee = async (req, res) => {
 
 export const closeMonth = async (req, res) => {
   try {
-    const employees = await Employee.find({ user: req.user.id });
+    const userId = req.user._id || req.user.id;
+    const sourceAccount = await Account.findOne({ userId, accountType: 'Wallet' }) 
+                       || await Account.findOne({ userId }); 
+    if (!sourceAccount) {
+      return res.status(400).json({ 
+        message: "No bank account found. Please add an account in the Accounts tab first." 
+      });
+    }
+
+    const employees = await Employee.find({ user: userId });
     const totalPayroll = employees.reduce((sum, emp) => sum + (emp.workingDays * emp.dailyRate), 0);
 
     if (totalPayroll > 0) {
       await Transaction.create({
-        user: req.user.id,
-        type: 'expense',
-        category: 'Salary',
+        userId: userId,
+        fromAccount: sourceAccount._id, 
+        toAccount: sourceAccount._id,   
         amount: totalPayroll,
-        description: `Monthly Payroll for ${new Date().toLocaleString('default', { month: 'long' })}`
+        description: `Payroll: ${new Date().toLocaleString('default', { month: 'long' })}`,
+        status: 'Completed'
       });
+      sourceAccount.balance -= totalPayroll;
+      await sourceAccount.save();
     }
-
-    const result = await Employee.updateMany({ user: req.user.id }, { $set: { workingDays: 0 } });
+    await Employee.updateMany({ user: userId }, { $set: { workingDays: 0 } });
     
     res.json({ 
-      message: `Payroll of $${totalPayroll.toLocaleString()} processed and recorded. Reset ${result.modifiedCount} employees.` 
+      message: `Payroll of $${totalPayroll.toLocaleString()} processed from ${sourceAccount.bankName}.` 
     });
   } catch (error) {
     console.error("Close Month Error:", error);
-    res.status(500).json({ message: "Server failed to close month: " + error.message });
+    res.status(500).json({ message: "Server error: " + error.message });
   }
 };
 
