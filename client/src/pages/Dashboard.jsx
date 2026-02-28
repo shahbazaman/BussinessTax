@@ -468,49 +468,51 @@ const Dashboard = () => {
 
             {/* Recent Activity Table */}
             <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden h-100 flex flex-col">
-              <div className="p-6 border-b border-slate-50 flex items-center gap-2 font-bold text-slate-800 uppercase text-xs tracking-wider">
-                <ArrowRightLeft size={16} className="text-blue-500" /> Recent Activity
-              </div>
-              <div className="overflow-y-auto flex-1">
-                <table className="w-full text-left">
-                  <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400">
-                    <tr>
-                      <th className="px-6 py-4">Date</th>
-                      <th className="px-6 py-4">Description</th>
-                      <th className="px-6 py-4">From → To</th>
-                      <th className="px-6 py-4 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {transactions.length > 0 ? (
-                      transactions.slice(0, 5).map((tx) => (
-                        <tr key={tx._id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-4 text-xs text-slate-500">
-                            {new Date(tx.timestamp).toLocaleDateString()}
-                          </td>
-                          <td className="px-6 py-4">
-                            <span className="text-sm font-bold text-slate-700">{tx.description}</span>
-                          </td>
-                          <td className="px-6 py-4 text-xs font-medium text-slate-500">
-                            {tx.fromAccount?.bankName} → {tx.toAccount?.bankName}
-                          </td>
-                          <td className="px-6 py-4 text-sm font-black text-right text-blue-600">
-                            {currencySymbol}{tx.amount?.toLocaleString()}
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td colSpan="4" className="px-6 py-8 text-center text-slate-400 text-sm">
-                          No recent transactions found.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+  <div className="p-6 border-b border-slate-50 flex items-center gap-2 font-bold text-slate-800 uppercase text-xs tracking-wider shrink-0">
+    <ArrowRightLeft size={16} className="text-blue-500" /> Recent Activity
+  </div>
 
+  <div className="overflow-x-auto overflow-y-auto flex-1 no-scrollbar">
+    <table className="w-full text-left border-collapse min-w-150 lg:min-w-full">
+      <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400 sticky top-0 z-10">
+        <tr>
+          <th className="px-4 lg:px-6 py-4">Date</th>
+          <th className="px-4 lg:px-6 py-4">Description</th>
+          <th className="px-4 lg:px-6 py-4">From → To</th>
+          <th className="px-4 lg:px-6 py-4 text-right">Amount</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-50">
+        {transactions.length > 0 ? (
+          transactions.slice(0, 5).map((tx) => (
+            <tr key={tx._id} className="hover:bg-slate-50/50 transition-colors">
+              <td className="px-4 lg:px-6 py-4 text-[10px] lg:text-xs text-slate-500 whitespace-nowrap">
+                {new Date(tx.timestamp).toLocaleDateString()}
+              </td>
+              <td className="px-4 lg:px-6 py-4">
+                <span className="text-xs lg:text-sm font-bold text-slate-700 block truncate max-w-30 lg:max-w-none">
+                  {tx.description}
+                </span>
+              </td>
+              <td className="px-4 lg:px-6 py-4 text-[10px] lg:text-xs font-medium text-slate-500 whitespace-nowrap">
+                {tx.fromAccount?.bankName} → {tx.toAccount?.bankName}
+              </td>
+              <td className="px-4 lg:px-6 py-4 text-xs lg:text-sm font-black text-right text-blue-600 whitespace-nowrap">
+                {currencySymbol}{tx.amount?.toLocaleString()}
+              </td>
+            </tr>
+          ))
+        ) : (
+          <tr>
+            <td colSpan="4" className="px-6 py-8 text-center text-slate-400 text-sm">
+              No recent transactions found.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
             {/* Low Stock Widget */}
             {/* <div className="bg-white rounded-[2.5rem] shadow-sm border border-rose-100 overflow-hidden flex flex-col h-100"> */}
               {/* Low Stock Widget */}
