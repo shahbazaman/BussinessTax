@@ -7,43 +7,40 @@ import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
+// Import the advanced Modal component
+import InvoiceModal from '../components/InvoiceModal'; 
+
 const Invoices = () => {
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
+  const [products, setProducts] = useState([]); // Required for Advanced Modal
+  const [accounts, setAccounts] = useState([]); // Required for Advanced Modal
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('All');
-  const [editingId, setEditingId] = useState(null);
   const [currency, setCurrency] = useState('USD');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [accounts, setAccounts] = useState([]);
 
   const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
 
-  const [formData, setFormData] = useState({
-    customerName: '',
-    amount: '',
-    dueDate: '',
-    clientId: '',
-    status: 'Pending'
-  });
-
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [invRes, clientRes, profileRes, accRes] = await Promise.all([
+      const [invRes, clientRes, profileRes, accRes, prodRes] = await Promise.all([
         api.get('/invoices'),
         api.get('/clients'),
         api.get('/auth/profile'),
-        api.get('/accounts') // Hits your updated accountRoutes.js
+        api.get('/accounts'),
+        api.get('/products') // Fetching products for the modal's search feature
       ]);
       setInvoices(invRes.data);
       setClients(clientRes.data);
       setCurrency(profileRes.data.currency || 'USD');
       setAccounts(accRes.data);
+      setProducts(prodRes.data);
     } catch (err) {
       toast.error("Cloud synchronization failed");
     } finally {
@@ -81,37 +78,10 @@ const Invoices = () => {
   const updateStatus = async (id, newStatus) => {
     try {
       await api.put(`/invoices/${id}/status`, { status: newStatus });
-      if (newStatus === 'Paid') {
-        toast.success(`Payment verified! Income recorded.`);
-      } else {
-        toast.success(`Invoice marked as ${newStatus}`);
-      }
+      toast.success(`Invoice marked as ${newStatus}`);
       fetchData();
     } catch (err) {
       toast.error("Failed to update status");
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const payload = {
-      ...formData,
-      amount: Number(formData.amount),
-      client: formData.clientId 
-    };
-
-    try {
-      if (editingId) {
-        await api.put(`/invoices/${editingId}`, payload);
-        toast.success("Invoice Updated");
-      } else {
-        await api.post('/invoices', payload);
-        toast.success("Invoice Generated");
-      }
-      handleCloseModal();
-      fetchData();
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Operation failed");
     }
   };
 
@@ -127,71 +97,6 @@ const Invoices = () => {
     }
   };
 
-  const handleEditClick = (inv) => {
-    setEditingId(inv._id);
-    setFormData({
-      customerName: inv.customerName,
-      amount: inv.amount,
-      dueDate: inv.dueDate ? new Date(inv.dueDate).toISOString().split('T')[0] : '',
-      clientId: inv.client?._id || inv.client || '',
-      status: inv.status
-    });
-    setShowModal(true);
-  };
-
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setEditingId(null);
-    setFormData({ customerName: '', amount: '', dueDate: '', clientId: '', status: 'Pending' });
-  };
-
-  const initiatePayment = async (invoice) => {
-    try {
-      if (accounts.length === 0) {
-        return toast.error("❌ No bank account found. Please add an account in the Dashboard first.");
-      }
-
-      const targetAccountId = accounts[0]._id;
-
-      const { data: order } = await api.post('/payments/create-order', {
-        amount: invoice.amount,
-        currency: "INR" 
-      });
-
-      const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-        amount: order.amount,
-        currency: "INR",
-        name: "BusinessTax Ledger",
-        description: `Invoice #${invoice._id.slice(-6)}`,
-        order_id: order.id,
-        handler: async (response) => {
-          try {
-            await api.post('/payments/verify', {
-              ...response,
-              invoiceId: invoice._id,
-              accountId: targetAccountId 
-            });
-            toast.success("Payment verified! Balance updated.");
-            fetchData();
-          } catch (err) {
-            toast.error("Verification failed");
-          }
-        },
-        prefill: {
-          name: invoice.customerName,
-          email: "client@example.com",
-          contact: "9999999999"
-        },
-        theme: { color: "#0f172a" },
-      };
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-    } catch (err) {
-      toast.error("Could not initiate payment");
-    }
-  };
-
   const downloadPDF = (invoice) => {
     try {
       const doc = new jsPDF();
@@ -203,7 +108,7 @@ const Invoices = () => {
       doc.setTextColor(100);
       doc.text(`Invoice ID: ${invoice._id.slice(-8).toUpperCase()}`, 15, 45);
       doc.text(`Issued: ${new Date(invoice.createdAt).toLocaleDateString()}`, 15, 52);
-      doc.text(`Status: ${invoice.status.toUpperCase()}`, 15, 59);
+      doc.text(`Type: ${invoice.type || 'Sale'}`, 15, 59);
 
       doc.setFontSize(12);
       doc.setTextColor(0);
@@ -213,12 +118,13 @@ const Invoices = () => {
 
       autoTable(doc, {
         startY: 95,
-        head: [['Description', 'Due Date', 'Total Amount']],
-        body: [[
-          `Service/Product Delivery`,
-          new Date(invoice.dueDate).toLocaleDateString(),
-          formatValue(invoice.amount)
-        ]],
+        head: [['Item', 'Price', 'Qty', 'Total']],
+        body: invoice.items ? invoice.items.map(item => [
+          item.name,
+          formatValue(item.price),
+          item.quantity,
+          formatValue(item.price * item.quantity)
+        ]) : [['Service/Product', '-', '-', formatValue(invoice.amount)]],
         theme: 'grid',
         headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] }
       });
@@ -227,7 +133,6 @@ const Invoices = () => {
       doc.setFontSize(14);
       doc.text(`Grand Total: ${formatValue(invoice.amount)}`, 140, finalY);    
       doc.save(`Invoice_${invoice.customerName || 'Record'}.pdf`);
-      toast.success("Invoice downloaded!");
     } catch (error) {
       toast.error("Failed to generate PDF");
     }
@@ -244,10 +149,16 @@ const Invoices = () => {
             <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Ledger Management System</p>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => setShowModal(true)} className="bg-slate-900 text-white px-8 py-4 rounded-3xl flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 font-black text-xs uppercase tracking-widest">
+            <button 
+              onClick={() => setShowModal(true)} 
+              className="bg-slate-900 text-white px-8 py-4 rounded-3xl flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 font-black text-xs uppercase tracking-widest"
+            >
               <Plus size={18} strokeWidth={3} /> New Invoice
             </button>
-            <button onClick={() => exportToCSV(filteredInvoices, 'Invoices_Export')} className="bg-white border border-slate-200 text-slate-700 px-6 py-4 rounded-3xl flex items-center gap-2 hover:bg-slate-50 transition-all font-bold text-xs uppercase tracking-widest">
+            <button 
+              onClick={() => exportToCSV(filteredInvoices, 'Invoices_Export')} 
+              className="bg-white border border-slate-200 text-slate-700 px-6 py-4 rounded-3xl flex items-center gap-2 hover:bg-slate-50 transition-all font-bold text-xs uppercase tracking-widest"
+            >
               <Download size={18} /> CSV
             </button>
           </div>
@@ -355,10 +266,10 @@ const Invoices = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50/50">
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Type</th>
                     <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Client Name</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount Due</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
                     <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Due Date</th>
                     <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                   </tr>
                 </thead>
@@ -366,10 +277,13 @@ const Invoices = () => {
                   {filteredInvoices.length > 0 ? (
                     filteredInvoices.map((inv) => (
                       <tr key={inv._id} className="hover:bg-blue-50/30 transition-colors group">
-                        <td className="px-8 py-6 font-black text-slate-800">{inv.customerName}</td>
                         <td className="px-8 py-6">
-                          <span className="font-black text-slate-900 text-lg">{formatValue(inv.amount)}</span>
+                           <span className={`text-[9px] font-black px-3 py-1 rounded-full ${inv.type === 'Sale' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
+                             {(inv.type || 'SALE').toUpperCase()}
+                           </span>
                         </td>
+                        <td className="px-8 py-6 font-black text-slate-800">{inv.customerName}</td>
+                        <td className="px-8 py-6 font-black text-slate-900 text-lg">{formatValue(inv.amount)}</td>
                         <td className="px-8 py-6">
                           <select 
                             value={inv.status} 
@@ -383,22 +297,9 @@ const Invoices = () => {
                             <option value="Overdue">OVERDUE</option>
                           </select>
                         </td>
-                        <td className="px-8 py-6 text-sm font-bold text-slate-500">
-                          {new Date(inv.dueDate).toLocaleDateString()}
-                        </td>
                         <td className="px-8 py-6 text-right">
                           <div className="flex justify-end gap-2">
-                            {inv.status === 'Pending' && (
-                              <button 
-                                onClick={() => initiatePayment(inv)}
-                                className="p-3 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
-                                title="Pay Now"
-                              >
-                                <CreditCard size={18} />
-                              </button>
-                            )}
                             <button onClick={() => downloadPDF(inv)} className="p-3 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all"><Download size={18} /></button>
-                            <button onClick={() => handleEditClick(inv)} className="p-3 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-xl transition-all"><Edit2 size={18}/></button>
                             <button onClick={() => handleDelete(inv._id)} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={18}/></button>
                           </div>
                         </td>
@@ -421,62 +322,16 @@ const Invoices = () => {
         )}
       </div>
 
-      {/* Modal */}
-      {showModal && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[3.5rem] w-full max-w-xl shadow-2xl overflow-hidden p-10 animate-in zoom-in duration-300">
-            <div className="flex justify-between items-center mb-10">
-              <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">
-                {editingId ? 'Modify Invoice' : 'New Invoice'}
-              </h3>
-              <button onClick={handleCloseModal} className="p-3 bg-slate-50 rounded-full hover:bg-rose-50 hover:text-rose-500 transition-all"><X size={24}/></button>
-            </div>
-            
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Select Client</label>
-                <select 
-                  required
-                  className="w-full p-6 bg-slate-50 border-none rounded-3xl outline-none font-bold text-slate-700"
-                  value={formData.clientId}
-                  onChange={(e) => {
-                    const selected = clients.find(c => c._id === e.target.value);
-                    setFormData({...formData, clientId: e.target.value, customerName: selected?.name || ''});
-                  }}
-                >
-                  <option value="">Search Portfolio...</option>
-                  {clients.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                </select>
-              </div>
+      {/* RENDER THE ADVANCED MODAL COMPONENT */}
+      <InvoiceModal 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)} 
+        onRefresh={fetchData} 
+        clients={clients} 
+        products={products} 
+        accounts={accounts} 
+      />
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Amount</label>
-                  <input 
-                    type="number" required step="0.01" 
-                    className="w-full p-6 bg-slate-50 border-none rounded-3xl font-black text-xl"
-                    value={formData.amount}
-                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Deadline</label>
-                  <input 
-                    type="date" required
-                    className="w-full p-6 bg-slate-50 border-none rounded-3xl font-bold"
-                    value={formData.dueDate}
-                    onChange={(e) => setFormData({...formData, dueDate: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-3xl font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all">
-                {editingId ? 'Synchronize Updates' : 'Authorize Invoice'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
       <ToastContainer position="bottom-right" theme="dark" />
     </div>
   );

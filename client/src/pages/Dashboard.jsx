@@ -466,8 +466,8 @@ const Dashboard = () => {
               </div>
             </div>
 
-            {/* Recent Activity Table */}
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden h-100 flex flex-col">
+{/* Recent Activity Table */}
+<div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden h-100 flex flex-col">
   <div className="p-6 border-b border-slate-50 flex items-center gap-2 font-bold text-slate-800 uppercase text-xs tracking-wider shrink-0">
     <ArrowRightLeft size={16} className="text-blue-500" /> Recent Activity
   </div>
@@ -478,6 +478,7 @@ const Dashboard = () => {
         <tr>
           <th className="px-4 lg:px-6 py-4">Date</th>
           <th className="px-4 lg:px-6 py-4">Description</th>
+          <th className="px-4 lg:px-6 py-4">Category</th> {/* NEW COLUMN */}
           <th className="px-4 lg:px-6 py-4">From → To</th>
           <th className="px-4 lg:px-6 py-4 text-right">Amount</th>
         </tr>
@@ -490,24 +491,27 @@ const Dashboard = () => {
                 {new Date(tx.timestamp).toLocaleDateString()}
               </td>
               <td className="px-4 lg:px-6 py-4">
-                <span className="text-xs lg:text-sm font-bold text-slate-700 block truncate">
+                <span className="text-xs lg:text-sm font-bold text-slate-700 block truncate max-w-[150px]">
                   {tx.title}
                 </span>
-                <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase font-black">
-                  {tx.category}
+              </td>
+              {/* Category Column - Now visible as a high-contrast pill */}
+              <td className="px-4 lg:px-6 py-4">
+                <span className="text-[9px] lg:text-[10px] bg-blue-50 text-blue-600 px-2.5 py-1 rounded-lg border border-blue-100 uppercase font-black tracking-tighter whitespace-nowrap">
+                  {tx.category || 'General'} 
                 </span>
               </td>
               <td className="px-4 lg:px-6 py-4 text-[10px] lg:text-xs font-medium text-slate-500 whitespace-nowrap">
-                {tx.fromAccount?.bankName} → {tx.toAccount?.bankName}
+                {tx.fromAccount?.bankName || 'N/A'} → {tx.toAccount?.bankName || 'N/A'}
               </td>
               <td className="px-4 lg:px-6 py-4 text-xs lg:text-sm font-black text-right text-blue-600 whitespace-nowrap">
                 {currencySymbol}{tx.amount?.toLocaleString()}
-              </td>              
+              </td>               
             </tr>
           ))
         ) : (
           <tr>
-            <td colSpan="4" className="px-6 py-8 text-center text-slate-400 text-sm">
+            <td colSpan="5" className="px-6 py-8 text-center text-slate-400 text-sm">
               No recent transactions found.
             </td>
           </tr>
