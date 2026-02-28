@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { X, ArrowRightLeft, Send } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
-
 const TransferModal = ({ isOpen, onClose, accounts, onRefresh }) => {
   const [transferData, setTransferData] = useState({
     fromId: '',
@@ -10,7 +9,6 @@ const TransferModal = ({ isOpen, onClose, accounts, onRefresh }) => {
     amount: '',
     description: ''
   });
-  // Inside TransferModal.jsx
 const sourceAccount = accounts.find(a => a._id === transferData.fromId);
 const isInvalid = !sourceAccount || Number(transferData.amount) > sourceAccount.balance;
   const handleSubmit = async (e) => {
@@ -27,9 +25,7 @@ const isInvalid = !sourceAccount || Number(transferData.amount) > sourceAccount.
       toast.error(err.response?.data?.message || "Transfer failed");
     }
   };
-
   if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-[3rem] w-full max-w-md p-8 shadow-2xl">
@@ -39,7 +35,6 @@ const isInvalid = !sourceAccount || Number(transferData.amount) > sourceAccount.
           </h2>
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full"><X /></button>
         </div>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block">Source Account</label>
@@ -52,13 +47,11 @@ const isInvalid = !sourceAccount || Number(transferData.amount) > sourceAccount.
               {accounts.map(a => <option key={a._id} value={a._id}>{a.bankName} (${a.balance})</option>)}
             </select>
           </div>
-
           <div className="flex justify-center -my-2 relative z-10">
             <div className="bg-white p-2 rounded-full border border-slate-100 shadow-sm text-blue-600">
               <ArrowRightLeft size={20} className="rotate-90" />
             </div>
           </div>
-
           <div>
             <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block">Destination Account</label>
             <select 
@@ -70,7 +63,6 @@ const isInvalid = !sourceAccount || Number(transferData.amount) > sourceAccount.
               {accounts.map(a => <option key={a._id} value={a._id}>{a.bankName}</option>)}
             </select>
           </div>
-
           <div className="pt-4">
             <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block">Amount to Transfer</label>
             <input 
@@ -81,10 +73,6 @@ const isInvalid = !sourceAccount || Number(transferData.amount) > sourceAccount.
               required
             />
           </div>
-
-          {/* <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all mt-4 shadow-xl shadow-blue-100">
-            <Send size={20} /> Execute Transfer
-          </button> */}
 <button disabled={isInvalid} className={`w-full bg-blue-600 text-white py-5 rounded-3xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all mt-4 shadow-xl shadow-blue-100 ${isInvalid ? 'bg-slate-200 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} ...`}>
   {isInvalid ? 'Insufficient Funds' : <><Send size={20} />Execute Transfer</>}
 </button>
@@ -93,5 +81,4 @@ const isInvalid = !sourceAccount || Number(transferData.amount) > sourceAccount.
     </div>
   );
 };
-
 export default TransferModal;

@@ -1,15 +1,13 @@
 @import "tailwindcss";
-
 @theme {
-  --color-brand-light: #3b82f6;
-  --color-brand: #1e40af;
-  --color-brand-dark: #1e3a8a;
-  --color-sidebar: #111827;
-  --color-surface: #f8fafc;
+  --color-brand-light:
+  --color-brand:
+  --color-brand-dark:
+  --color-sidebar:
+  --color-surface:
 }
-
 @layer base {
-  html, body, #root {
+  html, body,
     height: 100%;
     width: 100%;
     margin: 0;
@@ -17,33 +15,24 @@
     display: flex;
     flex-direction: column;
   }
-
   body {
     @apply bg-slate-50 text-slate-900 antialiased;
     font-family: 'Inter', system-ui, sans-serif;
   }
 }
-
-/* Custom Scrollbar - Using standard CSS variables to prevent Tailwind crash */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
 ::-webkit-scrollbar-track {
-  background: #f1f5f9; /* slate-100 */
+  background:
 }
-
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1; /* slate-300 */
+  background:
   border-radius: 10px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6; /* brand-light */
+  background:
 }
-
-/* Fix for the centering issue */
-#root {
   text-align: left;
 }

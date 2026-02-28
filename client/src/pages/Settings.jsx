@@ -5,28 +5,21 @@ import {
   Loader2, Lock, Eye, EyeOff, AlertCircle 
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-
 const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [isGoogleUser, setIsGoogleUser] = useState(false);
-  
-  // Settings Form State
   const [formData, setFormData] = useState({
     businessName: '',
     taxRate: 20,
     currency: 'USD',
     contactEmail: ''
   });
-
-  // Password Form State
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   });
-
-  // Fetch existing settings and user type on load
   useEffect(() => {
     const fetchSettings = async () => {
       try {
@@ -37,7 +30,6 @@ const Settings = () => {
           currency: res.data.currency || 'USD',
           contactEmail: res.data.email || ''
         });
-        // Check if user is a Google Auth user
         setIsGoogleUser(res.data.authMethod === 'google' || !!res.data.googleId);
       } catch (err) {
         console.error("Failed to load settings");
@@ -48,8 +40,6 @@ const Settings = () => {
     };
     fetchSettings();
   }, []);
-
-  // Update General Settings
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -62,19 +52,14 @@ const Settings = () => {
       setLoading(false);
     }
   };
-
-  // Update Password Logic
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       return toast.error("New passwords do not match");
     }
-    
     if (passwordData.newPassword.length < 6) {
       return toast.error("Password must be at least 6 characters");
     }
-
     setLoading(true);
     try {
       await api.put('/accounts/update-password', {
@@ -89,14 +74,12 @@ const Settings = () => {
       setLoading(false);
     }
   };
-
   if (fetching) return (
     <div className="flex flex-col items-center justify-center min-h-screen text-slate-400">
       <Loader2 className="animate-spin mb-2" size={32} />
       <p className="font-bold text-xs uppercase tracking-widest">Syncing Preferences...</p>
     </div>
   );
-
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-3xl mx-auto pb-20">
@@ -104,15 +87,12 @@ const Settings = () => {
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">Settings</h2>
           <p className="text-slate-500">Configure your business identity and security credentials</p>
         </div>
-
-        {/* 1. GENERAL BUSINESS SETTINGS */}
         <form onSubmit={handleSettingsSubmit} className="space-y-6">
           <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
             <div className="flex items-center gap-2 mb-6 text-slate-800">
               <Building2 size={20} className="text-blue-500" />
               <h3 className="font-bold">Business Profile</h3>
             </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Business Name</label>
@@ -135,13 +115,11 @@ const Settings = () => {
               </div>
             </div>
           </div>
-
           <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
             <div className="flex items-center gap-2 mb-6 text-slate-800">
               <Percent size={20} className="text-green-500" />
               <h3 className="font-bold">Tax & Localization</h3>
             </div>
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Default Tax Rate (%)</label>
@@ -167,7 +145,6 @@ const Settings = () => {
               </div>
             </div>
           </div>
-
           <div className="flex justify-end">
             <button 
               type="submit" 
@@ -179,18 +156,13 @@ const Settings = () => {
             </button>
           </div>
         </form>
-
         <hr className="my-10 border-slate-200" />
-
-        {/* 2. SECURITY SECTION (Conditional based on Login Method) */}
         <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
           <div className="flex items-center gap-2 mb-6 text-slate-800">
             <ShieldCheck size={20} className="text-orange-500" />
             <h3 className="font-bold">Security & Authentication</h3>
           </div>
-
           {isGoogleUser ? (
-            /* Google Auth Message */
             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 flex items-start gap-4">
               <div className="p-3 bg-white rounded-xl text-blue-500 shadow-sm">
                 <ShieldCheck size={24} />
@@ -211,7 +183,6 @@ const Settings = () => {
               </div>
             </div>
           ) : (
-            /* Email/Password Form */
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Current Password</label>
@@ -227,7 +198,6 @@ const Settings = () => {
                   />
                 </div>
               </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">New Password</label>
@@ -252,7 +222,6 @@ const Settings = () => {
                   />
                 </div>
               </div>
-
               <div className="flex justify-end pt-2">
                 <button 
                   type="submit" 
@@ -270,5 +239,4 @@ const Settings = () => {
     </div>
   );
 };
-
 export default Settings;

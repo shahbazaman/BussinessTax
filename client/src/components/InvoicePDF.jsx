@@ -1,6 +1,5 @@
 import React from 'react';
 import { Page, Text, View, Document, StyleSheet, Font } from '@react-pdf/renderer';
-
 const styles = StyleSheet.create({
   page: { padding: 40, backgroundColor: '#FFFFFF', fontFamily: 'Helvetica' },
   header: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 },
@@ -18,23 +17,19 @@ const styles = StyleSheet.create({
   totalBox: { width: 150, borderTopWidth: 2, borderColor: '#1e293b', paddingTop: 8 },
   totalText: { fontSize: 16, fontWeight: 'bold', textAlign: 'right' }
 });
-
 const InvoicePDF = ({ data }) => (
   <Document>
     <Page size="A4" style={styles.page}>
-      {/* Header */}
       <View style={styles.header}>
         <View>
           <Text style={styles.brand}>AccountGo</Text>
-          <Text style={styles.status}>Invoice #{data.invoiceNumber}</Text>
+          <Text style={styles.status}>Invoice
         </View>
         <View style={{ textAlign: 'right' }}>
           <Text style={styles.value}>{data.date}</Text>
           <Text style={styles.status}>Due: {data.dueDate}</Text>
         </View>
       </View>
-
-      {/* Addresses */}
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 40 }}>
         <View>
           <Text style={styles.label}>Bill From</Text>
@@ -47,16 +42,12 @@ const InvoicePDF = ({ data }) => (
           <Text style={styles.status}>{data.clientEmail}</Text>
         </View>
       </View>
-
-      {/* Table Header */}
       <View style={[styles.tableRow, styles.tableHeader]}>
         <Text style={[styles.col, { flex: 3 }]}>Description</Text>
         <Text style={styles.col}>Qty</Text>
         <Text style={styles.col}>Price</Text>
         <Text style={[styles.col, styles.colRight]}>Amount</Text>
       </View>
-
-      {/* Items */}
       {data.items.map((item, i) => (
         <View key={i} style={styles.tableRow}>
           <Text style={[styles.col, { flex: 3 }]}>{item.description}</Text>
@@ -67,8 +58,6 @@ const InvoicePDF = ({ data }) => (
           </Text>
         </View>
       ))}
-
-      {/* Totals */}
       <View style={styles.totalSection}>
         <View style={styles.totalBox}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
@@ -84,5 +73,4 @@ const InvoicePDF = ({ data }) => (
     </Page>
   </Document>
 );
-
 export default InvoicePDF;

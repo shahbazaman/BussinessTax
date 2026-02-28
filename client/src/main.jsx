@@ -5,7 +5,6 @@ import './index.css'
 import { AuthProvider } from './context/AuthContext'
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-// Use the createRoot API correctly
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <AuthProvider>

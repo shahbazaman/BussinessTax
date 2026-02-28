@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-
 const invoiceSchema = new mongoose.Schema({
   user: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -25,7 +24,7 @@ const invoiceSchema = new mongoose.Schema({
   invoiceNumber: { 
     type: String, 
     required: true,
-    unique: true // Good practice to prevent duplicate invoice numbers
+    unique: true
   },
   customerName: { type: String, required: true },
   amount: { type: Number, required: true },
@@ -35,21 +34,18 @@ const invoiceSchema = new mongoose.Schema({
     default: 'Pending' 
   },
   dueDate: { type: Date, required: true },
-  
-  // --- NEW FIELDS FOR RAZORPAY & ACCOUNTING ---
   razorpayOrderId: { 
     type: String, 
     unique: true, 
-    sparse: true // Allows multiple 'null' values for unpaid invoices
+    sparse: true
   },
   paidIntoAccount: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Account' // Links to your updated accountRoutes logic
+    ref: 'Account'
   },
   paymentDate: { 
     type: Date 
   }
 }, { timestamps: true });
-
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 export default Invoice;

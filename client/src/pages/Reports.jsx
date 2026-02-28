@@ -5,21 +5,17 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-
 const Reports = () => {
   const [stats, setStats] = useState({ totalIncome: 0, totalExpenses: 0, netProfit: 0 });
   const [taxRate, setTaxRate] = useState(15);
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState('USD');
-
   const income = parseFloat(stats.totalIncome || 0);
   const profit = parseFloat(stats.netProfit || 0);
   const currentTaxRate = parseFloat(taxRate || 0);
   const estimatedTax = profit > 0 ? (profit * (currentTaxRate / 100)) : 0;
-  
   const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
-
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -37,21 +33,17 @@ const Reports = () => {
     };
     fetchStats();
   }, []);
-
-  // Updated to handle PDF-friendly symbols
   const formatValue = (value, usePlain = false) => {
     const symbol = usePlain && currency === 'INR' ? 'Rs.' : currencySymbol;
     return `${symbol}${Number(value || 0).toLocaleString(undefined, {
       minimumFractionDigits: 2, maximumFractionDigits: 2
     })}`;
   };
-
 const handleExportPDF = async () => {
     const loadingToast = toast.loading("Generating High-Resolution PDF...");
     try {
       const element = document.getElementById('report-print-area-standalone');
       if (!element) throw new Error("Template not found");
-      // 1. Create a hidden iframe to "sandbox" the PDF generation
       const iframe = document.createElement('iframe');
       iframe.style.position = 'fixed';
       iframe.style.right = '0';
@@ -62,7 +54,6 @@ const handleExportPDF = async () => {
       iframe.style.visibility = 'hidden';
       document.body.appendChild(iframe);
       const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;      
-      // 2. Inject ONLY the safe HTML and basic styles (No Tailwind 4.0)
       iframeDoc.write(`
         <html>
           <body style="margin:0; padding:0;">
@@ -71,7 +62,6 @@ const handleExportPDF = async () => {
         </html>
       `);
       iframeDoc.close();
-      // 3. Capture the canvas from inside the clean iframe
       const canvas = await html2canvas(iframeDoc.body, { 
         scale: 2, 
         useCORS: true, 
@@ -93,18 +83,14 @@ const handleExportPDF = async () => {
       toast.update(loadingToast, { render: "Export failed: " + err.message, type: "error", isLoading: false, autoClose: 3000 });
     }
   };
-
   if (loading) return (
     <div className="flex justify-center items-center h-screen bg-slate-50">
       <div className="animate-pulse text-slate-400 font-black tracking-widest uppercase">Syncing Fiscal Data...</div>
     </div>
   );
-
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-4xl mx-auto">
-        
-        {/* UI Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
@@ -117,9 +103,7 @@ const handleExportPDF = async () => {
             <Download size={16} /> Export PDF
           </button>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Settings Card */}
           <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Calculator size={20} /></div>
@@ -136,8 +120,6 @@ const handleExportPDF = async () => {
               <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300 text-xl">%</span>
             </div>
           </div>
-
-          {/* Result Card */}
           <div className="bg-slate-900 p-8 rounded-[2rem] shadow-xl text-white relative overflow-hidden flex flex-col justify-center">
             <div className="relative z-10">
               <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mb-1">Estimated Tax Owed</p>
@@ -151,8 +133,6 @@ const handleExportPDF = async () => {
             <PieChart className="absolute -right-6 -bottom-6 text-white/5" size={160} />
           </div>
         </div>
-
-        {/* Detailed Breakdown UI */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
           <div className="p-8 border-b border-slate-50 flex justify-between items-center">
             <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Financial Breakdown</h3>
@@ -169,7 +149,6 @@ const handleExportPDF = async () => {
               </div>
               <span className="text-2xl font-black text-slate-800">{formatValue(stats.totalIncome)}</span>
             </div>
-
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl"><ArrowDownRight size={24} /></div>
@@ -180,7 +159,6 @@ const handleExportPDF = async () => {
               </div>
               <span className="text-2xl font-black text-rose-500">-{formatValue(stats.totalExpenses)}</span>
             </div>
-
             <div className="pt-8 border-t border-dashed border-slate-200 flex items-center justify-between">
               <p className="font-black text-slate-800 uppercase text-sm">Net Taxable Profit</p>
               <span className="text-3xl font-black text-slate-900 tracking-tighter">{formatValue(stats.netProfit)}</span>
@@ -188,10 +166,7 @@ const handleExportPDF = async () => {
           </div>
         </div>
       </div>
-
       <ToastContainer position="bottom-right" theme="colored" />
-
-      {/* --- HIDDEN PDF TEMPLATE (Using PDF-Safe Hex Colors & Fonts) --- */}
       <div style={{ position: 'absolute', left: '-9999px', top: '0' }}>
         <div id="report-print-area-standalone" style={{ 
           width: '800px', 
@@ -206,7 +181,6 @@ const handleExportPDF = async () => {
               Report Generated: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
             </p>
           </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginBottom: '50px' }}>
             <div style={{ padding: '30px', backgroundColor: '#f8fafc', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
               <p style={{ fontSize: '14px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '10px' }}>Gross Revenue</p>
@@ -217,7 +191,6 @@ const handleExportPDF = async () => {
               <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#ef4444', margin: '0' }}>-{formatValue(stats.totalExpenses, true)}</h2>
             </div>
           </div>
-
           <div style={{ padding: '40px', backgroundColor: '#0f172a', borderRadius: '32px', color: '#ffffff', textAlign: 'center' }}>
             <p style={{ fontSize: '14px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '2px' }}>
               Estimated Tax Liability ({taxRate}%)
@@ -230,7 +203,6 @@ const handleExportPDF = async () => {
               Net Taxable Profit: {formatValue(stats.netProfit, true)}
             </p>
           </div>
-
           <div style={{ marginTop: '60px', borderTop: '2px solid #f1f5f9', paddingTop: '30px' }}>
             <h4 style={{ fontSize: '14px', fontWeight: '900', color: '#0f172a', marginBottom: '10px' }}>Disclaimer</h4>
             <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.6' }}>
@@ -244,5 +216,4 @@ const handleExportPDF = async () => {
     </div>
   );
 };
-
 export default Reports;

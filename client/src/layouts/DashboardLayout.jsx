@@ -6,17 +6,14 @@ import {
     Users, 
     Settings, 
     LogOut, 
-    Package,     // New for Inventory
-    PieChart,    // New for Reports
-    Landmark     // New for Accounts
+    Package,    
+    PieChart,   
+    Landmark    
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
 const Sidebar = () => {
     const location = useLocation();
     const { logout } = useAuth();
-    
-    // Added Inventory, Reports, and Accounts to the navigation array
     const navItems = [
         { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
         { icon: FileText, label: 'Invoices', path: '/invoices' },
@@ -27,12 +24,9 @@ const Sidebar = () => {
         { icon: PieChart, label: 'Reports', path: '/reports' },
         { icon: Settings, label: 'Settings', path: '/settings' },
     ];
-
     return (
         <div className="w-64 h-screen bg-slate-900 text-white flex flex-col fixed shadow-2xl z-50">
             <div className="p-6 text-2xl font-black tracking-tight text-blue-400">BussinessTax</div>
-            
-            {/* Navigation Links */}
             <nav className="flex-1 px-4 space-y-2 mt-4 overflow-y-auto">
                 {navItems.map((item) => (
                     <Link 
@@ -49,8 +43,6 @@ const Sidebar = () => {
                     </Link>
                 ))}
             </nav>
-
-            {/* Logout Button */}
             <div className="p-4 border-t border-slate-800">
                 <button 
                     onClick={logout} 
@@ -62,12 +54,10 @@ const Sidebar = () => {
         </div>
     );
 };
-
 export default function DashboardLayout() {
     return (
         <div className="flex bg-slate-50 min-h-screen">
             <Sidebar />
-            {/* Main Content Area */}
             <main className="flex-1 lg:ml-64 p-4 lg:p-8 overflow-y-auto h-screen">
                 <div className="max-w-7xl mx-auto">
                     <Outlet />

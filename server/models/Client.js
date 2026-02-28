@@ -1,7 +1,5 @@
 import mongoose from 'mongoose';
-
 const ClientSchema = new mongoose.Schema({
-  // Standardized to 'user'
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   name: { type: String, required: true },
   email: { type: String, required: true },
@@ -10,5 +8,4 @@ const ClientSchema = new mongoose.Schema({
   businessName: { type: String },
   createdAt: { type: Date, default: Date.now }
 });
-
 export default mongoose.model('Client', ClientSchema);

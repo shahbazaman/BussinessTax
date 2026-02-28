@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
-
 const TransactionSchema = new mongoose.Schema({
-  userId: { //check for userId or user
+  userId: {
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
     required: true 
@@ -34,5 +33,4 @@ const TransactionSchema = new mongoose.Schema({
     default: Date.now 
   }
 });
-
 export default mongoose.model('Transaction', TransactionSchema);

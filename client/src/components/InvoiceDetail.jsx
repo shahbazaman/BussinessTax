@@ -1,22 +1,18 @@
 import { generateInvoicePDF } from '../utils/generatePDF';
 const InvoiceDetail = ({ invoice, onClose }) => {
   if (!invoice) return null;
-
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95">
-        {/* Invoice Header */}
         <div className="p-8 border-b border-slate-100 flex justify-between items-start bg-slate-50">
           <div>
             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">INVOICE</h2>
-            <p className="text-slate-500 mt-1">Ref: #{invoice._id.slice(-6).toUpperCase()}</p>
+            <p className="text-slate-500 mt-1">Ref:
           </div>
           <button 
             onClick={onClose} aria-label="Close invoice"  className="bg-white p-2 rounded-full shadow-sm hover:bg-red-50 hover:text-red-500 transition-all" > <X size={24} />
             </button>
         </div>
-
-        {/* Invoice Body */}
         <div className="p-8 space-y-8">
           <div className="grid grid-cols-2 gap-8">
             <div>
@@ -30,8 +26,6 @@ const InvoiceDetail = ({ invoice, onClose }) => {
               </p>
             </div>
           </div>
-
-          {/* Table */}
           <table className="w-full text-left">
             <thead>
               <tr className="text-slate-400 text-sm border-b border-slate-100">
@@ -50,8 +44,6 @@ const InvoiceDetail = ({ invoice, onClose }) => {
               ))}
             </tbody>
           </table>
-
-          {/* Final Total */}
           <div className="flex justify-end">
             <div className="w-64 space-y-3 bg-slate-50 p-6 rounded-2xl">
               <div className="flex justify-between text-slate-500">
@@ -65,8 +57,6 @@ const InvoiceDetail = ({ invoice, onClose }) => {
             </div>
           </div>
         </div>
-
-        {/* Footer Actions */}
         <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-4">
           <button onClick={() => generateInvoicePDF(invoice)} className="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-all">
             Download PDF</button>

@@ -8,7 +8,6 @@ export const getEmployees = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 export const addEmployee = async (req, res) => {
   const { name, role, dailyRate } = req.body;
   try {
@@ -23,7 +22,6 @@ export const addEmployee = async (req, res) => {
     res.status(400).json({ message: error.message });
   }
 };
-
 export const deleteEmployee = async (req, res) => {
   try {
     const employee = await Employee.findOneAndDelete({ _id: req.params.id, user: req.user.id });
@@ -33,7 +31,6 @@ export const deleteEmployee = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 export const closeMonth = async (req, res) => {
   const employees = await Employee.find({ user: req.user.id });
   const totalPayroll = employees.reduce((sum, emp) => sum + (emp.workingDays * emp.dailyRate), 0);
@@ -51,18 +48,14 @@ export const updateAttendance = async (req, res) => {
   try {
     const employee = await Employee.findById(req.params.id);
     if (!employee) return res.status(404).json({ message: "Employee not found" });
-
     const today = new Date().setHours(0, 0, 0, 0);
     const lastDate = employee.lastAttendanceDate ? new Date(employee.lastAttendanceDate).setHours(0, 0, 0, 0) : null;
-
     if (lastDate === today) {
       return res.status(400).json({ message: "Attendance already marked for today" });
     }
-
     employee.workingDays += 1;
     employee.lastAttendanceDate = new Date();
     await employee.save();
-
     res.json(employee);
   } catch (error) {
     res.status(400).json({ message: "Update failed" });

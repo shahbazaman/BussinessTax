@@ -1,22 +1,17 @@
 import User from '../models/User.js';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
-
 export const registerUser = async (req, res) => {
   try {
     const { name, email, password } = req.body;
-    
     const userExists = await User.findOne({ email });
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
-
     const user = await User.create({ name, email, password });
-
     res.status(201).json({
       _id: user._id,
       name: user.name,
@@ -28,12 +23,10 @@ export const registerUser = async (req, res) => {
     res.status(500).json({ message: "Server Error: " + error.message });
   }
 };
-
 export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
     const user = await User.findOne({ email });
-
     if (user && (await bcrypt.compare(password, user.password))) {
       res.json({
         _id: user._id,
@@ -48,7 +41,6 @@ export const loginUser = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
-
 export const getUserProfile = async (req, res) => {
   const user = await User.findById(req.user._id);
   if (user) {
@@ -64,18 +56,14 @@ export const getUserProfile = async (req, res) => {
     res.status(404).json({ message: 'User not found' });
   }
 };
-
 export const updateUserSettings = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
-
     if (user) {
       user.businessName = req.body.businessName || user.businessName;
       user.currency = req.body.currency || user.currency;
       user.taxRate = req.body.taxRate || user.taxRate;
-
       const updatedUser = await user.save();
-
       res.json({
         _id: updatedUser._id,
         businessName: updatedUser.businessName,
@@ -92,25 +80,19 @@ export const updateUserSettings = async (req, res) => {
 export const googleLogin = async (req, res) => {
   const { name, email, googleId } = req.body;
   try {
-    // Check if user exists by email or googleId
     let user = await User.findOne({ email });
-
     if (user) {
-      user.googleId = googleId; // Update id if they previously used email/pass
+      user.googleId = googleId;
       await user.save();
     } else {
-      // Create new user if they don't exist
       user = await User.create({ name, email, googleId });
     }
-
-    // Generate your usual JWT token here
     const token = generateToken(user._id); 
     res.json({ _id: user._id, name: user.name, email: user.email, token });
   } catch (error) {
     res.status(500).json({ message: "Google auth failed" });
   }
 };
-
 export const updatePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;

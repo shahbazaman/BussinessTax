@@ -1,14 +1,11 @@
 import { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-
 const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const { register } = useContext(AuthContext);
   const navigate = useNavigate();
-
 const [loading, setLoading] = useState(false);
-
 const handleSubmit = async (e) => {
   e.preventDefault();
   setLoading(true);
@@ -22,7 +19,6 @@ const handleSubmit = async (e) => {
     setLoading(false);
   }
 };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-100">
@@ -30,7 +26,6 @@ const handleSubmit = async (e) => {
           <h2 className="text-3xl font-bold text-slate-900">Create Account</h2>
           <p className="text-slate-500 mt-2">Start managing your business tax today.</p>
         </div>
-
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">Full Name</label>
@@ -70,5 +65,4 @@ const handleSubmit = async (e) => {
     </div>
   );
 };
-
 export default Register;
