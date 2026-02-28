@@ -70,4 +70,24 @@ router.get('/', protect, async (req, res) => {
 
 router.delete('/:id', protect, deleteExpense);
 
+router.put('/:id', protect, async (req, res) => {
+  try {
+    const expense = await Expense.findById(req.params.id);
+    if (!expense) return res.status(404).json({ message: 'Expense not found' });
+    if (expense.user.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+    const { title, amount, category, date, receiptUrl } = req.body;
+    expense.title = title || expense.title;
+    expense.amount = amount || expense.amount;
+    expense.category = category || expense.category;
+    expense.date = date || expense.date;
+    expense.receiptUrl = receiptUrl || expense.receiptUrl;
+
+    const updatedExpense = await expense.save();
+    res.json(updatedExpense);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+});
 export default router;

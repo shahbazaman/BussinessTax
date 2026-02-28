@@ -51,7 +51,7 @@ const navigate = useNavigate();
             
             <div className="text-right">
               <p className="text-sm font-black text-rose-600">{item.stock} in stock</p>
-              <p className="text-[10px] text-slate-400 font-bold uppercase">Threshold: {item.threshold}</p>
+              {/* <p className="text-[10px] text-slate-400 font-bold uppercase">Threshold: {item.threshold}</p> */}
             </div>
           </div>
         ))}

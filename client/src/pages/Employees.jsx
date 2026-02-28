@@ -183,7 +183,7 @@ const Employees = () => {
       {/* Responsive Table Wrapper */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto no-scrollbar">
-          <table className="w-full text-left border-collapse min-w-[800px]">
+          <table className="w-full text-left border-collapse min-w-200">
             <thead className="bg-slate-50/80 sticky top-0 backdrop-blur-md z-10">
               <tr className="text-[10px] uppercase font-black text-slate-400">
                 <th className="px-8 py-5">Employee</th>

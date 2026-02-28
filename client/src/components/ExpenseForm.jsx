@@ -10,16 +10,25 @@ const ExpenseForm = ({ onRefresh }) => {
     currency: 'USD',
     date: new Date().toISOString().split('T')[0]
   });
+  
+  // State for custom category
+  const [otherCategory, setOtherCategory] = useState('');
 
   const categories = ['Software', 'Rent', 'Marketing', 'Travel', 'Salaries', 'Utilities', 'Other'];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/expenses', expense); //hi
+      // Logic: If category is 'Other', use the custom input value
+      const finalCategory = expense.category === 'Other' ? otherCategory : expense.category;
+      
+      const payload = { ...expense, category: finalCategory };
+      
+      await api.post('/expenses', payload);
       alert('Expense logged!');
-      onRefresh(); // To update the profit chart on Dashboard
+      onRefresh(); 
       setExpense({ title: '', amount: '', category: 'Software', currency: 'USD', date: new Date().toISOString().split('T')[0] });
+      setOtherCategory(''); // Reset custom input
     } catch (err) {
       console.error(err);
     }
@@ -33,7 +42,7 @@ const ExpenseForm = ({ onRefresh }) => {
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input 
-          placeholder="Expense Title (e.g. AWS Bill)"
+          placeholder="Expense Title"
           className="w-full p-3 bg-slate-50 border-none rounded-xl outline-none focus:ring-2 focus:ring-red-500/20"
           value={expense.title}
           onChange={(e) => setExpense({...expense, title: e.target.value})}
@@ -75,6 +84,19 @@ const ExpenseForm = ({ onRefresh }) => {
           onChange={(e) => setExpense({...expense, date: e.target.value})}
         />
       </div>
+
+      {/* Conditional "Other" Input */}
+      {expense.category === 'Other' && (
+        <div className="animate-in slide-in-from-top-2 duration-200">
+          <input 
+            placeholder="Specify Category Name"
+            className="w-full p-3 bg-red-50/50 border border-red-100 rounded-xl outline-none focus:ring-2 focus:ring-red-500/20 font-semibold"
+            value={otherCategory}
+            onChange={(e) => setOtherCategory(e.target.value)}
+            required
+          />
+        </div>
+      )}
 
       <button className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-all">
         Log Expense

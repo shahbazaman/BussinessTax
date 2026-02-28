@@ -15,10 +15,20 @@ const expenseSchema = new mongoose.Schema({
     type: Number, 
     required: true 
   },
+  // Added: Currency field to store what the user selected (USD, INR, etc.)
+  currency: { 
+    type: String, 
+    default: 'USD' 
+  },
+  // Added: The result of the exchange rate conversion for your charts
+  convertedAmount: { 
+    type: Number 
+  },
   category: { 
     type: String, 
-    enum: ['Rent', 'Software', 'Marketing', 'Travel', 'Supplies', 'Other'],
-    default: 'Other' 
+    // Note: Removed 'enum' to allow custom "Other" categories from the frontend
+    default: 'Other',
+    trim: true
   },
   status: {
     type: String,
@@ -28,7 +38,7 @@ const expenseSchema = new mongoose.Schema({
   receiptUrl: { 
     type: String 
   },
-  expenseDate: { 
+  date: { 
     type: Date, 
     default: Date.now 
   }

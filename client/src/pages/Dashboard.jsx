@@ -490,8 +490,11 @@ const Dashboard = () => {
                 {new Date(tx.timestamp).toLocaleDateString()}
               </td>
               <td className="px-4 lg:px-6 py-4">
-                <span className="text-xs lg:text-sm font-bold text-slate-700 block truncate max-w-30 lg:max-w-none">
-                  {tx.description}
+                <span className="text-xs lg:text-sm font-bold text-slate-700 block truncate">
+                  {tx.title}
+                </span>
+                <span className="text-[9px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full uppercase font-black">
+                  {tx.category}
                 </span>
               </td>
               <td className="px-4 lg:px-6 py-4 text-[10px] lg:text-xs font-medium text-slate-500 whitespace-nowrap">
@@ -499,7 +502,7 @@ const Dashboard = () => {
               </td>
               <td className="px-4 lg:px-6 py-4 text-xs lg:text-sm font-black text-right text-blue-600 whitespace-nowrap">
                 {currencySymbol}{tx.amount?.toLocaleString()}
-              </td>
+              </td>              
             </tr>
           ))
         ) : (
@@ -514,8 +517,6 @@ const Dashboard = () => {
   </div>
 </div>
             {/* Low Stock Widget */}
-            {/* <div className="bg-white rounded-[2.5rem] shadow-sm border border-rose-100 overflow-hidden flex flex-col h-100"> */}
-              {/* Low Stock Widget */}
             <div className="h-100 flex flex-col">
                 <LowStockWidget products={products} />
             </div>

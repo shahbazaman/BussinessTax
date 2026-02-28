@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../utils/api';
-import { Plus, Receipt, Trash2, Tag, X, Calendar, DollarSign } from 'lucide-react';
+import { Plus, Receipt, Trash2, Tag, X, Calendar, Edit2 } from 'lucide-react';
 import { exportToCSV } from '../utils/exportCSV';
+
 const Expenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null); // Added missing error state
+  const [error, setError] = useState(null);
+  const [editingId, setEditingId] = useState(null); // Track which expense is being edited
+
   const [formData, setFormData] = useState({ 
     title: '', 
     amount: '', 
@@ -14,29 +17,45 @@ const Expenses = () => {
     expenseDate: new Date().toISOString().split('T')[0],
     receiptUrl: '' 
   });
+
   const [searchTerm, setSearchTerm] = useState('');
-const [startDate, setStartDate] = useState('');
-const [endDate, setEndDate] = useState('');
-  // 1. Centralized fetch function
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // 1. Fetch Expenses
   const fetchExpenses = async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get('/expenses'); // Uses your axios instance
+      const res = await api.get('/expenses');
       setExpenses(res.data);
     } catch (err) { 
       console.error("Error fetching expenses:", err);
       setError("Failed to load expenses. Please check your connection.");
     } finally {
-      setLoading(false); // This stops the "Loading..." message
+      setLoading(false);
     }
   };
 
-  // 2. Call fetchExpenses on component mount
   useEffect(() => {
     fetchExpenses();
   }, []);
 
+  // 2. Prepare Edit Mode
+  const handleEditClick = (exp) => {
+    setEditingId(exp._id);
+    setFormData({
+      title: exp.title,
+      amount: exp.amount,
+      category: exp.category,
+      // Handle the date conversion for the input field
+      expenseDate: new Date(exp.date || exp.expenseDate).toISOString().split('T')[0],
+      receiptUrl: exp.receiptUrl || ''
+    });
+    setShowModal(true);
+  };
+
+  // 3. Handle Create or Update
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title || !formData.amount) return alert("Please fill in title and amount");
@@ -46,12 +65,18 @@ const [endDate, setEndDate] = useState('');
       const cleanedData = {
         ...formData,
         amount: Number(formData.amount),
-        expenseDate: formData.expenseDate || new Date().toISOString().split('T')[0]
+        // Mapping expenseDate (frontend) to date (backend schema)
+        date: formData.expenseDate 
       };
 
-      await api.post('/expenses', cleanedData);
+      if (editingId) {
+        await api.put(`/expenses/${editingId}`, cleanedData);
+      } else {
+        await api.post('/expenses', cleanedData);
+      }
+
       handleCloseModal(); 
-      fetchExpenses(); // Refresh the list
+      fetchExpenses();
     } catch (err) {
       alert(err.response?.data?.message || "Failed to save");
     } finally {
@@ -72,6 +97,7 @@ const [endDate, setEndDate] = useState('');
 
   const handleCloseModal = () => {
     setShowModal(false);
+    setEditingId(null);
     setFormData({ 
       title: '', 
       amount: '', 
@@ -82,19 +108,19 @@ const [endDate, setEndDate] = useState('');
   };
 
   const filteredExpenses = useMemo(() => {
-  return expenses.filter(exp => {
-    const title = exp.title || "";
-    const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase());
+    return expenses.filter(exp => {
+      const title = exp.title || "";
+      const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const expDate = new Date(exp.expenseDate || exp.createdAt).setHours(0, 0, 0, 0);
-    const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
-    const end = endDate ? new Date(endDate).setHours(0, 0, 0, 0) : null;
+      const expDate = new Date(exp.date || exp.expenseDate || exp.createdAt).setHours(0, 0, 0, 0);
+      const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
+      const end = endDate ? new Date(endDate).setHours(0, 0, 0, 0) : null;
 
-    return matchesSearch && (start ? expDate >= start : true) && (end ? expDate <= end : true);
-  });
-}, [expenses, searchTerm, startDate, endDate]);
+      return matchesSearch && (start ? expDate >= start : true) && (end ? expDate <= end : true);
+    });
+  }, [expenses, searchTerm, startDate, endDate]);
 
-const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+  const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
@@ -102,45 +128,46 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
         
         {/* Header & Stats */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-  <div>
-    <h2 className="text-2xl font-bold text-slate-800">Business Expenses</h2>
-    <p className="text-sm text-slate-500">Total spent this period: 
-      <span className="font-bold text-red-600 ml-1">-${totalSpent.toLocaleString()}</span>
-    </p>
-  </div>
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800">Business Expenses</h2>
+            <p className="text-sm text-slate-500">Total spent this period: 
+              <span className="font-bold text-red-600 ml-1">-${totalSpent.toLocaleString()}</span>
+            </p>
+          </div>
 
-  {/* Button Group */}
-  <div className="flex items-center gap-3">
-    <button 
-      onClick={() => setShowModal(true)} 
-      className="bg-slate-900 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 font-bold text-sm"
-    >
-      <Plus size={18} /> Record Expense
-    </button>
-    
-    <button 
-      onClick={() => exportToCSV(filteredExpenses, 'Expenses')}
-      className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 transition-all font-bold text-sm"
-    >
-      Export CSV
-    </button>
-  </div>
-</div>
-{/* Filter Bar */}
-<div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
-  <input 
-    type="text" placeholder="Search..." 
-    className="flex-1 px-4 py-2 bg-slate-50 rounded-xl outline-none text-sm"
-    value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-  />
-  <div className="flex items-center gap-2">
-    <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-    <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-    {(startDate || endDate || searchTerm) && (
-      <button onClick={() => {setStartDate(''); setEndDate(''); setSearchTerm('');}} className="p-2 text-red-500"><X size={18} /></button>
-    )}
-  </div>
-</div>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={() => setShowModal(true)} 
+              className="bg-slate-900 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 font-bold text-sm"
+            >
+              <Plus size={18} /> Record Expense
+            </button>
+            
+            <button 
+              onClick={() => exportToCSV(filteredExpenses, 'Expenses')}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 transition-all font-bold text-sm"
+            >
+              Export CSV
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Bar */}
+        <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+          <input 
+            type="text" placeholder="Search..." 
+            className="flex-1 px-4 py-2 bg-slate-50 rounded-xl outline-none text-sm"
+            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <div className="flex items-center gap-2">
+            <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            {(startDate || endDate || searchTerm) && (
+              <button onClick={() => {setStartDate(''); setEndDate(''); setSearchTerm('');}} className="p-2 text-red-500"><X size={18} /></button>
+            )}
+          </div>
+        </div>
+
         {/* Expenses List */}
         <div className="grid gap-3">
           {loading ? (
@@ -153,7 +180,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
               <p>{error}</p>
               <button onClick={fetchExpenses} className="mt-4 text-sm font-bold underline">Try Again</button>
             </div>
-          ) : expenses.length > 0 ? (
+          ) : filteredExpenses.length > 0 ? (
             filteredExpenses.map((exp) => (
               <div key={exp._id} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between hover:border-red-100 transition-all group">
                 <div className="flex items-center gap-4">
@@ -167,16 +194,24 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
                         <Tag size={10} /> {exp.category}
                       </span>
                       <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
-                        <Calendar size={10} /> {new Date(exp.expenseDate).toLocaleDateString()}
+                        <Calendar size={10} /> {new Date(exp.date || exp.expenseDate).toLocaleDateString()}
                       </span>
                     </div>
                   </div>
                 </div>
                 
-                <div className="flex items-center gap-4 md:gap-8">
-                  <span className="font-black text-slate-900 md:text-xl">
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-slate-900 md:text-xl mr-4">
                     -${Number(exp.amount).toLocaleString()}
                   </span>
+                  {/* EDIT BUTTON */}
+                  <button 
+                    onClick={() => handleEditClick(exp)}
+                    className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                  >
+                    <Edit2 size={18}/>
+                  </button>
+                  {/* DELETE BUTTON */}
                   <button 
                     onClick={() => handleDelete(exp._id)}
                     className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
@@ -189,18 +224,20 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
           ) : (
             <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center">
               <Receipt size={48} className="mx-auto text-slate-200 mb-4" />
-              <p className="text-slate-500 font-medium">No expenses recorded yet.</p>
+              <p className="text-slate-500 font-medium">No expenses found.</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Modal - Same as yours */}
+      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden">
             <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-800">New Expense</h3>
+              <h3 className="text-xl font-bold text-slate-800">
+                {editingId ? 'Edit Expense' : 'New Expense'}
+              </h3>
               <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
 
@@ -264,7 +301,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={handleCloseModal} className="flex-1 py-3 text-slate-500 font-bold text-sm">Cancel</button>
                 <button type="submit" className="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-red-100 hover:bg-red-600 transition-all">
-                  Save Expense
+                  {editingId ? 'Update Expense' : 'Save Expense'}
                 </button>
               </div>
             </form>

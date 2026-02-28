@@ -5,7 +5,7 @@ import { exportToCSV } from '../utils/exportCSV';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable'; 
+import autoTable from 'jspdf-autotable';
 
 const Invoices = () => {
   const [invoices, setInvoices] = useState([]);
@@ -19,6 +19,7 @@ const Invoices = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [accounts, setAccounts] = useState([]);
+
   const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
 
@@ -30,38 +31,34 @@ const Invoices = () => {
     status: 'Pending'
   });
 
- const fetchData = async () => {
-  setLoading(true);
-  try {
-    const [invRes, clientRes, profileRes, accRes] = await Promise.all([
-      api.get('/invoices'),
-      api.get('/clients'),
-      api.get('/auth/profile'),
-      api.get('/accounts') // Fetching your bank accounts
-    ]);
-    setInvoices(invRes.data);
-    setClients(clientRes.data);
-    setCurrency(profileRes.data.currency || 'USD');
-    setAccounts(accRes.data); // Store accounts in state
-  } catch (err) {
-    toast.error("Cloud synchronization failed");
-  } finally {
-    setLoading(false);
-  }
-};
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const [invRes, clientRes, profileRes, accRes] = await Promise.all([
+        api.get('/invoices'),
+        api.get('/clients'),
+        api.get('/auth/profile'),
+        api.get('/accounts') // Hits your updated accountRoutes.js
+      ]);
+      setInvoices(invRes.data);
+      setClients(clientRes.data);
+      setCurrency(profileRes.data.currency || 'USD');
+      setAccounts(accRes.data);
+    } catch (err) {
+      toast.error("Cloud synchronization failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  // --- UPDATED DATE RANGE FILTERING LOGIC ---
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
       const invDate = new Date(inv.createdAt).getTime();
-      
-      // Normalize Start Date to the beginning of the day
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
-      // Normalize End Date to the very last millisecond of the day
       const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
       
       const clientName = inv.customerName || "";
@@ -81,34 +78,19 @@ const Invoices = () => {
     })}`;
   };
 
-const updateStatus = async (id, newStatus) => {
-  try {
-    // 1. Update the Invoice Status
-    await api.put(`/invoices/${id}/status`, { status: newStatus });
-    // 2. Logic: If status changed to Paid, we record it as actual Income
-    if (newStatus === 'Paid') {
-      const invoice = invoices.find(inv => inv._id === id);      
-      // Optional: If your backend doesn't handle this automatically, 
-      // you can call your transactions/income endpoint here:
-      /*
-      await api.post('/transactions', {
-        type: 'Income',
-        amount: invoice.amount,
-        category: 'Invoice Payment',
-        description: `Payment received for Invoice: ${invoice.customerName}`,
-        date: new Date().toISOString()
-      });
-      */      
-      toast.success(`Payment verified! Income recorded.`);
-    } else {
-      toast.success(`Invoice marked as ${newStatus}`);
+  const updateStatus = async (id, newStatus) => {
+    try {
+      await api.put(`/invoices/${id}/status`, { status: newStatus });
+      if (newStatus === 'Paid') {
+        toast.success(`Payment verified! Income recorded.`);
+      } else {
+        toast.success(`Invoice marked as ${newStatus}`);
+      }
+      fetchData();
+    } catch (err) {
+      toast.error("Failed to update status");
     }
-    fetchData();
-  } catch (err) {
-    toast.error("Failed to update status");
-    console.error(err);
-  }
-};
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -162,100 +144,94 @@ const updateStatus = async (id, newStatus) => {
     setEditingId(null);
     setFormData({ customerName: '', amount: '', dueDate: '', clientId: '', status: 'Pending' });
   };
-const initiatePayment = async (invoice) => {
-  try {
-    // 1. Check if an account exists to receive funds
-    if (accounts.length === 0) {
-      return toast.error("❌ No bank account found. Please add an account in the Dashboard first.");
+
+  const initiatePayment = async (invoice) => {
+    try {
+      if (accounts.length === 0) {
+        return toast.error("❌ No bank account found. Please add an account in the Dashboard first.");
+      }
+
+      const targetAccountId = accounts[0]._id;
+
+      const { data: order } = await api.post('/payments/create-order', {
+        amount: invoice.amount,
+        currency: "INR" 
+      });
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        amount: order.amount,
+        currency: "INR",
+        name: "BusinessTax Ledger",
+        description: `Invoice #${invoice._id.slice(-6)}`,
+        order_id: order.id,
+        handler: async (response) => {
+          try {
+            await api.post('/payments/verify', {
+              ...response,
+              invoiceId: invoice._id,
+              accountId: targetAccountId 
+            });
+            toast.success("Payment verified! Balance updated.");
+            fetchData();
+          } catch (err) {
+            toast.error("Verification failed");
+          }
+        },
+        prefill: {
+          name: invoice.customerName,
+          email: "client@example.com",
+          contact: "9999999999"
+        },
+        theme: { color: "#0f172a" },
+      };
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      toast.error("Could not initiate payment");
     }
-
-    // Use the first account as default
-    const targetAccountId = accounts[0]._id;
-
-    // 2. Create Razorpay Order
-    const { data: order } = await api.post('/payments/create-order', {
-      amount: invoice.amount,
-      currency: "INR"  //currency is orginal i wrote "inr" for testing //hi 
-    });
-console.log("Order Created Successfully:", order.id);
-    const options = {
-    key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-    amount: order.amount, // Still in subunits from backend
-    currency: "INR",      // <--- CHANGE THIS TO "INR" FOR TESTING
-    name: "BusinessTax Ledger",
-    description: `Invoice #${invoice.invoiceNumber}`,
-    order_id: order.id,
-    
-    handler: async (response) => {
-        try {
-          // 3. Verify and pass the accountId to update balance
-          await api.post('/payments/verify', {
-            ...response,
-            invoiceId: invoice._id,
-            accountId: targetAccountId 
-          });
-          toast.success("Payment verified! Balance updated.");
-          fetchData();
-        } catch (err) {
-          toast.error("Verification failed");
-        }
-      },
-      prefill: {
-      name: invoice.customerName,
-      email: "test@example.com",
-      contact: "9999999999" // <--- ADD A DUMMY INDIAN NUMBER
-    },
-    theme: { color: "#0f172a" },
   };
-  const rzp = new window.Razorpay(options);
-  rzp.open();
-} catch (err) {
-    toast.error("Could not initiate payment");
-  }
-};
-const downloadPDF = (invoice) => {
-  try {
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFontSize(22);
-    doc.setTextColor(15, 23, 42);
-    doc.text("INVOICE", 105, 25, { align: "center" });
-    
-    // Details
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`Invoice ID: ${invoice._id.slice(-8).toUpperCase()}`, 15, 45);
-    doc.text(`Issued: ${new Date(invoice.createdAt).toLocaleDateString()}`, 15, 52);
-    doc.text(`Status: ${invoice.status.toUpperCase()}`, 15, 59);
 
-    doc.setFontSize(12);
-    doc.setTextColor(0);
-    doc.text("BILLED TO:", 15, 75);
-    doc.setFont(undefined, 'bold');
-    doc.text(invoice.customerName || "Valued Client", 15, 82);
-    // FIX: Call autoTable(doc, { ... }) instead of doc.autoTable({ ... })
-    autoTable(doc, {
-      startY: 95,
-      head: [['Description', 'Due Date', 'Total Amount']],
-      body: [[
-        `Service/Product Delivery`,
-        new Date(invoice.dueDate).toLocaleDateString(),
-        formatValue(invoice.amount)
-      ]],
-      theme: 'grid',
-      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] }
-    });
-    const finalY = doc.lastAutoTable.finalY + 15;
-    doc.setFontSize(14);
-    doc.text(`Grand Total: ${formatValue(invoice.amount)}`, 140, finalY);    
-    doc.save(`Invoice_${invoice.customerName || 'Record'}.pdf`);
-    toast.success("Invoice downloaded!");
-  } catch (error) {
-    console.error("PDF Error:", error);
-    toast.error("Failed to generate PDF");
-  }
-};
+  const downloadPDF = (invoice) => {
+    try {
+      const doc = new jsPDF();
+      doc.setFontSize(22);
+      doc.setTextColor(15, 23, 42);
+      doc.text("INVOICE", 105, 25, { align: "center" });
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`Invoice ID: ${invoice._id.slice(-8).toUpperCase()}`, 15, 45);
+      doc.text(`Issued: ${new Date(invoice.createdAt).toLocaleDateString()}`, 15, 52);
+      doc.text(`Status: ${invoice.status.toUpperCase()}`, 15, 59);
+
+      doc.setFontSize(12);
+      doc.setTextColor(0);
+      doc.text("BILLED TO:", 15, 75);
+      doc.setFont(undefined, 'bold');
+      doc.text(invoice.customerName || "Valued Client", 15, 82);
+
+      autoTable(doc, {
+        startY: 95,
+        head: [['Description', 'Due Date', 'Total Amount']],
+        body: [[
+          `Service/Product Delivery`,
+          new Date(invoice.dueDate).toLocaleDateString(),
+          formatValue(invoice.amount)
+        ]],
+        theme: 'grid',
+        headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255] }
+      });
+
+      const finalY = doc.lastAutoTable.finalY + 15;
+      doc.setFontSize(14);
+      doc.text(`Grand Total: ${formatValue(invoice.amount)}`, 140, finalY);    
+      doc.save(`Invoice_${invoice.customerName || 'Record'}.pdf`);
+      toast.success("Invoice downloaded!");
+    } catch (error) {
+      toast.error("Failed to generate PDF");
+    }
+  };
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
@@ -276,49 +252,41 @@ const downloadPDF = (invoice) => {
             </button>
           </div>
         </div>
-<div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-  {/* Realized Income */}
-  <div className="bg-emerald-500 p-4 rounded-2xl text-white shadow-sm flex items-center gap-4">
-    <div className="p-2.5 bg-white/20 rounded-xl">
-      <DollarSign size={20} />
-    </div>
-    <div>
-      <p className="text-[9px] font-black uppercase tracking-wider opacity-80 leading-none mb-1">Realized</p>
-      <h4 className="text-xl font-black">
-        {formatValue(filteredInvoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.amount, 0))}
-      </h4>
-    </div>
-  </div>
 
-  {/* Pending Receivables */}
-  <div className="bg-amber-500 p-4 rounded-2xl text-white shadow-sm flex items-center gap-4">
-    <div className="p-2.5 bg-white/20 rounded-xl">
-      <Calendar size={20} />
-    </div>
-    <div>
-      <p className="text-[9px] font-black uppercase tracking-wider opacity-80 leading-none mb-1">Pending</p>
-      <h4 className="text-xl font-black">
-        {formatValue(filteredInvoices.filter(i => i.status === 'Pending').reduce((sum, i) => sum + i.amount, 0))}
-      </h4>
-    </div>
-  </div>
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="bg-emerald-500 p-4 rounded-2xl text-white shadow-sm flex items-center gap-4">
+            <div className="p-2.5 bg-white/20 rounded-xl"><DollarSign size={20} /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider opacity-80 leading-none mb-1">Realized</p>
+              <h4 className="text-xl font-black">
+                {formatValue(filteredInvoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + i.amount, 0))}
+              </h4>
+            </div>
+          </div>
 
-  {/* Active Count */}
-  <div className="bg-slate-900 p-4 rounded-2xl text-white shadow-sm flex items-center gap-4">
-    <div className="p-2.5 bg-slate-800 rounded-xl">
-      <FileText size={20} />
-    </div>
-    <div>
-      <p className="text-[9px] font-black uppercase tracking-wider opacity-80 leading-none mb-1">Invoices</p>
-      <h4 className="text-xl font-black">{filteredInvoices.length} <span className="text-[10px] font-normal opacity-60">Total</span></h4>
-    </div>
-  </div>
-</div>
-        {/* Filters Bar with Date Range */}
+          <div className="bg-amber-500 p-4 rounded-2xl text-white shadow-sm flex items-center gap-4">
+            <div className="p-2.5 bg-white/20 rounded-xl"><Calendar size={20} /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider opacity-80 leading-none mb-1">Pending</p>
+              <h4 className="text-xl font-black">
+                {formatValue(filteredInvoices.filter(i => i.status === 'Pending').reduce((sum, i) => sum + i.amount, 0))}
+              </h4>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 p-4 rounded-2xl text-white shadow-sm flex items-center gap-4">
+            <div className="p-2.5 bg-slate-800 rounded-xl"><FileText size={20} /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase tracking-wider opacity-80 leading-none mb-1">Invoices</p>
+              <h4 className="text-xl font-black">{filteredInvoices.length} <span className="text-[10px] font-normal opacity-60">Total</span></h4>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters Bar */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-            
-            {/* Search */}
             <div className="lg:col-span-4 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
               <input 
@@ -330,7 +298,6 @@ const downloadPDF = (invoice) => {
               />
             </div>
             
-            {/* Status */}
             <div className="lg:col-span-2 relative">
               <select 
                 className="w-full px-4 py-4 bg-slate-50 border-none rounded-2xl outline-none font-black text-[10px] uppercase tracking-widest text-slate-600 appearance-none cursor-pointer"
@@ -344,7 +311,6 @@ const downloadPDF = (invoice) => {
               </select>
             </div>
 
-            {/* Date Range Group */}
             <div className="lg:col-span-6 flex items-center gap-2 bg-slate-900 p-2 rounded-2xl">
               <div className="flex-1 flex items-center gap-2 px-3">
                 <span className="text-[9px] font-black text-blue-400 uppercase">From</span>
@@ -355,9 +321,7 @@ const downloadPDF = (invoice) => {
                   onChange={(e) => setStartDate(e.target.value)}
                 />
               </div>
-              
               <ArrowRight size={14} className="text-slate-600" />
-
               <div className="flex-1 flex items-center gap-2 px-3">
                 <span className="text-[9px] font-black text-blue-400 uppercase">To</span>
                 <input 
@@ -367,7 +331,6 @@ const downloadPDF = (invoice) => {
                   onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
-
               {(startDate || endDate) && (
                 <button 
                   onClick={() => { setStartDate(''); setEndDate(''); }}
@@ -380,7 +343,7 @@ const downloadPDF = (invoice) => {
           </div>
         </div>
 
-        {/* Content Area */}
+        {/* Table Content */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-300">
             <Loader2 className="animate-spin mb-4" size={48} />
@@ -423,11 +386,11 @@ const downloadPDF = (invoice) => {
                         <td className="px-8 py-6 text-sm font-bold text-slate-500">
                           {new Date(inv.dueDate).toLocaleDateString()}
                         </td>
-                        <td className="px-8 py-6">
+                        <td className="px-8 py-6 text-right">
                           <div className="flex justify-end gap-2">
                             {inv.status === 'Pending' && (
                               <button 
-                                onClick={() => initiatePayment(inv)} // ADD THIS LINE
+                                onClick={() => initiatePayment(inv)}
                                 className="p-3 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
                                 title="Pay Now"
                               >
@@ -446,7 +409,7 @@ const downloadPDF = (invoice) => {
                       <td colSpan="5" className="px-8 py-20 text-center">
                         <div className="flex flex-col items-center opacity-20">
                           <FileText size={64} className="mb-4" />
-                          <p className="font-black uppercase tracking-widest text-xs">No records found for this range</p>
+                          <p className="font-black uppercase tracking-widest text-xs">No records found</p>
                         </div>
                       </td>
                     </tr>
@@ -458,7 +421,7 @@ const downloadPDF = (invoice) => {
         )}
       </div>
 
-      {/* Unified Modal */}
+      {/* Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[3.5rem] w-full max-w-xl shadow-2xl overflow-hidden p-10 animate-in zoom-in duration-300">
