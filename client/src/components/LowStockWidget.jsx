@@ -28,7 +28,7 @@ const navigate = useNavigate();
 }
 
   return (
-    <div className="bg-white rounded-[2.5rem] border border-rose-100 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-[2.5rem] border border-rose-100 shadow-sm overflow-hidden w-full h-full flex flex-col">
       <div className="p-6 bg-rose-50/50 border-b border-rose-100 flex items-center justify-between">
         <div className="flex items-center gap-3 text-rose-600">
           <AlertTriangle size={20} />

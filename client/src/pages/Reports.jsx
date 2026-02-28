@@ -46,32 +46,51 @@ const Reports = () => {
     })}`;
   };
 
-  const handleExportPDF = async () => {
+const handleExportPDF = async () => {
     const loadingToast = toast.loading("Generating High-Resolution PDF...");
     try {
       const element = document.getElementById('report-print-area-standalone');
       if (!element) throw new Error("Template not found");
-      
-      const canvas = await html2canvas(element, { 
-        scale: 3, 
+      // 1. Create a hidden iframe to "sandbox" the PDF generation
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '850px';
+      iframe.style.height = '1100px';
+      iframe.style.border = '0';
+      iframe.style.visibility = 'hidden';
+      document.body.appendChild(iframe);
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;      
+      // 2. Inject ONLY the safe HTML and basic styles (No Tailwind 4.0)
+      iframeDoc.write(`
+        <html>
+          <body style="margin:0; padding:0;">
+            ${element.innerHTML}
+          </body>
+        </html>
+      `);
+      iframeDoc.close();
+      // 3. Capture the canvas from inside the clean iframe
+      const canvas = await html2canvas(iframeDoc.body, { 
+        scale: 2, 
         useCORS: true, 
-        logging: false, 
         backgroundColor: "#ffffff",
-        windowWidth: 800
+        width: 800,
+        height: 1000,
+        logging: false
       });
-
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      
+      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;      
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Tax-Report-${new Date().toISOString().split('T')[0]}.pdf`);
-      
+      document.body.removeChild(iframe);      
       toast.update(loadingToast, { render: "Report Exported!", type: "success", isLoading: false, autoClose: 3000 });
     } catch (err) {
-      console.error("PDF Error:", err);
-      toast.update(loadingToast, { render: "Export failed. Check console.", type: "error", isLoading: false, autoClose: 3000 });
+      console.error("PDF Sandbox Error:", err);
+      toast.update(loadingToast, { render: "Export failed: " + err.message, type: "error", isLoading: false, autoClose: 3000 });
     }
   };
 

@@ -512,10 +512,10 @@ const Dashboard = () => {
             </div>
 
             {/* Low Stock Widget */}
-            <div className="bg-white rounded-[2.5rem] shadow-sm border border-rose-100 overflow-hidden flex flex-col h-100">
-              <div className="space-y-8 h-full">
+            {/* <div className="bg-white rounded-[2.5rem] shadow-sm border border-rose-100 overflow-hidden flex flex-col h-100"> */}
+              {/* Low Stock Widget */}
+            <div className="h-100 flex flex-col">
                 <LowStockWidget products={products} />
-              </div>
             </div>
           </div>
 

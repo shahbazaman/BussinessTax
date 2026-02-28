@@ -68,7 +68,7 @@ export default function DashboardLayout() {
         <div className="flex bg-slate-50 min-h-screen">
             <Sidebar />
             {/* Main Content Area */}
-            <main className="ml-64 flex-1 p-4 lg:p-8 overflow-y-auto h-screen">
+            <main className="flex-1 lg:ml-64 p-4 lg:p-8 overflow-y-auto h-screen">
                 <div className="max-w-7xl mx-auto">
                     <Outlet />
                 </div>
