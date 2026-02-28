@@ -7,6 +7,7 @@ import { exportToCSV } from '../utils/exportCSV';
 const Employees = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false); // New: Prevents double-clicks
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
@@ -42,11 +43,14 @@ const Employees = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // Ensure dailyRate is a number
+      const payload = { ...formData, dailyRate: Number(formData.dailyRate) };
+      
       if (isEditing) {
-        await api.put(`/employees/${currentId}`, formData);
+        await api.put(`/employees/${currentId}`, payload);
         toast.success("Employee updated!");
       } else {
-        await api.post('/employees', formData);
+        await api.post('/employees', payload);
         toast.success("Employee onboarded!");
       }
       closeModal();
@@ -94,17 +98,20 @@ const Employees = () => {
   };
 
   const handleCloseMonth = async () => {
-    if (!window.confirm("Reset all working days to zero?")) return;
+    if (!window.confirm("This will reset all working days and record payroll in accounts. Proceed?")) return;
     try {
+      setProcessing(true);
       const { data } = await api.post('/employees/close-month'); 
       toast.success(data.message);
       fetchData(); 
     } catch (err) {
       toast.error(err.response?.data?.message || "Error closing month");
+    } finally {
+      setProcessing(false);
     }
   };
 
-  const totalPayroll = employees.reduce((acc, emp) => acc + (emp.dailyRate * emp.workingDays), 0);
+  const totalPayroll = employees.reduce((acc, emp) => acc + (Number(emp.dailyRate) * Number(emp.workingDays)), 0);
 
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40}/></div>;
 
@@ -131,9 +138,10 @@ const Employees = () => {
 
         <button 
           onClick={handleCloseMonth} 
-          className="bg-white text-rose-600 border border-rose-100 py-4 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-rose-50 transition-all shadow-sm"
+          disabled={processing}
+          className="bg-white text-rose-600 border border-rose-100 py-4 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-rose-50 transition-all shadow-sm disabled:opacity-50"
         >
-          <CalendarCheck size={18} /> Close Month
+          {processing ? <Loader2 className="animate-spin" size={18} /> : <CalendarCheck size={18} />} Close Month
         </button>
 
         <button 
@@ -175,7 +183,7 @@ const Employees = () => {
       {/* Responsive Table Wrapper */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="overflow-x-auto no-scrollbar">
-          <table className="w-full text-left border-collapse min-w-200">
+          <table className="w-full text-left border-collapse min-w-[800px]">
             <thead className="bg-slate-50/80 sticky top-0 backdrop-blur-md z-10">
               <tr className="text-[10px] uppercase font-black text-slate-400">
                 <th className="px-8 py-5">Employee</th>
@@ -194,11 +202,11 @@ const Employees = () => {
                       {emp.role}
                     </span>
                   </td>
-                  <td className="px-8 py-5 font-mono text-sm font-bold text-slate-600">${emp.dailyRate}</td>
+                  <td className="px-8 py-5 font-mono text-sm font-bold text-slate-600">${Number(emp.dailyRate).toLocaleString()}</td>
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-3">
                       <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-black">{emp.workingDays} Days</span>
-                      <span className="font-black text-slate-800">${(emp.dailyRate * emp.workingDays).toLocaleString()}</span>
+                      <span className="font-black text-slate-800">${(Number(emp.dailyRate) * emp.workingDays).toLocaleString()}</span>
                     </div>
                   </td>
                   <td className="px-8 py-5">

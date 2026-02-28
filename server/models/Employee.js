@@ -9,11 +9,14 @@ const employeeSchema = new mongoose.Schema({
   status: { type: String, enum: ['Active', 'On Leave', 'Terminated'], default: 'Active' },
   joinDate: { type: Date, default: Date.now },
   lastAttendanceDate: { type: Date, default: null}
-}, { timestamps: true });
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
+
 employeeSchema.virtual('totalSalary').get(function() {
   return this.dailyRate * this.workingDays;
 });
-
-employeeSchema.set('toJSON', { virtuals: true });
 
 export default mongoose.model('Employee', employeeSchema);

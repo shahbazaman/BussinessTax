@@ -13,13 +13,10 @@ import {
 router.route('/')
   .get(protect, getEmployees)
   .post(protect, addEmployee);
-
 router.post('/close-month', protect, closeMonth);
-
 router.route('/:id')
   .put(protect, updateEmployee) 
   .delete(protect, deleteEmployee);
-
 router.put('/:id/attendance', protect, updateAttendance);
 
 export default router;
