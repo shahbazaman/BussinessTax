@@ -179,13 +179,13 @@ const initiatePayment = async (invoice) => {
     });
 
     const options = {
-      key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-      amount: order.amount,
-      currency: order.currency,
-      name: "BusinessTax Ledger",
-      description: `Invoice #${invoice._id.slice(-6).toUpperCase()}`,
-      order_id: order.id,
-      handler: async (response) => {
+    key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+    amount: order.amount, // Still in subunits from backend
+    currency: "INR",      // <--- CHANGE THIS TO "INR" FOR TESTING
+    name: "BusinessTax Ledger",
+    description: `Invoice #${invoice.invoiceNumber}`,
+    order_id: order.id,
+    handler: async (response) => {
         try {
           // 3. Verify and pass the accountId to update balance
           await api.post('/payments/verify', {
@@ -199,13 +199,16 @@ const initiatePayment = async (invoice) => {
           toast.error("Verification failed");
         }
       },
-      prefill: { name: invoice.customerName },
-      theme: { color: "#0f172a" },
-    };
-
-    const rzp = new window.Razorpay(options);
-    rzp.open();
-  } catch (err) {
+      prefill: {
+      name: invoice.customerName,
+      email: "test@example.com",
+      contact: "9999999999" // <--- ADD A DUMMY INDIAN NUMBER
+    },
+    theme: { color: "#0f172a" },
+  };
+  const rzp = new window.Razorpay(options);
+  rzp.open();
+} catch (err) {
     toast.error("Could not initiate payment");
   }
 };
