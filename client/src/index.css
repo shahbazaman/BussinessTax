@@ -1,38 +1,75 @@
 @import "tailwindcss";
-@theme {
-  --color-brand-light:
-  --color-brand:
-  --color-brand-dark:
-  --color-sidebar:
-  --color-surface:
+
+/* Using :root instead of @theme to stop "Unknown at-rule" warnings */
+:root {
+  --color-brand-light: #f0fdf4;
+  --color-brand: #16a34a;
+  --color-brand-dark: #15803d;
+  --color-sidebar: #ffffff;
+  --color-surface: #f8fafc;
 }
+
 @layer base {
-  html, body,
+  html, body {
     height: 100%;
     width: 100%;
     margin: 0;
     padding: 0;
-    display: flex;
-    flex-direction: column;
   }
+
   body {
-    @apply bg-slate-50 text-slate-900 antialiased;
+    /* Use the variable with a standard CSS property */
+    background-color: var(--color-surface);
+    color: #0f172a; 
     font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Centering Fix for #root */
+  #root {
+    width: 100%;
+    min-height: 100%;
+    display: block; 
   }
 }
+
+/* --- Cross-Browser Scrollbar Logic --- */
+
+/* Standard properties wrapped in @supports to prevent parser errors */
+@supports (scrollbar-width: thin) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+}
+
+/* Webkit properties for Chrome/Safari */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
+
 ::-webkit-scrollbar-track {
-  background:
+  background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
-  background:
+  background-color: #cbd5e1;
   border-radius: 10px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
-  background:
+  background-color: #94a3b8;
 }
-  text-align: left;
+
+@layer utilities {
+  .no-scrollbar {
+    -ms-overflow-style: none; /* IE/Edge */
+    scrollbar-width: none;    /* Firefox */
+  }
+  
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
 }
