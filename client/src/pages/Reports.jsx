@@ -104,7 +104,7 @@ const handleExportPDF = async () => {
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-slate-100">
+          <div className="bg-white p-6 rounded-4xl shadow-sm border border-slate-100">
             <div className="flex items-center gap-3 mb-6">
               <div className="p-2 bg-blue-50 text-blue-600 rounded-xl"><Calculator size={20} /></div>
               <h3 className="font-bold text-slate-700">Tax Settings</h3>
@@ -120,7 +120,7 @@ const handleExportPDF = async () => {
               <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-slate-300 text-xl">%</span>
             </div>
           </div>
-          <div className="bg-slate-900 p-8 rounded-[2rem] shadow-xl text-white relative overflow-hidden flex flex-col justify-center">
+          <div className="bg-slate-900 rounded-2xl p-8 shadow-xl text-white relative overflow-hidden flex flex-col justify-center">
             <div className="relative z-10">
               <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest mb-1">Estimated Tax Owed</p>
               <h3 className="text-5xl font-black text-green-400 tracking-tighter">
