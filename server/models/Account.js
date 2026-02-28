@@ -22,8 +22,7 @@ const AccountSchema = new mongoose.Schema({
     default: 'Checking'
   },
   accountNumber: { 
-    type: String,
-    unique: true, 
+    type: String, 
     sparse: true 
   },
   createdAt: { 
@@ -31,6 +30,5 @@ const AccountSchema = new mongoose.Schema({
     default: Date.now 
   }
 });
-AccountSchema.index({ userId: 1 });
-
+AccountSchema.index({ userId: 1, accountNumber: 1 }, { unique: true });
 export default mongoose.model('Account', AccountSchema);

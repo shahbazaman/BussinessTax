@@ -175,9 +175,9 @@ const initiatePayment = async (invoice) => {
     // 2. Create Razorpay Order
     const { data: order } = await api.post('/payments/create-order', {
       amount: invoice.amount,
-      currency: currency 
+      currency: "INR"  //currency is orginal i wrote "inr" for testing //hi 
     });
-
+console.log("Order Created Successfully:", order.id);
     const options = {
     key: import.meta.env.VITE_RAZORPAY_KEY_ID,
     amount: order.amount, // Still in subunits from backend
@@ -185,6 +185,7 @@ const initiatePayment = async (invoice) => {
     name: "BusinessTax Ledger",
     description: `Invoice #${invoice.invoiceNumber}`,
     order_id: order.id,
+    
     handler: async (response) => {
         try {
           // 3. Verify and pass the accountId to update balance

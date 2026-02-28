@@ -16,6 +16,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import InvoiceModal from '../components/InvoiceModal';
 import LowStockWidget from '../components/LowStockWidget';
+import { useNavigate } from 'react-router-dom';
 
 // ---------------------------------------------------------------------------
 // StatCard
@@ -45,7 +46,7 @@ const Dashboard = () => {
   const [clients, setClients]               = useState([]);
   const [transactions, setTransactions]     = useState([]);
   const [products, setProducts]             = useState([]);
-
+  const navigate = useNavigate();
   // Modal visibility
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showClientModal, setShowClientModal]     = useState(false);
@@ -366,7 +367,7 @@ const Dashboard = () => {
                   <Landmark size={16} className="text-blue-500" /> Liquidity Accounts
                 </div>
                 <button
-                  onClick={() => setShowAccountModal(true)}
+                  onClick={() => navigate('/accounts')}
                   className="bg-blue-50 text-blue-600 p-1.5 rounded-lg hover:bg-blue-100 transition-all active:scale-95"
                   title="Add New Account"
                 >
@@ -512,7 +513,7 @@ const Dashboard = () => {
 
             {/* Low Stock Widget */}
             <div className="bg-white rounded-[2.5rem] shadow-sm border border-rose-100 overflow-hidden flex flex-col h-100">
-              <div className="space-y-8">
+              <div className="space-y-8 h-full">
                 <LowStockWidget products={products} />
               </div>
             </div>

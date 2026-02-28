@@ -21,22 +21,30 @@ router.get('/', protect, async (req, res) => {
 router.post('/', protect, async (req, res) => {
   try {
     const { bankName, balance, accountType, accountNumber } = req.body;
-    
-    // Check if account number already exists for this user to avoid duplicates
+    // 1. Validation check
+    if (!bankName || !accountType) {
+      return res.status(400).json({ message: "Bank Name and Account Type are required" });
+    }
+    // 2. Check duplicate for THIS user specifically
     const existing = await Account.findOne({ accountNumber, userId: req.user._id });
-    if (existing) return res.status(400).json({ message: "Account number already exists" });
-
+    if (existing && accountNumber) {
+      return res.status(400).json({ message: "You have already added this account number" });
+    }
     const newAccount = new Account({
       userId: req.user._id,
-      bankName,
+      bankName: bankName.trim(),
       balance: parseFloat(balance) || 0,
-      accountType,
+      accountType, // Ensure this matches ['Checking', 'Savings', 'Wallet']
       accountNumber
-    });
-    
+    });    
     await newAccount.save();
     res.status(201).json(newAccount);
   } catch (err) {
+    console.error("Account Add Error:", err);
+    // If it's a mongo duplicate error not caught by our check
+    if (err.code === 11000) {
+       return res.status(400).json({ message: "Account number must be unique" });
+    }
     res.status(400).json({ message: err.message });
   }
 });

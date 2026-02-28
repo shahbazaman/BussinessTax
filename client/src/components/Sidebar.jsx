@@ -58,7 +58,7 @@ const Sidebar = () => {
         <div className={`h-20 hidden lg:flex items-center border-b border-slate-50 px-4 ${isCollapsed ? 'justify-center' : 'justify-between'}`}>
           {!isCollapsed && (
             <span className="text-xl font-bold italic tracking-tight text-slate-800 uppercase">
-              Account<span className="text-green-500">Go</span>
+              BUSSINESS<span className="text-green-500">TAX</span>
             </span>
           )}
           <button onClick={() => setIsCollapsed(!isCollapsed)} className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400">
