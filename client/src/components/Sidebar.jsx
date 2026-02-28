@@ -108,7 +108,7 @@ const Sidebar = () => {
             </div>
             {!isCollapsed && (
               <div className="min-w-0 leading-tight">
-                <p className="text-xs font-bold text-slate-900 truncate">{user?.name || 'tester bussiness tax'}</p>
+                <p className="text-xs font-bold text-slate-900 truncate">{user?.name || 'USER'}</p>
                 <p className="text-[9px] text-slate-400 uppercase tracking-tighter">Premium Account</p>
               </div>
             )}
