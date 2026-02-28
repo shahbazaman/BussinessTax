@@ -6,11 +6,12 @@ import {
     Users, 
     Settings, 
     LogOut, 
-    Package,    
-    PieChart,   
-    Landmark    
+    Package,     
+    PieChart,    
+    Landmark     
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
 const Sidebar = () => {
     const location = useLocation();
     const { logout } = useAuth();
@@ -24,6 +25,7 @@ const Sidebar = () => {
         { icon: PieChart, label: 'Reports', path: '/reports' },
         { icon: Settings, label: 'Settings', path: '/settings' },
     ];
+
     return (
         <div className="w-64 h-screen bg-slate-900 text-white flex flex-col fixed shadow-2xl z-50">
             <div className="p-6 text-2xl font-black tracking-tight text-blue-400">BussinessTax</div>

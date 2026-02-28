@@ -1,6 +1,7 @@
 import React from 'react';
 import { AlertTriangle, PackagePlus, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+
 const LowStockWidget = ({ products }) => {
   const lowStockItems = products?.flatMap(product => 
     product.variants?.filter(v => {
@@ -13,6 +14,7 @@ const LowStockWidget = ({ products }) => {
     }))
   ) || [];
 const navigate = useNavigate();
+  // CHANGE: Instead of return null, show a success state
  if (lowStockItems.length === 0) {
   return (
     <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 text-center shadow-sm">
@@ -24,6 +26,7 @@ const navigate = useNavigate();
     </div>
   );
 }
+
   return (
     <div className="bg-white rounded-[2.5rem] border border-rose-100 shadow-sm overflow-hidden w-full h-full flex flex-col">
       <div className="p-6 bg-rose-50/50 border-b border-rose-100 flex items-center justify-between">
@@ -35,6 +38,7 @@ const navigate = useNavigate();
           {lowStockItems.length} CRITICAL
         </span>
       </div>
+
       <div className="divide-y divide-slate-50 max-h-75 overflow-y-auto">
         {lowStockItems.map((item, idx) => (
           <div key={idx} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
@@ -44,6 +48,7 @@ const navigate = useNavigate();
                 Variant: {item.name} • SKU: {item.sku}
               </p>
             </div>
+            
             <div className="text-right">
               <p className="text-sm font-black text-rose-600">{item.stock} in stock</p>
               <p className="text-[10px] text-slate-400 font-bold uppercase">Threshold: {item.threshold}</p>
@@ -51,6 +56,7 @@ const navigate = useNavigate();
           </div>
         ))}
       </div>
+
       <div className="p-4 bg-slate-50">
         <button onClick={() => navigate('/inventory')} className="w-full bg-white border border-slate-200 py-3 rounded-2xl text-xs font-black text-slate-600 hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all flex items-center justify-center gap-2">
           <PackagePlus size={14} /> Create Purchase Order <ArrowRight size={14} />
@@ -59,4 +65,5 @@ const navigate = useNavigate();
     </div>
   );
 };
+
 export default LowStockWidget;  

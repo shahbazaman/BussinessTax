@@ -6,7 +6,7 @@ const Expenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null); // Added missing error state
   const [formData, setFormData] = useState({ 
     title: '', 
     amount: '', 
@@ -17,25 +17,30 @@ const Expenses = () => {
   const [searchTerm, setSearchTerm] = useState('');
 const [startDate, setStartDate] = useState('');
 const [endDate, setEndDate] = useState('');
+  // 1. Centralized fetch function
   const fetchExpenses = async () => {
     try {
       setLoading(true);
       setError(null);
-      const res = await api.get('/expenses');
+      const res = await api.get('/expenses'); // Uses your axios instance
       setExpenses(res.data);
     } catch (err) { 
       console.error("Error fetching expenses:", err);
       setError("Failed to load expenses. Please check your connection.");
     } finally {
-      setLoading(false);
+      setLoading(false); // This stops the "Loading..." message
     }
   };
+
+  // 2. Call fetchExpenses on component mount
   useEffect(() => {
     fetchExpenses();
   }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.title || !formData.amount) return alert("Please fill in title and amount");
+
     setLoading(true);
     try {
       const cleanedData = {
@@ -43,15 +48,17 @@ const [endDate, setEndDate] = useState('');
         amount: Number(formData.amount),
         expenseDate: formData.expenseDate || new Date().toISOString().split('T')[0]
       };
+
       await api.post('/expenses', cleanedData);
       handleCloseModal(); 
-      fetchExpenses();
+      fetchExpenses(); // Refresh the list
     } catch (err) {
       alert(err.response?.data?.message || "Failed to save");
     } finally {
       setLoading(false);
     }
   };
+
   const handleDelete = async (id) => {
     if (window.confirm("Delete this expense record?")) {
       try {
@@ -62,6 +69,7 @@ const [endDate, setEndDate] = useState('');
       }
     }
   };
+
   const handleCloseModal = () => {
     setShowModal(false);
     setFormData({ 
@@ -72,20 +80,27 @@ const [endDate, setEndDate] = useState('');
       receiptUrl: '' 
     });
   };
+
   const filteredExpenses = useMemo(() => {
   return expenses.filter(exp => {
     const title = exp.title || "";
     const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase());
+
     const expDate = new Date(exp.expenseDate || exp.createdAt).setHours(0, 0, 0, 0);
     const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
     const end = endDate ? new Date(endDate).setHours(0, 0, 0, 0) : null;
+
     return matchesSearch && (start ? expDate >= start : true) && (end ? expDate <= end : true);
   });
 }, [expenses, searchTerm, startDate, endDate]);
+
 const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-5xl mx-auto">
+        
+        {/* Header & Stats */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
   <div>
     <h2 className="text-2xl font-bold text-slate-800">Business Expenses</h2>
@@ -93,6 +108,8 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
       <span className="font-bold text-red-600 ml-1">-${totalSpent.toLocaleString()}</span>
     </p>
   </div>
+
+  {/* Button Group */}
   <div className="flex items-center gap-3">
     <button 
       onClick={() => setShowModal(true)} 
@@ -100,6 +117,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
     >
       <Plus size={18} /> Record Expense
     </button>
+    
     <button 
       onClick={() => exportToCSV(filteredExpenses, 'Expenses')}
       className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 transition-all font-bold text-sm"
@@ -108,6 +126,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
     </button>
   </div>
 </div>
+{/* Filter Bar */}
 <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
   <input 
     type="text" placeholder="Search..." 
@@ -122,6 +141,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
     )}
   </div>
 </div>
+        {/* Expenses List */}
         <div className="grid gap-3">
           {loading ? (
             <div className="text-center py-20 text-slate-400">
@@ -152,6 +172,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
                     </div>
                   </div>
                 </div>
+                
                 <div className="flex items-center gap-4 md:gap-8">
                   <span className="font-black text-slate-900 md:text-xl">
                     -${Number(exp.amount).toLocaleString()}
@@ -173,6 +194,8 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
           )}
         </div>
       </div>
+
+      {/* Modal - Same as yours */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden">
@@ -180,6 +203,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
               <h3 className="text-xl font-bold text-slate-800">New Expense</h3>
               <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
+
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Expense Title</label>
@@ -190,6 +214,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
                   onChange={(e) => setFormData({...formData, title: e.target.value})} 
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Amount ($)</label>
@@ -215,6 +240,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
                   </select>
                 </div>
               </div>
+
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Date</label>
                 <input 
@@ -224,6 +250,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
                   onChange={(e) => setFormData({...formData, expenseDate: e.target.value})} 
                 />
               </div>
+
               <div>
                 <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Receipt URL (Optional)</label>
                 <input 
@@ -233,6 +260,7 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
                   onChange={(e) => setFormData({...formData, receiptUrl: e.target.value})} 
                 />
               </div>
+
               <div className="flex gap-3 pt-4">
                 <button type="button" onClick={handleCloseModal} className="flex-1 py-3 text-slate-500 font-bold text-sm">Cancel</button>
                 <button type="submit" className="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-red-100 hover:bg-red-600 transition-all">
@@ -246,4 +274,5 @@ const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount
     </div>
   );
 };
+
 export default Expenses;

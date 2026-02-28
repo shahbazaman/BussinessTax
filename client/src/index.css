@@ -1,75 +1,49 @@
 @import "tailwindcss";
 
-/* Using :root instead of @theme to stop "Unknown at-rule" warnings */
-:root {
-  --color-brand-light: #f0fdf4;
-  --color-brand: #16a34a;
-  --color-brand-dark: #15803d;
-  --color-sidebar: #ffffff;
+@theme {
+  --color-brand-light: #3b82f6;
+  --color-brand: #1e40af;
+  --color-brand-dark: #1e3a8a;
+  --color-sidebar: #111827;
   --color-surface: #f8fafc;
 }
 
 @layer base {
-  html, body {
+  html, body, #root {
     height: 100%;
     width: 100%;
     margin: 0;
     padding: 0;
+    display: flex;
+    flex-direction: column;
   }
 
   body {
-    /* Use the variable with a standard CSS property */
-    background-color: var(--color-surface);
-    color: #0f172a; 
+    @apply bg-slate-50 text-slate-900 antialiased;
     font-family: 'Inter', system-ui, sans-serif;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-  }
-
-  /* Centering Fix for #root */
-  #root {
-    width: 100%;
-    min-height: 100%;
-    display: block; 
   }
 }
 
-/* --- Cross-Browser Scrollbar Logic --- */
-
-/* Standard properties wrapped in @supports to prevent parser errors */
-@supports (scrollbar-width: thin) {
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #cbd5e1 transparent;
-  }
-}
-
-/* Webkit properties for Chrome/Safari */
+/* Custom Scrollbar - Using standard CSS variables to prevent Tailwind crash */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: #f1f5f9; /* slate-100 */
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #cbd5e1;
+  background: #cbd5e1; /* slate-300 */
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8;
+  background: #3b82f6; /* brand-light */
 }
 
-@layer utilities {
-  .no-scrollbar {
-    -ms-overflow-style: none; /* IE/Edge */
-    scrollbar-width: none;    /* Firefox */
-  }
-  
-  .no-scrollbar::-webkit-scrollbar {
-    display: none; /* Chrome/Safari */
-  }
+/* Fix for the centering issue */
+#root {
+  text-align: left;
 }

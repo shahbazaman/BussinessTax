@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { signInWithGoogle } from '../utils/firebase';
 import api from '../utils/api';
+
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -10,6 +11,8 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const { login } = useContext(AuthContext); 
   const navigate = useNavigate();
+
+  // 1. REDIRECTION CHECK: Look for both 'token' or 'userInfo'
   useEffect(() => {
     const token = localStorage.getItem('token');
     const userInfo = localStorage.getItem('userInfo');
@@ -17,12 +20,17 @@ const Login = () => {
       navigate('/'); 
     }
   }, [navigate]);
+
+  // Handle Manual Email/Password Login
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
     try {
       await login(email, password);
+      
+      // Dispatch event so App.jsx hears the change instantly
       window.dispatchEvent(new Event('authChange')); 
       navigate('/');
     } catch (err) {
@@ -31,20 +39,31 @@ const Login = () => {
       setLoading(false);
     }
   };
+
+  // Handle Google Login
   const handleGoogleAuth = async (e) => {
+    // Prevent any accidental form triggers
     if (e) e.preventDefault();
     setError('');
+
     try {
       const result = await signInWithGoogle();
       if (!result) return;
+
       const user = result.user;
+      
+      // Call your backend route (ensure this matches ./routes/accountRoutes.js setup)
       const { data } = await api.post('/auth/google', {
         name: user.displayName,
         email: user.email,
         googleId: user.uid
       });
+
+      // 2. CONSISTENT STORAGE: Set both so all guards work
       localStorage.setItem('token', data.token);
       localStorage.setItem('userInfo', JSON.stringify(data));
+
+      // 3. NAVIGATION: Use event + navigate instead of location.href
       window.dispatchEvent(new Event('authChange')); 
       navigate('/'); 
     } catch (error) {
@@ -58,6 +77,7 @@ const Login = () => {
       }
     }
   };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 border border-slate-100">
@@ -65,11 +85,13 @@ const Login = () => {
           <h2 className="text-3xl font-bold text-slate-800">Welcome Back</h2>
           <p className="text-slate-500 mt-2">Log in to manage your business</p>
         </div>
+
         {error && (
           <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-6 text-sm border border-red-100 text-center">
             {error}
           </div>
         )}
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Email Address</label>
@@ -82,6 +104,7 @@ const Login = () => {
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
             <input
@@ -93,6 +116,7 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+
           <button
             type="submit"
             disabled={loading}
@@ -100,6 +124,8 @@ const Login = () => {
           >
             {loading ? 'Logging in...' : 'Sign In'}
           </button>
+
+          {/* 4. TYPE="BUTTON" IS THE FIX FOR POPUP ERRORS */}
           <button 
             type="button" 
             onClick={handleGoogleAuth}
@@ -109,6 +135,7 @@ const Login = () => {
             Continue with Google
           </button>
         </form>
+
         <div className="mt-8 text-center text-sm text-slate-600">
           Don't have an account?{' '}
           <Link to="/register" className="text-blue-600 font-semibold hover:underline">
@@ -119,4 +146,5 @@ const Login = () => {
     </div>
   );
 };
+
 export default Login;

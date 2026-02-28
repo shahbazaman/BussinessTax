@@ -4,12 +4,15 @@ import api from '../utils/api';
 import { toast } from 'react-toastify';
 import AddAccountModal from "../components/AddAccountModal";
 import TransferModal from '../components/TransferModal';
+
 const Accounts = () => {
   const [accounts, setAccounts] = useState([]);
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+
+  // 1. Unified Fetch: Accounts + Recent Activity
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -19,22 +22,28 @@ const Accounts = () => {
         api.get('/invoices'),
         api.get('/transactions')
       ]);
+
       setAccounts(accRes.data);
+
+      // Combine expenses and invoices into one feed
       const combinedFeed = [
         ...expRes.data.map(e => ({ ...e, feedType: 'expense' })),
         ...invRes.data.map(i => ({ ...i, feedType: 'invoice' })),
         ...transRes.data.map(t => ({ ...t, feedType: 'transfer' }))
       ].sort((a, b) => new Date(b.date) - new Date(a.date));
-      setActivity(combinedFeed.slice(0, 5));
+
+      setActivity(combinedFeed.slice(0, 5)); // Only top 5
     } catch (err) {
       toast.error("Financial sync failed");
     } finally {
       setLoading(false);
     }
   }, []);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this account link?")) return;
     try {
@@ -45,14 +54,17 @@ const Accounts = () => {
       toast.error("Delete failed");
     }
   };
+
   if (loading) return (
     <div className="flex flex-col justify-center items-center h-screen gap-4">
       <Loader2 className="animate-spin text-blue-600" size={40} />
       <p className="text-slate-400 font-black animate-pulse uppercase tracking-widest text-xs">Accessing Vault...</p>
     </div>
   );
+
   return (
     <div className="p-4 lg:p-8 space-y-8 max-w-350 mx-auto">
+      {/* --- Header --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-800 tracking-tight">Liquidity</h2>
@@ -73,6 +85,8 @@ const Accounts = () => {
           </button>
         </div>
       </div>
+
+      {/* --- Account Cards --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {accounts.map((acc) => (
           <div key={acc._id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl transition-all relative group">
@@ -96,6 +110,8 @@ const Accounts = () => {
           </div>
         ))}
       </div>
+
+      {/* --- Unified Activity Feed --- */}
       <div className="bg-white rounded-[3rem] border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-8 border-b border-slate-50 bg-slate-50/30 flex justify-between items-center">
           <h4 className="font-black text-slate-800 uppercase text-xs tracking-[0.2em]">Global Transaction Feed</h4>
@@ -138,14 +154,18 @@ const Accounts = () => {
               </div>
             );
           })}
+          
           {activity.length === 0 && (
             <p className="p-10 text-center text-slate-400 font-bold text-sm">No recent transactions found.</p>
           )}
         </div>
       </div>
+
       <AddAccountModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onRefresh={fetchData} />
+        {/* <AddAccountModal isOpen={showAccountModal} onClose={() => setShowAccountModal(false)} onAdd={handleAddAccount} newData={newAccount} setNewData={setNewAccount} /> */}
       <TransferModal isOpen={isTransferModalOpen} onClose={() => setIsTransferModalOpen(false)} accounts={accounts} onRefresh={fetchData} />
     </div>
   );
 };
+
 export default Accounts;

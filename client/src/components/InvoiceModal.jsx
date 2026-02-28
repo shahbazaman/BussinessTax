@@ -3,22 +3,29 @@ import { jsPDF } from 'jspdf';
 import { X, Search, Trash2, ShoppingCart, CreditCard, Landmark, CheckCircle, Download } from 'lucide-react';
 import api from '../utils/api.js';
 import { toast } from 'react-toastify';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom'; // Add this
+// ─── Helper: resets all form state back to initial values ───────────────────
 const INITIAL_INVOICE = { clientId: '', dueDate: '', status: 'Pending' };
+
 const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts = [] }) => {
   const [type, setType]                   = useState('Sale');
   const [invoiceData, setInvoiceData]     = useState(INITIAL_INVOICE);
   const [selectedItems, setSelectedItems] = useState([]);
   const [searchQuery, setSearchQuery]     = useState('');
   const navigate = useNavigate();
+  // ── Razorpay / save state ─────────────────────────────────────────────────
   const [selectedAccountId, setSelectedAccountId] = useState('');
-  const [savedInvoiceId, setSavedInvoiceId]       = useState(null);  
+  const [savedInvoiceId, setSavedInvoiceId]       = useState(null);   // null = not saved yet
   const [paymentLoading, setPaymentLoading]       = useState(false);
-  const [paymentDone, setPaymentDone]             = useState(false);  
+  const [paymentDone, setPaymentDone]             = useState(false);   // true after Razorpay success
+
   if (!isOpen) return null;
+
+  // ── Derived ───────────────────────────────────────────────────────────────
   const totalAmount = selectedItems.reduce(
     (sum, item) => sum + item.price * Number(item.quantity), 0
   );
+
   const searchResults = products
     .flatMap((p) =>
       p.variants.map((v) => ({
@@ -31,6 +38,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     .filter((item) =>
       item.displayLabel.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+  // ── Full reset + close ────────────────────────────────────────────────────
   const handleClose = () => {
     setType('Sale');
     setInvoiceData(INITIAL_INVOICE);
@@ -42,9 +51,12 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     setPaymentDone(false);
     onClose();
   };
+
+  // ── Add item ──────────────────────────────────────────────────────────────
   const handleAddItem = (variant) => {
     if (selectedItems.find((i) => i.variantId === variant._id))
       return toast.info('Item already added to invoice.');
+
     setSelectedItems([
       ...selectedItems,
       {
@@ -68,12 +80,18 @@ const downloadReceipt = () => {
   doc.text(`Date: ${new Date().toLocaleDateString()}`, 20, 70);
   doc.savedoc.save(`Receipt_${savedInvoiceId.slice(-6)}.pdf`);
 };
+  // ── Confirm Purchase / Save Invoice ──────────────────────────────────────
+  // After saving: shows success toast, refreshes dashboard, auto-closes modal
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
+
+    // Basic validation
     if (!invoiceData.clientId)      return toast.warning('Please select a client / vendor.');
     if (!invoiceData.dueDate)       return toast.warning('Please select a due date.');
     if (selectedItems.length === 0) return toast.warning('Add at least one product to the invoice.');
+
     const selectedClient = clients.find((c) => c._id === invoiceData.clientId);
+
     try {
       const payload = {
         ...invoiceData,
@@ -82,9 +100,14 @@ const downloadReceipt = () => {
         items: selectedItems,
         amount: totalAmount,
       };
+
       const res = await api.post('/invoices', payload);
+
+      // Store invoice _id for Razorpay (needed if user wants to pay after saving)
       const createdId = res.data._id || res.data.invoice?._id || null;
       setSavedInvoiceId(createdId);
+
+      // Toast for successful save
       toast.success(`✅ ${type} invoice saved successfully!`);
       onRefresh();
     } catch (err) {
@@ -94,11 +117,15 @@ const downloadReceipt = () => {
       );
     }
   };
+
+  // ── Razorpay payment flow ─────────────────────────────────────────────────
   const handleRazorpayPayment = async () => {
+    // Guard 1: Keys not yet configured (pre-hosting)
     const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+    // Inside handleRazorpayPayment function
 const { data: order } = await api.post('/payments/order', { 
   amount: totalAmount,
-  currency: 'INR'
+  currency: 'INR' // Change to 'USD' if your Razorpay account is international
 });
     if (!razorpayKey) {
       toast.info(
@@ -107,24 +134,35 @@ const { data: order } = await api.post('/payments/order', {
       );
       return;
     }
+
+    // Guard 2: Invoice must be saved first
     if (!savedInvoiceId) {
       toast.warning('⚠️ Please confirm & save the invoice first before initiating payment.');
       return;
     }
+
+    // Guard 3: Account must be selected
     if (!selectedAccountId) {
       toast.warning('⚠️ Please select a receiving account before paying.');
       return;
     }
+
+    // Guard 4: Razorpay SDK must be loaded in index.html
     if (!window.Razorpay) {
       toast.error(
         '❌ Razorpay SDK not loaded. Add this to index.html: <script src="https://checkout.razorpay.com/v1/checkout.js"></script>'
       );
       return;
     }
+
     setPaymentLoading(true);
     try {
+      // Step 1: Create backend order
       const { data: order } = await api.post('/create-order', { amount: totalAmount ,currency: 'INR'});
+
+      // Step 2: Open Razorpay checkout
       const selectedClient = clients.find((c) => c._id === invoiceData.clientId);
+
       const options = {
         key:         razorpayKey,
         amount:      order.amount,
@@ -132,8 +170,10 @@ const { data: order } = await api.post('/payments/order', {
         name:        'BusinessTax Ledger',
         description: `Invoice #${savedInvoiceId.slice(-6).toUpperCase()}`,
         order_id:    order.id,
+
         handler: async function (response) {
           try {
+            // Step 3: Verify on backend
             await api.post('/payments/verify', {
               razorpay_order_id:   response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
@@ -141,11 +181,17 @@ const { data: order } = await api.post('/payments/order', {
               invoiceId:           savedInvoiceId,
               accountId:           selectedAccountId,
             });
+
             setPaymentDone(true);
             setPaymentLoading(false);
+
+            // Toast for successful payment
             toast.success('✅ Payment verified & financial records updated!', { autoClose: 3000 });
             onRefresh();
+
+            // Auto-close modal after payment success
             setTimeout(() => handleClose(), 3100);
+
           } catch {
             setPaymentLoading(false);
             toast.error(
@@ -154,11 +200,14 @@ const { data: order } = await api.post('/payments/order', {
             );
           }
         },
+
         prefill: {
           name:  selectedClient?.name  || '',
           email: selectedClient?.email || '',
         },
+
         theme: { color: '#2563eb' },
+
         modal: {
           ondismiss: () => {
             setPaymentLoading(false);
@@ -166,17 +215,23 @@ const { data: order } = await api.post('/payments/order', {
           },
         },
       };
+
       const rzp = new window.Razorpay(options);
       rzp.open();
+
     } catch (err) {
       console.error(err);
       setPaymentLoading(false);
       toast.error('❌ Could not connect to payment gateway. Please try again.');
     }
   };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-[2.5rem] w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+
+        {/* ── Header ── */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase">Create Invoice</h2>
@@ -209,7 +264,11 @@ const { data: order } = await api.post('/payments/order', {
             <X />
           </button>
         </div>
+
+        {/* ── Body ── */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
+
+          {/* Client & Date */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
@@ -238,6 +297,8 @@ const { data: order } = await api.post('/payments/order', {
               />
             </div>
           </div>
+
+          {/* Product Search */}
           <div className="relative">
             <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
               Search Products / Variants
@@ -273,6 +334,8 @@ const { data: order } = await api.post('/payments/order', {
               </div>
             )}
           </div>
+
+          {/* Selected Items Table */}
           <div className="space-y-3">
             <h3 className="text-[10px] font-black text-slate-400 uppercase ml-2">Invoice Items</h3>
             {selectedItems.length === 0 && (
@@ -311,6 +374,8 @@ const { data: order } = await api.post('/payments/order', {
               </div>
             ))}
           </div>
+
+          {/* ── Receiving Account — only shown for Sale type ── */}
           {type === 'Sale' && (
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1">
@@ -337,13 +402,15 @@ const { data: order } = await api.post('/payments/order', {
               )}
             </div>
           )}
+
+          {/* ── Invoice saved indicator ── */}
           {savedInvoiceId && (
             <div className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3">
               <CheckCircle size={18} className="text-emerald-500 shrink-0" />
               <div>
                 <p className="text-emerald-700 text-xs font-black">Invoice Saved Successfully</p>
                 <p className="text-slate-400 text-[10px] font-mono mt-0.5">
-                  ID:
+                  ID: #{savedInvoiceId.slice(-10).toUpperCase()}
                 </p>
               </div>
               <span className="ml-auto text-[10px] text-slate-400 font-bold">
@@ -351,6 +418,8 @@ const { data: order } = await api.post('/payments/order', {
               </span>
             </div>
           )}
+
+          {/* ── Payment success indicator ── */}
           {paymentDone && (
   <div className="flex flex-col gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4">
     <div className="flex items-center gap-3">
@@ -365,13 +434,19 @@ const { data: order } = await api.post('/payments/order', {
     </button>
   </div>
 )}
+
         </form>
+
+        {/* ── Footer ── */}
         <div className="p-6 bg-slate-900 flex flex-col sm:flex-row justify-between items-center gap-4 mt-auto">
           <div>
             <p className="text-slate-400 text-[10px] font-black uppercase">Grand Total</p>
             <p className="text-white text-2xl font-black">${totalAmount.toLocaleString()}</p>
           </div>
+
           <div className="flex gap-3 w-full sm:w-auto">
+
+            {/* Confirm Purchase / Save — HIDDEN once invoice is saved */}
             {!savedInvoiceId && (
               <button
                 type="button"
@@ -382,6 +457,8 @@ const { data: order } = await api.post('/payments/order', {
                 Confirm {type}
               </button>
             )}
+
+            {/* Pay via Razorpay — SHOWN only after invoice saved, only for Sale, only before payment done */}
             {savedInvoiceId && !paymentDone && type === 'Sale' && (
               <button
                 type="button"
@@ -397,6 +474,8 @@ const { data: order } = await api.post('/payments/order', {
                 {paymentLoading ? 'Processing...' : 'Pay via Razorpay'}
               </button>
             )}
+
+            {/* Cancel / Done — always visible */}
             <button
               type="button"
               onClick={handleClose}
@@ -404,10 +483,13 @@ const { data: order } = await api.post('/payments/order', {
             >
               {savedInvoiceId ? 'Done' : 'Cancel'}
             </button>
+
           </div>
         </div>
+
       </div>
     </div>
   );
 };
+
 export default InvoiceModal;

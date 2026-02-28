@@ -4,6 +4,7 @@ import api from '../utils/api';
 import { toast } from 'react-toastify';
 import AddProductModal from '../components/AddProductModal';
 import { exportToCSV } from '../utils/exportCSV';
+
 const Inventory = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,6 +12,7 @@ const Inventory = () => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
@@ -22,10 +24,12 @@ const Inventory = () => {
       setLoading(false);
     }
   }, []);
+
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 const [editingProduct, setEditingProduct] = useState(null);
+
   const handleEdit = (product) => {
     setEditingProduct(product);
     setIsModalOpen(true);
@@ -40,26 +44,35 @@ const [editingProduct, setEditingProduct] = useState(null);
       toast.error("Delete failed");
     }
   };
+
   const filteredProducts = products.filter(p => {
     const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    
+    // Check if any variant in the product is low on stock
     const isLowStock = p.variants.some(v => v.stock <= (p.lowStockAlert || 10));
     const matchesStockFilter = showLowStockOnly ? isLowStock : true;
+
     return matchesSearch && matchesCategory && matchesStockFilter;
   });
+
   if (loading) return (
     <div className="flex flex-col justify-center items-center h-screen gap-4">
       <Loader2 className="animate-spin text-blue-600" size={40} />
       <p className="text-slate-400 font-bold animate-pulse uppercase tracking-widest text-xs">Syncing Inventory...</p>
     </div>
   );
+
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-400 mx-auto">
+      {/* --- Header Section --- */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
   <div>
     <h1 className="text-3xl font-black text-slate-800 tracking-tight">Inventory</h1>
     <p className="text-slate-500 text-sm font-medium">Monitor stock levels and manage product variants</p>
   </div>
+
+  {/* Wrap buttons in this div to keep them together */}
   <div className="flex items-center gap-3">
     <button 
       onClick={() => setIsModalOpen(true)}
@@ -67,6 +80,7 @@ const [editingProduct, setEditingProduct] = useState(null);
     >
       <Plus size={20} strokeWidth={3}/> New Product
     </button>
+    
     <button 
       onClick={() => exportToCSV(products, 'Inventory')}
       className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-3 rounded-2xl font-black text-sm uppercase flex items-center gap-2 shadow-xl shadow-emerald-200 transition-all active:scale-95"
@@ -75,6 +89,8 @@ const [editingProduct, setEditingProduct] = useState(null);
     </button>
   </div>
 </div>
+
+      {/* --- Filters & Search Bar --- */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 bg-white p-4 rounded-4xl border border-slate-100 shadow-sm">
         <div className="lg:col-span-5 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -85,6 +101,7 @@ const [editingProduct, setEditingProduct] = useState(null);
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
+
         <div className="lg:col-span-3">
           <select 
             className="w-full px-4 py-3 rounded-xl bg-slate-50 border-none outline-none font-bold text-slate-600 cursor-pointer"
@@ -101,6 +118,7 @@ const [editingProduct, setEditingProduct] = useState(null);
             <option value="Other">Other</option>
           </select>
         </div>
+
         <div className="lg:col-span-4 flex gap-2">
           <button 
             onClick={() => setShowLowStockOnly(!showLowStockOnly)}
@@ -114,6 +132,8 @@ const [editingProduct, setEditingProduct] = useState(null);
           </button>
         </div>
       </div>
+
+      {/* --- Product Grid --- */}
       {filteredProducts.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
           {filteredProducts.map(product => (
@@ -130,12 +150,14 @@ const [editingProduct, setEditingProduct] = useState(null);
               >
                 <Trash2 size={18} />
               </button>
+
               <div className="mb-6">
                 <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-50/50 px-3 py-1.5 rounded-lg border border-blue-100">
                   {product.category}
                 </span>
                 <h3 className="font-black text-slate-800 text-xl mt-3 line-clamp-1">{product.title}</h3>
               </div>
+
               <div className="space-y-3 flex-1">
                 {product.variants.map((v, idx) => {
                   const isLow = v.stock <= (product.lowStockAlert || 10);
@@ -169,16 +191,19 @@ const [editingProduct, setEditingProduct] = useState(null);
           <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">No items match your search</p>
         </div>
       )}
+
+      {/* Modal */}
       <AddProductModal 
   isOpen={isModalOpen} 
   onClose={() => {
     setIsModalOpen(false);
-    setEditingProduct(null);
+    setEditingProduct(null); // Clear the edit state when closing
   }} 
   onRefresh={fetchProducts}
-  editingProduct={editingProduct}
+  editingProduct={editingProduct} // Pass the state here
 />
     </div>
   );
 };
+
 export default Inventory;

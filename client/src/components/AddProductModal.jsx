@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Save, Package, AlertCircle, Edit3 } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
+
 const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   const initialState = {
     title: '',
@@ -9,8 +10,13 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
     lowStockAlert: 10,
     variants: [{ name: '', weight: '', unit: 'kg', price: '', stock: '', sku: '' }]
   };
+
   const [productData, setProductData] = useState(initialState);
+  
+  // Determine mode based on whether editingProduct exists
   const isEditing = !!editingProduct;
+
+  // Sync form data when modal opens or editingProduct changes
   useEffect(() => {
     if (isOpen) {
       if (editingProduct) {
@@ -20,20 +26,24 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
       }
     }
   }, [isOpen, editingProduct]);
+
   const handleChange = (e) => {
     setProductData({ ...productData, [e.target.name]: e.target.value });
   };
+
   const handleVariantChange = (index, e) => {
     const newVariants = [...productData.variants];
     newVariants[index][e.target.name] = e.target.value;
     setProductData({ ...productData, variants: newVariants });
   };
+
   const addVariantField = () => {
     setProductData({
       ...productData,
       variants: [...productData.variants, { name: '', weight: '', unit: 'kg', price: '', stock: '', sku: '' }]
     });
   };
+
   const removeVariantField = (index) => {
     if (productData.variants.length > 1) {
       const newVariants = productData.variants.filter((_, i) => i !== index);
@@ -42,8 +52,12 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
       toast.warning("At least one variant is required");
     }
   };
+
 const handleSubmit = async (e) => {
   e.preventDefault();
+
+  // 1. Filter out variants that don't have a name or price
+  // 2. Convert strings to numbers
   const validVariants = productData.variants
     .filter(v => v.name.trim() !== '' && v.price !== '') 
     .map(v => ({
@@ -53,14 +67,17 @@ const handleSubmit = async (e) => {
       stock: Number(v.stock) || 0,
       sku: v.sku?.trim() === "" ? undefined : v.sku
     }));
+
   if (validVariants.length === 0) {
     return toast.error("At least one complete variant is required.");
   }
+
   const sanitizedData = {
     ...productData,
     lowStockAlert: Number(productData.lowStockAlert) || 10,
     variants: validVariants
   };
+
   try {
     if (isEditing) {
       await api.put(`/products/${editingProduct._id}`, sanitizedData);
@@ -76,11 +93,14 @@ const handleSubmit = async (e) => {
     toast.error(err.response?.data?.message || "Validation Failed");
   }
 };
+
   if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-[3rem] w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-white/20">
-        {/* --- Header: Dynamic Title and Icon ---
+        
+        {/* --- Header: Dynamic Title and Icon --- */}
         <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-50">
           <div className="flex items-center gap-3">
             <div className={`p-3 ${isEditing ? 'bg-amber-500' : 'bg-blue-600'} rounded-2xl text-white shadow-lg shadow-blue-200`}>
@@ -99,13 +119,16 @@ const handleSubmit = async (e) => {
             <X size={24} />
           </button>
         </div>
+
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
-          {/* --- Basic Information Section ---
+          
+          {/* --- Basic Information Section --- */}
           <section className="space-y-4">
             <div className="flex items-center gap-2 text-slate-400 mb-2">
               <AlertCircle size={16} />
               <span className="text-[10px] font-black uppercase tracking-[0.2em]">Core Details</span>
             </div>
+            
             <input
               name="title"
               value={productData.title}
@@ -114,6 +137,7 @@ const handleSubmit = async (e) => {
               onChange={handleChange}
               required
             />
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <select
                 name="category"
@@ -131,6 +155,7 @@ const handleSubmit = async (e) => {
                 <option value="Office Supplies">Office Supplies</option>
                 <option value="Other">Other</option>
               </select>
+
               <div className="relative">
                 <input
                   name="lowStockAlert"
@@ -144,7 +169,8 @@ const handleSubmit = async (e) => {
               </div>
             </div>
           </section>
-          {/* --- Variants Management Section ---
+
+          {/* --- Variants Management Section --- */}
           <section className="space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2 text-slate-400">
@@ -159,6 +185,7 @@ const handleSubmit = async (e) => {
                 <Plus size={14} strokeWidth={3} /> Add Variant
               </button>
             </div>
+
             <div className="space-y-3">
               {productData.variants.map((variant, index) => (
                 <div key={index} className="group relative p-6 bg-slate-50/50 rounded-4xl border border-slate-100 hover:border-blue-100 transition-all">
@@ -247,7 +274,8 @@ const handleSubmit = async (e) => {
             </div>
           </section>
         </form>
-        {/* --- Footer: Dynamic Button Label ---
+
+        {/* --- Footer: Dynamic Button Label --- */}
         <div className="p-8 bg-slate-50 border-t border-slate-100">
           <button 
             type="submit" 
@@ -261,4 +289,5 @@ const handleSubmit = async (e) => {
     </div>
   );
 };
+
 export default AddProductModal;

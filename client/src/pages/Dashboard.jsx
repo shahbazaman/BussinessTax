@@ -17,6 +17,10 @@ import 'react-toastify/dist/ReactToastify.css';
 import InvoiceModal from '../components/InvoiceModal';
 import LowStockWidget from '../components/LowStockWidget';
 import { useNavigate } from 'react-router-dom';
+
+// ---------------------------------------------------------------------------
+// StatCard
+// ---------------------------------------------------------------------------
 const StatCard = ({ label, value, icon, color }) => (
   <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex items-center gap-4 group hover:border-blue-100 transition-all">
     <div className={`${color} p-4 rounded-2xl text-white shadow-lg transition-transform group-hover:scale-110`}>
@@ -28,7 +32,12 @@ const StatCard = ({ label, value, icon, color }) => (
     </div>
   </div>
 );
+
+// ---------------------------------------------------------------------------
+// Dashboard
+// ---------------------------------------------------------------------------
 const Dashboard = () => {
+  // ── State ──────────────────────────────────────────────────────────────────
   const [stats, setStats]                   = useState(null);
   const [accounts, setAccounts]             = useState([]);
   const [loading, setLoading]               = useState(true);
@@ -38,23 +47,33 @@ const Dashboard = () => {
   const [transactions, setTransactions]     = useState([]);
   const [products, setProducts]             = useState([]);
   const navigate = useNavigate();
+  // Modal visibility
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showClientModal, setShowClientModal]     = useState(false);
   const [showAccountModal, setShowAccountModal]   = useState(false);
   const [showInvoiceModal, setShowInvoiceModal]   = useState(false);
+
+  // Form data
   const [transferData, setTransferData] = useState({ fromId: '', toId: '', amount: 0 });
   const [newClient, setNewClient]       = useState({ name: '', email: '', phone: '' });
   const [newAccount, setNewAccount]     = useState({
     bankName: '', balance: '', accountType: 'Checking', accountNumber: ''
   });
+
+  // Ref used for the hidden PDF print area
   const invoicePrintRef = useRef(null);
+
+  // ── Currency helpers ────────────────────────────────────────────────────────
   const CURRENCY_MAP   = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
+
   const formatValue = (value) =>
     `${currencySymbol}${Number(value || 0).toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })}`;
+
+  // ── Data fetching ───────────────────────────────────────────────────────────
   const fetchDashboardData = useCallback(async () => {
     setLoading(true);
     try {
@@ -73,6 +92,7 @@ const Dashboard = () => {
         api.get('/auth/profile'),
         api.get('/products'),
       ]);
+
       setStats(statsRes.data);
       setAccounts(accountsRes.data);
       setClients(clientsRes.data);
@@ -86,12 +106,17 @@ const Dashboard = () => {
       setLoading(false);
     }
   }, []);
+
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
+
+  // ── Tax calculations ────────────────────────────────────────────────────────
   const TAX_RATE     = userTaxRate / 100;
   const estimatedTax = stats?.netProfit > 0 ? stats.netProfit * TAX_RATE : 0;
   const finalTakeHome = (stats?.netProfit || 0) - estimatedTax;
+
+  // ── Low-stock helper ────────────────────────────────────────────────────────
   const lowStockItems = products
     .flatMap((p) =>
       p.variants
@@ -103,6 +128,13 @@ const Dashboard = () => {
         }))
     )
     .slice(0, 5);
+
+  // ── PDF Download ─────────────────────────────────────────────────────────────
+  /**
+   * Captures the hidden #invoice-print-area div and saves it as a PDF.
+   * Called from the "Download PDF" button inside the old inline invoice modal
+   * section (kept for backward-compat), OR can be wired to any button.
+   */
   const handleDownloadPDF = async () => {
     const element = invoicePrintRef.current;
     if (!element) {
@@ -115,6 +147,7 @@ const Dashboard = () => {
       const pdf      = new jsPDF('p', 'mm', 'a4');
       const pdfWidth  = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Invoice_Download.pdf`);
     } catch (err) {
@@ -122,6 +155,8 @@ const Dashboard = () => {
       toast.error('Failed to generate PDF');
     }
   };
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
   const handleTransfer = async (e) => {
     e.preventDefault();
     if (transferData.fromId === transferData.toId) {
@@ -141,6 +176,7 @@ const Dashboard = () => {
       toast.error('Transfer failed: ' + (err.response?.data?.message || 'Server Error'));
     }
   };
+
   const handleAddAccount = async (e) => {
     e.preventDefault();
     try {
@@ -152,6 +188,7 @@ const Dashboard = () => {
       toast.error('Failed to add account: ' + (err.response?.data?.message || 'Error'));
     }
   };
+
   const handleAddClient = async (e) => {
     e.preventDefault();
     try {
@@ -163,8 +200,10 @@ const Dashboard = () => {
       toast.error('Error adding client: ' + (err.response?.data?.message || 'Error'));
     }
   };
+
   const handleDeleteAccount = async (accountId) => {
     if (!window.confirm('Permanently delete this account?')) return;
+
     const deletePromise = api.delete(`/accounts/${accountId}`);
     toast.promise(deletePromise, {
       pending: 'Deleting account...',
@@ -175,6 +214,7 @@ const Dashboard = () => {
         },
       },
     });
+
     try {
       await deletePromise;
       fetchDashboardData();
@@ -182,10 +222,13 @@ const Dashboard = () => {
       console.error(err);
     }
   };
+
   const handlePayment = async (amount, invoiceId) => {
     toast.info('Payment integration will be active after hosting!');
     console.log(`Payment planned for: $${amount} (Invoice: ${invoiceId})`);
   };
+
+  // ── Loading screen ──────────────────────────────────────────────────────────
   if (loading)
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -197,14 +240,19 @@ const Dashboard = () => {
         </div>
       </div>
     );
+
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen relative">
       <div className="max-w-7xl mx-auto space-y-8">
+
+        {/* ── Header ── */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
             <h1 className="text-3xl font-black text-slate-800 tracking-tight">Financial Overview</h1>
             <p className="text-slate-500 text-sm">Real-time status of your business liquidity</p>
           </div>
+
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => setShowClientModal(true)}
@@ -226,6 +274,8 @@ const Dashboard = () => {
             </button>
           </div>
         </div>
+
+        {/* ── Invoice Modal (imported component) ── */}
         <InvoiceModal
           isOpen={showInvoiceModal}
           onClose={() => setShowInvoiceModal(false)}
@@ -234,12 +284,16 @@ const Dashboard = () => {
           products={products}
           accounts={accounts}
         />
+
+        {/* ── Summary Stats ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard label="Customers"      value={stats?.customers}    icon={<Users size={20} />}    color="bg-blue-500"   />
           <StatCard label="Vendors"        value={stats?.vendors}      icon={<UserCheck size={20} />} color="bg-emerald-500" />
           <StatCard label="Active Invoices" value={stats?.invoiceCount} icon={<FileCheck size={20} />} color="bg-amber-500"  />
           <StatCard label="Unpaid Bills"   value={stats?.bills}        icon={<Receipt size={20} />}  color="bg-rose-500"   />
         </div>
+
+        {/* ── Profit & Loss ── */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Income</p>
@@ -266,6 +320,8 @@ const Dashboard = () => {
             </h3>
           </div>
         </div>
+
+        {/* ── Tax & Take-Home ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 shadow-xl relative overflow-hidden group">
             <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all" />
@@ -278,6 +334,7 @@ const Dashboard = () => {
             </h3>
             <p className="text-slate-400 text-[10px] mt-2 italic">*Estimated based on current net profit</p>
           </div>
+
           <div className="bg-white p-6 rounded-[2.5rem] border-2 border-emerald-500 shadow-sm">
             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">True Take-Home Pay</p>
             <h3 className="text-3xl font-black text-slate-800 mt-1">
@@ -298,8 +355,12 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
+
+        {/* ── Charts & Tables ── */}
         <div className="space-y-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+
+            {/* Liquidity Accounts */}
             <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col h-100">
               <div className="p-6 border-b border-slate-50 flex items-center justify-between">
                 <div className="flex items-center gap-2 font-bold text-slate-800 uppercase text-xs tracking-wider">
@@ -313,6 +374,7 @@ const Dashboard = () => {
                   <Plus size={16} />
                 </button>
               </div>
+
               <div className="overflow-y-auto flex-1">
                 <table className="w-full text-left">
                   <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400">
@@ -356,6 +418,8 @@ const Dashboard = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Recent Internal Movements */}
               <div className="mt-auto bg-slate-50/50 border-t border-slate-100 p-6">
                 <div className="flex items-center gap-2 mb-4">
                   <ArrowRightLeft size={14} className="text-slate-400" />
@@ -401,6 +465,8 @@ const Dashboard = () => {
                 </div>
               </div>
             </div>
+
+            {/* Recent Activity Table */}
             <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden h-100 flex flex-col">
               <div className="p-6 border-b border-slate-50 flex items-center gap-2 font-bold text-slate-800 uppercase text-xs tracking-wider">
                 <ArrowRightLeft size={16} className="text-blue-500" /> Recent Activity
@@ -444,10 +510,16 @@ const Dashboard = () => {
                 </table>
               </div>
             </div>
+
+            {/* Low Stock Widget */}
+            {/* <div className="bg-white rounded-[2.5rem] shadow-sm border border-rose-100 overflow-hidden flex flex-col h-100"> */}
+              {/* Low Stock Widget */}
             <div className="h-100 flex flex-col">
                 <LowStockWidget products={products} />
             </div>
           </div>
+
+          {/* Monthly Cashflow Bar Chart */}
           <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">
               Income vs Expenses
@@ -469,6 +541,8 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Revenue Growth Trend Area Chart */}
           <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8">
               Revenue Growth Trend
@@ -500,7 +574,15 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* ── Toast ── */}
       <ToastContainer position="bottom-right" autoClose={3000} theme="light" />
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          MODALS
+      ══════════════════════════════════════════════════════════════════════ */}
+
+      {/* Transfer Modal */}
       {showTransferModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white p-8 rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in zoom-in duration-200">
@@ -513,6 +595,7 @@ const Dashboard = () => {
                 Close
               </button>
             </div>
+
             <form onSubmit={handleTransfer} className="space-y-5">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
@@ -532,6 +615,7 @@ const Dashboard = () => {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                   Destination
@@ -552,6 +636,7 @@ const Dashboard = () => {
                     ))}
                 </select>
               </div>
+
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">
                   Amount to Transfer
@@ -564,6 +649,7 @@ const Dashboard = () => {
                   onChange={(e) => setTransferData({ ...transferData, amount: e.target.value })}
                 />
               </div>
+
               <button
                 type="submit"
                 className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-sm hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 mt-4"
@@ -574,6 +660,8 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Add Client Modal */}
       {showClientModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -629,10 +717,13 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Add Account Modal */}
       {showAccountModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
             <h2 className="text-2xl font-black text-slate-800 mb-6">Link New Account</h2>
+
             <form onSubmit={handleAddAccount} className="space-y-4">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
@@ -646,6 +737,7 @@ const Dashboard = () => {
                   onChange={(e) => setNewAccount({ ...newAccount, bankName: e.target.value })}
                 />
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">
@@ -673,6 +765,7 @@ const Dashboard = () => {
                   </select>
                 </div>
               </div>
+
               <div className="flex gap-3 pt-4">
                 <button
                   type="button"
@@ -692,6 +785,11 @@ const Dashboard = () => {
           </div>
         </div>
       )}
+
+      {/* ══════════════════════════════════════════════════════════════════════
+          Hidden Invoice Print Area  (used by handleDownloadPDF)
+          Kept off-screen so html2canvas can capture it.
+      ══════════════════════════════════════════════════════════════════════ */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0, zIndex: -10 }}>
         <div
           ref={invoicePrintRef}
@@ -704,6 +802,7 @@ const Dashboard = () => {
             fontFamily: 'sans-serif',
           }}
         >
+          {/* Header row */}
           <div
             style={{
               display: 'flex',
@@ -723,6 +822,8 @@ const Dashboard = () => {
               <p style={{ color: '#64748b', margin: '4px 0 0 0' }}>Official Financial Statement</p>
             </div>
           </div>
+
+          {/* Bill-to / Due-date row */}
           <div
             style={{
               marginTop: '40px',
@@ -761,6 +862,8 @@ const Dashboard = () => {
               <h3 style={{ fontSize: '20px', fontWeight: 'bold', margin: '0' }}>N/A</h3>
             </div>
           </div>
+
+          {/* Amount box */}
           <div
             style={{
               marginTop: '60px',
@@ -784,4 +887,5 @@ const Dashboard = () => {
     </div>
   );
 };
+
 export default Dashboard;

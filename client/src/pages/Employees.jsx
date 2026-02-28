@@ -11,8 +11,11 @@ const Employees = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [formData, setFormData] = useState({ name: '', role: '', dailyRate: '' });
+
+  // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -29,7 +32,10 @@ const Employees = () => {
       setLoading(false);
     }
   };
+
   useEffect(() => { fetchData(); }, []);
+
+  // Filter Logic
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
       const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -38,7 +44,9 @@ const Employees = () => {
       return matchesSearch && matchesRole;
     });
   }, [employees, searchTerm, roleFilter]);
+
   const roles = ['All', ...new Set(employees.map(e => e.role))];
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -67,11 +75,13 @@ const isAlreadyMarked = (lastDate) => {
     setIsEditing(true);
     setShowModal(true);
   };
+
   const closeModal = () => {
     setShowModal(false);
     setIsEditing(false);
     setFormData({ name: '', role: '', dailyRate: '' });
   };
+
   const handleMarkAttendance = async (id) => {
     try {
       await api.put(`/employees/${id}/attendance`);
@@ -79,6 +89,7 @@ const isAlreadyMarked = (lastDate) => {
       fetchData(); 
     } catch (err) { toast.error("Update failed"); }
   };
+
   const handleDelete = async (id) => {
     if (!window.confirm("Remove this employee?")) return;
     try {
@@ -87,6 +98,7 @@ const isAlreadyMarked = (lastDate) => {
       fetchData();
     } catch (err) { toast.error("Delete failed"); }
   };
+
 const handleCloseMonth = async () => {
   if (!window.confirm("Reset all working days to zero?")) return;
   try {
@@ -97,11 +109,16 @@ const handleCloseMonth = async () => {
     toast.error(err.response?.data?.message || "Error closing month");
   }
 };
+
   const totalPayroll = employees.reduce((acc, emp) => acc + (emp.dailyRate * emp.workingDays), 0);
+
   if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40}/></div>;
+
   return (
     <div className="p-6 space-y-6 bg-slate-50 min-h-screen">
+      {/* Stats Header */}
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+  {/* Stat 1: Total Staff */}
   <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Staff</p>
     <div className="flex items-center gap-3">
@@ -109,6 +126,8 @@ const handleCloseMonth = async () => {
       <p className="text-2xl font-black text-slate-800">{employees.length}</p>
     </div>
   </div>
+
+  {/* Stat 2: Payroll */}
   <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payroll</p>
     <div className="flex items-center gap-3">
@@ -116,18 +135,24 @@ const handleCloseMonth = async () => {
       <p className="text-2xl font-black text-slate-800">${totalPayroll.toLocaleString()}</p>
     </div>
   </div>
+
+  {/* Button 1: Close Month */}
   <button 
     onClick={handleCloseMonth} 
     className="bg-white text-rose-600 border border-rose-100 px-6 py-3 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-rose-50 transition-all shadow-sm"
   >
     <CalendarCheck size={20} /> Close Month
   </button>
+
+  {/* Button 2: Add Employee */}
   <button 
     onClick={() => setShowModal(true)} 
     className="bg-slate-900 text-white rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
   >
     <UserPlus size={20} /> Add Employee
   </button>
+
+  {/* Button 3: Export CSV */}
   <button  
     onClick={() => exportToCSV(filteredEmployees, 'Employees')} 
     className="bg-emerald-600 text-white rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-200"
@@ -135,6 +160,8 @@ const handleCloseMonth = async () => {
     <Receipt size={20} /> Export CSV
   </button>
 </div>
+
+      {/* Search & Filters */}
       <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -154,6 +181,8 @@ const handleCloseMonth = async () => {
           </select>
         </div>
       </div>
+
+      {/* Scrollable Table Section */}
       <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
         <div className="max-h-125 overflow-y-auto custom-scrollbar">
           <table className="w-full text-left border-collapse">
@@ -191,6 +220,8 @@ const handleCloseMonth = async () => {
           </table>
         </div>
       </div>
+
+      {/* --- ADD/EDIT MODAL --- */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[3rem] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -212,4 +243,5 @@ const handleCloseMonth = async () => {
     </div>
   );
 };
+
 export default Employees;

@@ -6,12 +6,14 @@ import {
   Settings, Landmark, ChevronLeft, ChevronRight, LogOut, Menu, X,
   Package, PieChart 
 } from 'lucide-react';
+
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
+
   const menuItems = [
     { icon: <LayoutDashboard />, label: 'Dashboard', path: '/' },
     { icon: <FileText />, label: 'Invoices', path: '/invoices' },
@@ -23,14 +25,17 @@ const Sidebar = () => {
     { icon: <Users />, label: 'Employees', path: '/employees' },
     { icon: <Settings />, label: 'Settings', path: '/settings' },
   ];
+
   const handleLogout = () => {
     logout();
     localStorage.removeItem('token');
     window.dispatchEvent(new Event('authChange'));
     navigate('/login');
   };
+
   return (
     <>
+      {/* --- MOBILE TOP HEADER --- */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between z-50">
         <h1 className="font-bold italic text-lg text-slate-900 uppercase">
           BUSSINESS<span className="text-green-500">TAX</span>
@@ -42,18 +47,24 @@ const Sidebar = () => {
           {isMobileOpen ? <X size={24} /> : <Menu size={24} />}
         </button>
       </div>
+
+      {/* --- SIDEBAR CONTAINER --- */}
       <aside className={`
         fixed lg:static inset-y-0 left-0 z-40 bg-white border-r border-slate-200 transition-all duration-300 ease-in-out
         ${isCollapsed ? 'w-24' : 'w-64'}
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         flex flex-col h-screen
       `}>
+        
+        {/* Sidebar Brand Header */}
         <div className={`h-20 flex items-center border-b border-slate-50 px-6 shrink-0 
           ${isCollapsed ? 'justify-center' : 'justify-between'}
           ${isMobileOpen ? 'flex' : 'hidden lg:flex'}`}>
+          
           <span className="text-xl font-bold italic tracking-tight text-slate-800 uppercase">
             BUSSINESS<span className="text-green-500">TAX</span>
           </span>
+          
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)} 
             className="hidden lg:block p-1.5 rounded-md hover:bg-slate-100 text-slate-400"
@@ -61,6 +72,8 @@ const Sidebar = () => {
             {isCollapsed ? <ChevronRight size={18}/> : <ChevronLeft size={18}/>}
           </button>
         </div>
+
+        {/* Navigation - Scrollable Section */}
         <nav className="flex-1 py-4 space-y-1 overflow-y-auto no-scrollbar">
           {menuItems.map((item, idx) => {
             const isActive = location.pathname === item.path;
@@ -75,9 +88,12 @@ const Sidebar = () => {
                   ${isActive ? 'bg-green-600 text-white rounded-xl shadow-lg shadow-green-100' : 'text-slate-500 hover:bg-slate-50 rounded-xl'}
                 `}
               >
+                {/* Icon Container */}
                 <div className={`${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-900'}`}>
                   {React.cloneElement(item.icon, { size: isCollapsed ? 22 : 20 })}
                 </div>
+
+                {/* Text Label - FIXED COLOR LOGIC */}
                 <span className={`font-bold transition-colors
                   ${isCollapsed ? 'text-[9px] uppercase mt-1' : 'text-sm'} 
                   ${isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'}`}
@@ -88,6 +104,8 @@ const Sidebar = () => {
             );
           })}
         </nav>
+
+        {/* Sidebar Footer (User & Logout) */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/30 shrink-0">
           <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : ''}`}>
             <div className="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center font-bold text-white shrink-0 text-xs shadow-sm">
@@ -100,6 +118,7 @@ const Sidebar = () => {
               </div>
             )}
           </div>
+
           <button 
             onClick={handleLogout}
             className={`flex items-center justify-center group w-full gap-2 transition-all ${isCollapsed ? 'flex-col' : 'py-2.5 hover:bg-red-50 rounded-lg'}`}
@@ -111,6 +130,8 @@ const Sidebar = () => {
           </button>
         </div>
       </aside>
+
+      {/* Background Overlay for Mobile */}
       {isMobileOpen && (
         <div 
           className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-30 lg:hidden" 
@@ -120,4 +141,5 @@ const Sidebar = () => {
     </>
   );
 };
+
 export default Sidebar;

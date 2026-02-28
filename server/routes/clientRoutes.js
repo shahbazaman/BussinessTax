@@ -1,8 +1,11 @@
 import express from 'express';
 import Client from '../models/Client.js';
-import Invoice from '../models/Invoice.js';
+import Invoice from '../models/Invoice.js'; // Ensure this path matches your project
 import protect from '../middleware/authMiddleware.js';
+
 const router = express.Router();
+
+// GET: Fetch clients with correctly mapped Revenue and Invoice Counts
 router.get('/', protect, async (req, res) => {
   try {
     const clients = await Client.find({ user: req.user.id }).lean();
@@ -18,11 +21,14 @@ router.get('/', protect, async (req, res) => {
         totalInvoiced: totalInvoiced
       };
     });
+
     res.json(clientsWithStats);
   } catch (err) {
     res.status(500).json({ message: "Error fetching clients" });
   }
 });
+
+// POST: Add new client
 router.post('/', protect, async (req, res) => {
   try {
     const { name, email, phone, address } = req.body;
@@ -35,20 +41,25 @@ router.post('/', protect, async (req, res) => {
     res.status(500).json({ message: "Error creating client" });
   }
 });
+
+// PUT: Edit existing client
 router.put('/:id', protect, async (req, res) => {
   try {
     const { name, email, phone, address } = req.body;
     const updatedClient = await Client.findOneAndUpdate(
-      { _id: req.params.id, user: req.user.id },
+      { _id: req.params.id, user: req.user.id }, // Ensure user owns the client
       { name, email, phone, address },
       { returnDocument: 'after' }
     );
+    
     if (!updatedClient) return res.status(404).json({ message: "Client not found" });
     res.json(updatedClient);
   } catch (err) {
     res.status(500).json({ message: "Error updating client" });
   }
 });
+
+// DELETE: Remove client
 router.delete('/:id', protect, async (req, res) => {
   try {
     const client = await Client.findOneAndDelete({ _id: req.params.id, user: req.user.id });
@@ -58,4 +69,5 @@ router.delete('/:id', protect, async (req, res) => {
     res.status(500).json({ message: "Error deleting client" });
   }
 });
+
 export default router;

@@ -5,6 +5,7 @@ const TaxReports = () => {
   const [invoices, setInvoices] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -21,13 +22,20 @@ const TaxReports = () => {
     };
     fetchData();
   }, []);
+
+  // Calculate Tax Collected (from Invoices)
   const taxCollected = invoices.reduce((acc, inv) => {
     const subtotal = (inv.convertedAmount || inv.totalAmount) / (1 + (inv.taxRate / 100));
     return acc + ((inv.convertedAmount || inv.totalAmount) - subtotal);
   }, 0);
+
+  // Calculate Tax Paid (Assuming 15% deductible tax on expenses for this example)
   const taxDeductible = expenses.reduce((acc, exp) => acc + ((exp.convertedAmount || exp.amount) * 0.15), 0);
+  
   const netTaxOwed = taxCollected - taxDeductible;
+
   if (loading) return <div className="p-8">Calculating your tax liability...</div>;
+
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
       <div className="flex justify-between items-center">
@@ -39,17 +47,20 @@ const TaxReports = () => {
           <Calculator size={18} /> Export for Accountant
         </button>
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
           <div className="p-3 bg-blue-50 text-blue-600 w-fit rounded-2xl mb-4"><ArrowUpRight /></div>
           <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Tax Collected</p>
           <h2 className="text-3xl font-black text-slate-900 mt-1">${taxCollected.toLocaleString(undefined, {minimumFractionDigits: 2})}</h2>
         </div>
+
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
           <div className="p-3 bg-amber-50 text-amber-600 w-fit rounded-2xl mb-4"><ArrowDownRight /></div>
           <p className="text-slate-500 text-sm font-bold uppercase tracking-wider">Tax Deductible</p>
           <h2 className="text-3xl font-black text-slate-900 mt-1">${taxDeductible.toLocaleString(undefined, {minimumFractionDigits: 2})}</h2>
         </div>
+
         <div className={`p-6 rounded-3xl border shadow-lg ${netTaxOwed > 0 ? 'bg-red-50 border-red-100' : 'bg-emerald-50 border-emerald-100'}`}>
           <div className={`p-3 w-fit rounded-2xl mb-4 ${netTaxOwed > 0 ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'}`}><Landmark /></div>
           <p className="text-slate-600 text-sm font-bold uppercase tracking-wider">Net Tax Owed</p>
@@ -58,6 +69,8 @@ const TaxReports = () => {
           </h2>
         </div>
       </div>
+
+      {/* Tax Breakdown Table */}
       <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-slate-50 font-bold text-slate-800">Detailed Transaction Log</div>
         <table className="w-full text-left">
@@ -86,4 +99,5 @@ const TaxReports = () => {
     </div>
   );
 };
+
 export default TaxReports;

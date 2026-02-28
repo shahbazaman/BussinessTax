@@ -6,6 +6,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable'; 
+
 const Invoices = () => {
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
@@ -20,6 +21,7 @@ const Invoices = () => {
   const [accounts, setAccounts] = useState([]);
   const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
+
   const [formData, setFormData] = useState({
     customerName: '',
     amount: '',
@@ -27,6 +29,7 @@ const Invoices = () => {
     clientId: '',
     status: 'Pending'
   });
+
  const fetchData = async () => {
   setLoading(true);
   try {
@@ -34,44 +37,59 @@ const Invoices = () => {
       api.get('/invoices'),
       api.get('/clients'),
       api.get('/auth/profile'),
-      api.get('/accounts')
+      api.get('/accounts') // Fetching your bank accounts
     ]);
     setInvoices(invRes.data);
     setClients(clientRes.data);
     setCurrency(profileRes.data.currency || 'USD');
-    setAccounts(accRes.data);
+    setAccounts(accRes.data); // Store accounts in state
   } catch (err) {
     toast.error("Cloud synchronization failed");
   } finally {
     setLoading(false);
   }
 };
+
   useEffect(() => {
     fetchData();
   }, []);
+
+  // --- UPDATED DATE RANGE FILTERING LOGIC ---
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
       const invDate = new Date(inv.createdAt).getTime();
+      
+      // Normalize Start Date to the beginning of the day
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
+      // Normalize End Date to the very last millisecond of the day
       const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
+      
       const clientName = inv.customerName || "";
       const matchesSearch = clientName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = filterStatus === 'All' || inv.status === filterStatus;
+      
       const matchesStart = start ? invDate >= start : true;
       const matchesEnd = end ? invDate <= end : true;
+
       return matchesSearch && matchesStatus && matchesStart && matchesEnd;
     });
   }, [invoices, searchTerm, filterStatus, startDate, endDate]);
+
   const formatValue = (value) => {
     return `${currencySymbol}${Number(value || 0).toLocaleString(undefined, {
       minimumFractionDigits: 2, maximumFractionDigits: 2
     })}`;
   };
+
 const updateStatus = async (id, newStatus) => {
   try {
+    // 1. Update the Invoice Status
     await api.put(`/invoices/${id}/status`, { status: newStatus });
+    // 2. Logic: If status changed to Paid, we record it as actual Income
     if (newStatus === 'Paid') {
       const invoice = invoices.find(inv => inv._id === id);      
+      // Optional: If your backend doesn't handle this automatically, 
+      // you can call your transactions/income endpoint here:
       /*
       await api.post('/transactions', {
         type: 'Income',
@@ -80,6 +98,7 @@ const updateStatus = async (id, newStatus) => {
         description: `Payment received for Invoice: ${invoice.customerName}`,
         date: new Date().toISOString()
       });
+      */      
       toast.success(`Payment verified! Income recorded.`);
     } else {
       toast.success(`Invoice marked as ${newStatus}`);
@@ -90,6 +109,7 @@ const updateStatus = async (id, newStatus) => {
     console.error(err);
   }
 };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const payload = {
@@ -97,6 +117,7 @@ const updateStatus = async (id, newStatus) => {
       amount: Number(formData.amount),
       client: formData.clientId 
     };
+
     try {
       if (editingId) {
         await api.put(`/invoices/${editingId}`, payload);
@@ -111,6 +132,7 @@ const updateStatus = async (id, newStatus) => {
       toast.error(err.response?.data?.message || "Operation failed");
     }
   };
+
   const handleDelete = async (id) => {
     if (window.confirm("Permanently delete this financial record?")) {
       try {
@@ -122,6 +144,7 @@ const updateStatus = async (id, newStatus) => {
       }
     }
   };
+
   const handleEditClick = (inv) => {
     setEditingId(inv._id);
     setFormData({
@@ -133,6 +156,7 @@ const updateStatus = async (id, newStatus) => {
     });
     setShowModal(true);
   };
+
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingId(null);
@@ -140,24 +164,31 @@ const updateStatus = async (id, newStatus) => {
   };
 const initiatePayment = async (invoice) => {
   try {
+    // 1. Check if an account exists to receive funds
     if (accounts.length === 0) {
       return toast.error("❌ No bank account found. Please add an account in the Dashboard first.");
     }
+
+    // Use the first account as default
     const targetAccountId = accounts[0]._id;
+
+    // 2. Create Razorpay Order
     const { data: order } = await api.post('/payments/create-order', {
       amount: invoice.amount,
-      currency: "INR" 
+      currency: "INR"  //currency is orginal i wrote "inr" for testing //hi 
     });
 console.log("Order Created Successfully:", order.id);
     const options = {
     key: import.meta.env.VITE_RAZORPAY_KEY_ID,
-    amount: order.amount,
-    currency: "INR",     
+    amount: order.amount, // Still in subunits from backend
+    currency: "INR",      // <--- CHANGE THIS TO "INR" FOR TESTING
     name: "BusinessTax Ledger",
     description: `Invoice #${invoice.invoiceNumber}`,
     order_id: order.id,
+    
     handler: async (response) => {
         try {
+          // 3. Verify and pass the accountId to update balance
           await api.post('/payments/verify', {
             ...response,
             invoiceId: invoice._id,
@@ -172,7 +203,7 @@ console.log("Order Created Successfully:", order.id);
       prefill: {
       name: invoice.customerName,
       email: "test@example.com",
-      contact: "9999999999"
+      contact: "9999999999" // <--- ADD A DUMMY INDIAN NUMBER
     },
     theme: { color: "#0f172a" },
   };
@@ -185,19 +216,25 @@ console.log("Order Created Successfully:", order.id);
 const downloadPDF = (invoice) => {
   try {
     const doc = new jsPDF();
+    
+    // Header
     doc.setFontSize(22);
     doc.setTextColor(15, 23, 42);
     doc.text("INVOICE", 105, 25, { align: "center" });
+    
+    // Details
     doc.setFontSize(10);
     doc.setTextColor(100);
     doc.text(`Invoice ID: ${invoice._id.slice(-8).toUpperCase()}`, 15, 45);
     doc.text(`Issued: ${new Date(invoice.createdAt).toLocaleDateString()}`, 15, 52);
     doc.text(`Status: ${invoice.status.toUpperCase()}`, 15, 59);
+
     doc.setFontSize(12);
     doc.setTextColor(0);
     doc.text("BILLED TO:", 15, 75);
     doc.setFont(undefined, 'bold');
     doc.text(invoice.customerName || "Valued Client", 15, 82);
+    // FIX: Call autoTable(doc, { ... }) instead of doc.autoTable({ ... })
     autoTable(doc, {
       startY: 95,
       head: [['Description', 'Due Date', 'Total Amount']],
@@ -219,10 +256,12 @@ const downloadPDF = (invoice) => {
     toast.error("Failed to generate PDF");
   }
 };
+
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-6xl mx-auto">
-        {/* Header Section
+        
+        {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Invoices</h2>
@@ -238,7 +277,7 @@ const downloadPDF = (invoice) => {
           </div>
         </div>
 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-  {/* Realized Income
+  {/* Realized Income */}
   <div className="bg-emerald-500 p-4 rounded-2xl text-white shadow-sm flex items-center gap-4">
     <div className="p-2.5 bg-white/20 rounded-xl">
       <DollarSign size={20} />
@@ -250,7 +289,8 @@ const downloadPDF = (invoice) => {
       </h4>
     </div>
   </div>
-  {/* Pending Receivables
+
+  {/* Pending Receivables */}
   <div className="bg-amber-500 p-4 rounded-2xl text-white shadow-sm flex items-center gap-4">
     <div className="p-2.5 bg-white/20 rounded-xl">
       <Calendar size={20} />
@@ -262,7 +302,8 @@ const downloadPDF = (invoice) => {
       </h4>
     </div>
   </div>
-  {/* Active Count
+
+  {/* Active Count */}
   <div className="bg-slate-900 p-4 rounded-2xl text-white shadow-sm flex items-center gap-4">
     <div className="p-2.5 bg-slate-800 rounded-xl">
       <FileText size={20} />
@@ -273,10 +314,11 @@ const downloadPDF = (invoice) => {
     </div>
   </div>
 </div>
-        {/* Filters Bar with Date Range
+        {/* Filters Bar with Date Range */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
-            {/* Search
+            
+            {/* Search */}
             <div className="lg:col-span-4 relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={20} />
               <input 
@@ -287,7 +329,8 @@ const downloadPDF = (invoice) => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            {/* Status
+            
+            {/* Status */}
             <div className="lg:col-span-2 relative">
               <select 
                 className="w-full px-4 py-4 bg-slate-50 border-none rounded-2xl outline-none font-black text-[10px] uppercase tracking-widest text-slate-600 appearance-none cursor-pointer"
@@ -300,7 +343,8 @@ const downloadPDF = (invoice) => {
                 <option value="Overdue">Overdue</option>
               </select>
             </div>
-            {/* Date Range Group
+
+            {/* Date Range Group */}
             <div className="lg:col-span-6 flex items-center gap-2 bg-slate-900 p-2 rounded-2xl">
               <div className="flex-1 flex items-center gap-2 px-3">
                 <span className="text-[9px] font-black text-blue-400 uppercase">From</span>
@@ -311,7 +355,9 @@ const downloadPDF = (invoice) => {
                   onChange={(e) => setStartDate(e.target.value)}
                 />
               </div>
+              
               <ArrowRight size={14} className="text-slate-600" />
+
               <div className="flex-1 flex items-center gap-2 px-3">
                 <span className="text-[9px] font-black text-blue-400 uppercase">To</span>
                 <input 
@@ -321,6 +367,7 @@ const downloadPDF = (invoice) => {
                   onChange={(e) => setEndDate(e.target.value)}
                 />
               </div>
+
               {(startDate || endDate) && (
                 <button 
                   onClick={() => { setStartDate(''); setEndDate(''); }}
@@ -332,7 +379,8 @@ const downloadPDF = (invoice) => {
             </div>
           </div>
         </div>
-        {/* Content Area
+
+        {/* Content Area */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-300">
             <Loader2 className="animate-spin mb-4" size={48} />
@@ -379,7 +427,7 @@ const downloadPDF = (invoice) => {
                           <div className="flex justify-end gap-2">
                             {inv.status === 'Pending' && (
                               <button 
-                                onClick={() => initiatePayment(inv)}
+                                onClick={() => initiatePayment(inv)} // ADD THIS LINE
                                 className="p-3 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
                                 title="Pay Now"
                               >
@@ -409,7 +457,8 @@ const downloadPDF = (invoice) => {
           </div>
         )}
       </div>
-      {/* Unified Modal
+
+      {/* Unified Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-xl flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[3.5rem] w-full max-w-xl shadow-2xl overflow-hidden p-10 animate-in zoom-in duration-300">
@@ -419,6 +468,7 @@ const downloadPDF = (invoice) => {
               </h3>
               <button onClick={handleCloseModal} className="p-3 bg-slate-50 rounded-full hover:bg-rose-50 hover:text-rose-500 transition-all"><X size={24}/></button>
             </div>
+            
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Select Client</label>
@@ -435,6 +485,7 @@ const downloadPDF = (invoice) => {
                   {clients.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
                 </select>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Amount</label>
@@ -455,6 +506,7 @@ const downloadPDF = (invoice) => {
                   />
                 </div>
               </div>
+
               <button type="submit" className="w-full py-6 bg-slate-900 text-white rounded-3xl font-black uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all">
                 {editingId ? 'Synchronize Updates' : 'Authorize Invoice'}
               </button>
@@ -466,4 +518,5 @@ const downloadPDF = (invoice) => {
     </div>
   );
 };
+
 export default Invoices;

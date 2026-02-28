@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+
 const expenseSchema = new mongoose.Schema({
   user: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -32,7 +33,9 @@ const expenseSchema = new mongoose.Schema({
     default: Date.now 
   }
 }, { 
-  timestamps: true
+  timestamps: true 
 });
+
 const Expense = mongoose.model('Expense', expenseSchema);
+
 export default Expense;

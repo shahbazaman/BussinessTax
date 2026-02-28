@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+
 const invoiceSchema = new mongoose.Schema({
   user: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -24,7 +25,7 @@ const invoiceSchema = new mongoose.Schema({
   invoiceNumber: { 
     type: String, 
     required: true,
-    unique: true
+    unique: true 
   },
   customerName: { type: String, required: true },
   amount: { type: Number, required: true },
@@ -37,7 +38,7 @@ const invoiceSchema = new mongoose.Schema({
   razorpayOrderId: { 
     type: String, 
     unique: true, 
-    sparse: true
+    sparse: true 
   },
   paidIntoAccount: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -47,5 +48,6 @@ const invoiceSchema = new mongoose.Schema({
     type: Date 
   }
 }, { timestamps: true });
+
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 export default Invoice;

@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer } from 'react-toastify'; 
 import 'react-toastify/dist/ReactToastify.css';
 import Sidebar from './components/Sidebar';
 import Dashboard from './pages/Dashboard';
@@ -11,9 +11,10 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings'; 
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Inventory from './pages/Inventory';
+import Inventory from './pages/Inventory'; 
 import Accounts from './pages/Accounts';  
 import Employees from './pages/Employees';
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   useEffect(() => {
@@ -27,6 +28,7 @@ function App() {
       window.removeEventListener('authChange', checkAuth);
     };
   }, []);
+
 useEffect(() => {
   const checkAuth = () => {
     const token = localStorage.getItem('token') || localStorage.getItem('userInfo');
@@ -38,7 +40,7 @@ useEffect(() => {
   return (
     <Router>
       <div className="flex min-h-screen bg-slate-50">
-        {isAuthenticated && <Sidebar />}
+        {isAuthenticated && <Sidebar />}        
         <main className="flex-1 overflow-x-hidden">
           <Routes>
             <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
@@ -51,7 +53,7 @@ useEffect(() => {
             <Route path="/settings" element={isAuthenticated ? <Settings /> : <Navigate to="/login" />} />
             <Route path="/inventory" element={isAuthenticated ? <Inventory /> : <Navigate to="/login" />} />
             <Route path="/accounts" element={isAuthenticated ? <Accounts /> : <Navigate to="/login" />} />
-            <Route path="/employees" element={isAuthenticated ? <Employees /> : <Navigate to="/login" />} />
+            <Route path="/employees" element={isAuthenticated ? <Employees /> : <Navigate to="/login" />} />            
             <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} />} />
           </Routes>
         </main>
@@ -60,4 +62,5 @@ useEffect(() => {
     </Router>
   );
 }
+
 export default App;

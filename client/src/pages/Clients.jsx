@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
-import { Plus, Search, Mail, Phone, Trash2, X, User, ExternalLink, Loader2, Edit2 } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Trash2, X, User, ExternalLink, Loader2, Edit2 } from 'lucide-react'; // Added Edit2
 import { useNavigate } from 'react-router-dom';
+
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  
+  // New state to track if we are editing
   const [editingClient, setEditingClient] = useState(null);
   const [formData, setFormData] = useState({ name: '', email: '', phone: '' });
   const navigate = useNavigate();
+
   const fetchClients = async () => {
     try {
       const res = await api.get('/clients');
@@ -20,27 +24,36 @@ const Clients = () => {
       setLoading(false);
     }
   };
+
   useEffect(() => {
     fetchClients();
   }, []);
+
+  // Handle opening the modal for a NEW client
   const handleOpenAddModal = () => {
     setEditingClient(null);
     setFormData({ name: '', email: '', phone: '' });
     setShowModal(true);
   };
+
+  // Handle opening the modal for EDITING a client
   const handleEdit = (client) => {
     setEditingClient(client);
     setFormData({ name: client.name, email: client.email, phone: client.phone || '' });
     setShowModal(true);
   };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       if (editingClient) {
+        // UPDATE MODE
         await api.put(`/clients/${editingClient._id}`, formData);
       } else {
+        // CREATE MODE
         await api.post('/clients', formData);
       }
+      
       setShowModal(false);
       setFormData({ name: '', email: '', phone: '' });
       setEditingClient(null);
@@ -49,6 +62,7 @@ const Clients = () => {
       alert(`Failed to ${editingClient ? 'update' : 'add'} client`);
     }
   };
+
   const handleDelete = async (id) => {
     if (window.confirm("Are you sure? This will not delete their invoices but will remove them from this directory.")) {
       try {
@@ -59,18 +73,23 @@ const Clients = () => {
       }
     }
   };
+
   const filteredClients = clients.filter(c => 
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-6xl mx-auto">
+        
+        {/* Header Section */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h2 className="text-3xl font-black text-slate-800 tracking-tight">Client Directory</h2>
             <p className="text-slate-500 text-sm font-medium">Manage your customer relationships and billing history</p>
           </div>
+          
           <div className="flex w-full md:w-auto gap-3">
             <div className="relative flex-1 md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
@@ -90,6 +109,8 @@ const Clients = () => {
             </button>
           </div>
         </div>
+
+        {/* Client Grid */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-400">
             <Loader2 className="animate-spin mb-4" size={40}/>
@@ -104,6 +125,8 @@ const Clients = () => {
                     <div className="w-14 h-14 bg-linear-to-br from-green-50 to-emerald-50 text-green-600 rounded-2xl flex items-center justify-center font-black text-2xl shadow-inner border border-green-100">
                       {client.name.charAt(0).toUpperCase()}
                     </div>
+                    
+                    {/* EDIT & DELETE BUTTONS */}
                     <div className="flex gap-1">
                       <button 
                         onClick={(e) => {
@@ -125,7 +148,9 @@ const Clients = () => {
                       </button>
                     </div>
                   </div>
+                  
                   <h3 className="font-bold text-slate-800 text-xl mb-1">{client.name}</h3>
+                  
                   <div className="space-y-2 mb-6">
                     <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
                       <Mail size={14} className="text-slate-300" /> {client.email}
@@ -136,6 +161,8 @@ const Clients = () => {
                       </div>
                     )}
                   </div>
+
+                  {/* Stats Section */}
                   <div className="grid grid-cols-2 gap-4 py-4 border-t border-slate-50 bg-slate-50/50 rounded-3xl px-4 mb-4">
                     <div>
                       <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Revenue</p>
@@ -146,6 +173,7 @@ const Clients = () => {
                       <p className="font-bold text-slate-800 text-lg">{client.invoiceCount || 0}</p>
                     </div>
                   </div>
+
                   <button 
                     onClick={() => navigate(`/invoices?clientId=${client._id}`)} 
                     className="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-bold hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all flex items-center justify-center gap-2"
@@ -172,6 +200,8 @@ const Clients = () => {
           </div>
         )}
       </div>
+
+      {/* Add/Edit Client Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[3rem] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden">
@@ -183,6 +213,7 @@ const Clients = () => {
                 <X size={20}/>
               </button>
             </div>
+            
             <form onSubmit={handleSubmit} className="p-8 space-y-6">
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Full Name</label>
@@ -196,6 +227,7 @@ const Clients = () => {
                   />
                 </div>
               </div>
+
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Email Address</label>
                 <div className="relative group">
@@ -208,6 +240,7 @@ const Clients = () => {
                   />
                 </div>
               </div>
+
               <div>
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Phone Number</label>
                 <div className="relative group">
@@ -220,6 +253,7 @@ const Clients = () => {
                   />
                 </div>
               </div>
+
               <div className="flex gap-4 pt-4">
                 <button 
                   type="submit" 
@@ -235,4 +269,5 @@ const Clients = () => {
     </div>
   );
 };
+
 export default Clients;

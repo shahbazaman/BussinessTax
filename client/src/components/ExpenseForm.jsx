@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../utils/api';
 import { Landmark, Receipt, Calendar } from 'lucide-react';
+
 const ExpenseForm = ({ onRefresh }) => {
   const [expense, setExpense] = useState({
     title: '',
@@ -9,23 +10,27 @@ const ExpenseForm = ({ onRefresh }) => {
     currency: 'USD',
     date: new Date().toISOString().split('T')[0]
   });
+
   const categories = ['Software', 'Rent', 'Marketing', 'Travel', 'Salaries', 'Utilities', 'Other'];
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.post('/expenses', expense);
+      await api.post('/expenses', expense); //hi
       alert('Expense logged!');
-      onRefresh();
+      onRefresh(); // To update the profit chart on Dashboard
       setExpense({ title: '', amount: '', category: 'Software', currency: 'USD', date: new Date().toISOString().split('T')[0] });
     } catch (err) {
       console.error(err);
     }
   };
+
   return (
     <form onSubmit={handleSubmit} className="bg-white p-6 rounded-2xl shadow-soft border border-slate-100 space-y-4">
       <h3 className="font-bold text-slate-800 flex items-center gap-2">
         <Receipt size={18} className="text-red-500" /> Log Business Expense
       </h3>
+      
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <input 
           placeholder="Expense Title (e.g. AWS Bill)"
@@ -43,6 +48,7 @@ const ExpenseForm = ({ onRefresh }) => {
           required
         />
       </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <select 
           className="w-full p-3 bg-slate-50 border-none rounded-xl outline-none"
@@ -51,6 +57,7 @@ const ExpenseForm = ({ onRefresh }) => {
         >
           {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
         </select>
+
         <select 
           className="w-full p-3 bg-slate-50 border-none rounded-xl outline-none"
           value={expense.currency}
@@ -60,6 +67,7 @@ const ExpenseForm = ({ onRefresh }) => {
           <option value="INR">INR (₹)</option>
           <option value="EUR">EUR (€)</option>
         </select>
+
         <input 
           type="date"
           className="w-full p-3 bg-slate-50 border-none rounded-xl outline-none"
@@ -67,10 +75,12 @@ const ExpenseForm = ({ onRefresh }) => {
           onChange={(e) => setExpense({...expense, date: e.target.value})}
         />
       </div>
+
       <button className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition-all">
         Log Expense
       </button>
     </form>
   );
 };
+
 export default ExpenseForm;
