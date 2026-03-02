@@ -117,7 +117,7 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-[3rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-white/20">
         
         {/* Header */}
@@ -183,7 +183,7 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
               name="supplier"
               value={productData.supplier}
               placeholder="Supplier/Manufacturer Name"
-              className="p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-700 shadow-inner h-[68px]"
+              className="p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-700 shadow-inner h-17"
               onChange={handleChange}
             />
           </section>

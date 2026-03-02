@@ -165,7 +165,7 @@ const CreateInvoice = () => {
           <div className="bg-white rounded-[2.5rem] p-8 shadow-sm border border-slate-100">
              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1 mb-2"><Info size={12}/> Terms & Notes</label>
              <textarea 
-               className="w-full p-4 bg-slate-50 rounded-2xl outline-none font-medium text-sm min-h-[100px]"
+               className="w-full p-4 bg-slate-50 rounded-2xl outline-none font-medium text-sm min-h-25"
                placeholder="Payment instructions, bank details, or thank you message..."
                onChange={(e) => setInvoice({...invoice, notes: e.target.value})}
              />
@@ -215,7 +215,7 @@ const CreateInvoice = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-[2rem] p-6 border border-slate-100">
+          <div className="bg-white rounded-4xl p-6 border border-slate-100">
              <div className="flex items-center gap-3 text-slate-400">
                <Hash size={18}/>
                <div>

@@ -40,36 +40,57 @@ export const closeMonth = async (req, res) => {
   try {
     const userId = req.user._id || req.user.id;
     const sourceAccount = await Account.findOne({ userId, accountType: 'Wallet' }) 
-                       || await Account.findOne({ userId }); 
+                        || await Account.findOne({ userId }); 
     if (!sourceAccount) {
       return res.status(400).json({ 
-        message: "No bank account found. Please add an account in the Accounts tab first." 
+        message: "Financial Operation Denied: No source account found. Please link a bank account or wallet first." 
       });
     }
 
-    const employees = await Employee.find({ user: userId });
-    const totalPayroll = employees.reduce((sum, emp) => sum + (emp.workingDays * emp.dailyRate), 0);
-
+    const employees = await Employee.find({ user: userId });    
+    if (!employees || employees.length === 0) {
+      return res.status(404).json({ message: "No employees found to process." });
+    }
+    const totalPayroll = employees.reduce((sum, emp) => sum + (Number(emp.workingDays) * Number(emp.dailyRate)), 0);
     if (totalPayroll > 0) {
+      if (sourceAccount.balance < totalPayroll) {
+        return res.status(400).json({ 
+          message: `Insufficient Funds: Payroll requires ${totalPayroll.toLocaleString()}, but ${sourceAccount.bankName} only has ${sourceAccount.balance.toLocaleString()}.` 
+        });
+      }
       await Transaction.create({
         userId: userId,
         fromAccount: sourceAccount._id, 
-        toAccount: sourceAccount._id,   
+        toAccount: sourceAccount._id, 
         amount: totalPayroll,
-        description: `Payroll: ${new Date().toLocaleString('default', { month: 'long' })}`,
-        status: 'Completed'
+        category: 'Salaries', 
+        description: `Payroll Settlement: ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`,
+        status: 'Completed',
+        type: 'Expense'
       });
       sourceAccount.balance -= totalPayroll;
       await sourceAccount.save();
     }
-    await Employee.updateMany({ user: userId }, { $set: { workingDays: 0 } });
-    
+    await Employee.updateMany(
+      { user: userId }, 
+      { 
+        $set: { 
+          workingDays: 0,
+          lastAttendanceDate: null 
+        } 
+      }
+    );
     res.json({ 
-      message: `Payroll of $${totalPayroll.toLocaleString()} processed from ${sourceAccount.bankName}.` 
+      success: true,
+      message: `Payroll of ${totalPayroll.toLocaleString()} processed from ${sourceAccount.bankName}. Staff units reset.`,
+      payout: totalPayroll
     });
+
   } catch (error) {
     console.error("Close Month Error:", error);
-    res.status(500).json({ message: "Server error: " + error.message });
+    res.status(500).json({ 
+      message: "Server error: " + error.message 
+    });
   }
 };
 

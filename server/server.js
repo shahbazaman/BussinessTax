@@ -12,17 +12,16 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import employeeRoutes from './routes/employeeRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
+import analyticsRoutes from './routes/analyticsRoutes.js';
 
 dotenv.config();
 
-// Connect to MongoDB
 connectDB();
 
 const app = express();
 
-// Middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL, // This will be your Vercel URL
+  origin: process.env.FRONTEND_URL, 
   credentials: true
 }));
 app.use(express.json()); 
@@ -35,7 +34,8 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/clients', clientRoutes);
 app.use('/api/accounts', accountRoutes);
 app.use('/api/employees', employeeRoutes);
-app.use('/api/products', productRoutes); // For the upcoming Inventory feature
+app.use('/api/products', productRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.get('/', (req, res) => {
   res.send('BusinessTax API is running...');
