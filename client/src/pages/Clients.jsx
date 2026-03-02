@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import api from '../utils/api';
-import { Plus, Search, Mail, Phone, Trash2, X, User, ExternalLink, Loader2, Edit2 } from 'lucide-react'; // Added Edit2
+import { 
+  Plus, Search, Mail, Phone, Trash2, X, User, ExternalLink, 
+  Loader2, Edit2, Building2, ShieldCheck, MapPin, ChevronDown, 
+  CreditCard, Landmark 
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useContext } from 'react';
 import { CurrencyContext } from '../context/CurrencyContext';
 
 const Clients = () => {
@@ -10,10 +13,32 @@ const Clients = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const { symbol } = useContext(CurrencyContext);
   const [editingClient, setEditingClient] = useState(null);
-  const [formData, setFormData] = useState({ name: '', email: '', phone: '' });
+  
   const navigate = useNavigate();
+
+  // Advanced Form State
+  const initialFormState = {
+    name: '',
+    email: '',
+    phone: '',
+    businessName: '',
+    taxId: '',
+    paymentTerms: 'Immediate',
+    creditLimit: 0,
+    openingBalance: 0,
+    billingAddress: {
+      street: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: ''
+    }
+  };
+
+  const [formData, setFormData] = useState(initialFormState);
 
   const fetchClients = async () => {
     try {
@@ -30,17 +55,20 @@ const Clients = () => {
     fetchClients();
   }, []);
 
-  // Handle opening the modal for a NEW client
   const handleOpenAddModal = () => {
     setEditingClient(null);
-    setFormData({ name: '', email: '', phone: '' });
+    setFormData(initialFormState);
+    setShowAdvanced(false);
     setShowModal(true);
   };
 
-  // Handle opening the modal for EDITING a client
   const handleEdit = (client) => {
     setEditingClient(client);
-    setFormData({ name: client.name, email: client.email, phone: client.phone || '' });
+    setFormData({
+      ...initialFormState,
+      ...client,
+      billingAddress: client.billingAddress || initialFormState.billingAddress
+    });
     setShowModal(true);
   };
 
@@ -48,16 +76,11 @@ const Clients = () => {
     e.preventDefault();
     try {
       if (editingClient) {
-        // UPDATE MODE
         await api.put(`/clients/${editingClient._id}`, formData);
       } else {
-        // CREATE MODE
         await api.post('/clients', formData);
       }
-      
       setShowModal(false);
-      setFormData({ name: '', email: '', phone: '' });
-      setEditingClient(null);
       fetchClients();
     } catch (err) {
       alert(`Failed to ${editingClient ? 'update' : 'add'} client`);
@@ -77,7 +100,8 @@ const Clients = () => {
 
   const filteredClients = clients.filter(c => 
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.businessName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -88,7 +112,7 @@ const Clients = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
             <h2 className="text-3xl font-black text-slate-800 tracking-tight">Client Directory</h2>
-            <p className="text-slate-500 text-sm font-medium">Manage your customer relationships and billing history</p>
+            <p className="text-slate-500 text-sm font-medium">Professional customer relationships & billing logic</p>
           </div>
           
           <div className="flex w-full md:w-auto gap-3">
@@ -96,7 +120,7 @@ const Clients = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Search clients..."
+                placeholder="Search clients or companies..."
                 className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm transition-all"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -127,30 +151,20 @@ const Clients = () => {
                       {client.name.charAt(0).toUpperCase()}
                     </div>
                     
-                    {/* EDIT & DELETE BUTTONS */}
                     <div className="flex gap-1">
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleEdit(client);
-                        }}
-                        className="p-2 text-slate-200 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-all"
-                      >
+                      <button onClick={() => handleEdit(client)} className="p-2 text-slate-200 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-all">
                         <Edit2 size={18} />
                       </button>
-                      <button 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(client._id);
-                        }}
-                        className="p-2 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all"
-                      >
+                      <button onClick={() => handleDelete(client._id)} className="p-2 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
                         <Trash2 size={18} />
                       </button>
                     </div>
                   </div>
                   
                   <h3 className="font-bold text-slate-800 text-xl mb-1">{client.name}</h3>
+                  <p className="text-xs font-bold text-green-600 mb-4 flex items-center gap-1 uppercase tracking-wider">
+                    <Building2 size={12} /> {client.businessName || 'Individual Account'}
+                  </p>
                   
                   <div className="space-y-2 mb-6">
                     <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
@@ -167,11 +181,11 @@ const Clients = () => {
                   <div className="grid grid-cols-2 gap-4 py-4 border-t border-slate-50 bg-slate-50/50 rounded-3xl px-4 mb-4">
                     <div>
                       <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Revenue</p>
-                      <p className="font-bold text-slate-800 text-lg">{ symbol }{Number(client.totalInvoiced || 0).toLocaleString()}</p>
+                      <p className="font-bold text-slate-800 text-lg">{symbol}{Number(client.totalInvoiced || 0).toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Invoices</p>
-                      <p className="font-bold text-slate-800 text-lg">{client.invoiceCount || 0}</p>
+                      <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Terms</p>
+                      <p className="font-bold text-slate-800 text-sm mt-1">{client.paymentTerms}</p>
                     </div>
                   </div>
 
@@ -185,82 +199,146 @@ const Clients = () => {
               ))
             ) : (
               <div className="col-span-full bg-white border-2 border-dashed border-slate-200 rounded-[3rem] p-20 text-center">
-                <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <User className="text-slate-300" size={40} />
-                </div>
+                <User className="text-slate-300 mx-auto mb-4" size={40} />
                 <h3 className="text-xl font-bold text-slate-800">No clients found</h3>
-                <p className="text-slate-500 mb-6">Start by adding your first business contact.</p>
-                <button 
-                  onClick={handleOpenAddModal}
-                  className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-sm"
-                >
-                  Create Client
-                </button>
+                <button onClick={handleOpenAddModal} className="mt-4 bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-sm">Create Client</button>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Add/Edit Client Modal */}
+      {/* Add/Edit Client Modal - ADVANCED VERSION */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[3rem] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden">
-            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-              <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-                {editingClient ? 'Edit Client' : 'New Client'}
-              </h3>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-200 my-auto overflow-hidden">
+            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10">
+              <div>
+                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
+                  {editingClient ? 'Edit Professional Profile' : 'New Client Onboarding'}
+                </h3>
+              </div>
               <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm transition-colors">
                 <X size={20}/>
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Full Name</label>
-                <div className="relative group">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
-                  <input 
-                    required type="text" placeholder="e.g. Jane Cooper" 
-                    className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold transition-all placeholder:text-slate-300"
-                    value={formData.name}
-                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  />
+            <form onSubmit={handleSubmit} className="p-8 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* --- Primary Contact Section --- */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Contact Information</h4>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Full Name *</label>
+                    <div className="relative group">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
+                      <input required type="text" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                        value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Email *</label>
+                    <div className="relative group">
+                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
+                      <input required type="email" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                        value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Phone</label>
+                    <div className="relative group">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
+                      <input type="tel" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                        value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- Business Identification Section --- */}
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-4">Business ID</h4>
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Company Name</label>
+                    <div className="relative group">
+                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
+                      <input type="text" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                        value={formData.businessName} onChange={(e) => setFormData({...formData, businessName: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Tax ID / VAT / GST</label>
+                    <div className="relative group">
+                      <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
+                      <input type="text" placeholder="e.g. TAX-99800" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                        value={formData.taxId} onChange={(e) => setFormData({...formData, taxId: e.target.value})} />
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Email Address</label>
-                <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
-                  <input 
-                    required type="email" placeholder="jane@company.com" 
-                    className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold transition-all placeholder:text-slate-300"
-                    value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  />
-                </div>
+              {/* --- Advanced Settings Toggle --- */}
+              <div className="mt-8 pt-6 border-t border-slate-100">
+                <button 
+                  type="button" 
+                  onClick={() => setShowAdvanced(!showAdvanced)}
+                  className="flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-all font-black text-[10px] uppercase tracking-widest"
+                >
+                  <ChevronDown className={`transition-transform duration-300 ${showAdvanced ? 'rotate-180' : ''}`} size={16} />
+                  Financial & Address Details
+                </button>
+
+                {showAdvanced && (
+                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-4 duration-300">
+                    <div className="space-y-4">
+                      <h5 className="text-[10px] font-bold text-slate-800 flex items-center gap-2"><CreditCard size={12}/> Billing Defaults</h5>
+                      <select 
+                        className="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold border-r-8 border-transparent"
+                        value={formData.paymentTerms} onChange={(e) => setFormData({...formData, paymentTerms: e.target.value})}
+                      >
+                        <option value="Immediate">Due on Receipt</option>
+                        <option value="Net 15">Net 15 Days</option>
+                        <option value="Net 30">Net 30 Days</option>
+                        <option value="Net 60">Net 60 Days</option>
+                      </select>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Credit Limit ({symbol})</label>
+                          <input type="number" className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm font-bold" 
+                            value={formData.creditLimit} onChange={(e) => setFormData({...formData, creditLimit: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Opening Bal ({symbol})</label>
+                          <input type="number" className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm font-bold" 
+                            value={formData.openingBalance} onChange={(e) => setFormData({...formData, openingBalance: e.target.value})} />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h5 className="text-[10px] font-bold text-slate-800 flex items-center gap-2"><MapPin size={12}/> Billing Address</h5>
+                      <input placeholder="Street Address" className="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-green-500/20" 
+                        value={formData.billingAddress.street} onChange={(e) => setFormData({...formData, billingAddress: {...formData.billingAddress, street: e.target.value}})} />
+                      <div className="grid grid-cols-2 gap-2">
+                        <input placeholder="City" className="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none" 
+                          value={formData.billingAddress.city} onChange={(e) => setFormData({...formData, billingAddress: {...formData.billingAddress, city: e.target.value}})} />
+                        <input placeholder="Country" className="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none" 
+                          value={formData.billingAddress.country} onChange={(e) => setFormData({...formData, billingAddress: {...formData.billingAddress, country: e.target.value}})} />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Phone Number</label>
-                <div className="relative group">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
-                  <input 
-                    type="tel" placeholder="+1 (555) 000-0000" 
-                    className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold transition-all placeholder:text-slate-300"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-4 pt-4">
+              <div className="pt-8">
                 <button 
                   type="submit" 
-                  className={`w-full text-white py-4 rounded-2xl font-black text-sm shadow-xl transition-all ${editingClient ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200' : 'bg-slate-900 hover:bg-slate-800 shadow-slate-200'}`}
+                  className={`w-full text-white py-5 rounded-4xl font-black text-sm shadow-xl transition-all ${editingClient ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' : 'bg-slate-900 hover:bg-emerald-600 shadow-slate-200'}`}
                 >
-                  {editingClient ? 'Save Changes' : 'Create Client Profile'}
+                  {editingClient ? 'Synchronize Client Data' : 'Authorize & Create Profile'}
                 </button>
               </div>
             </form>

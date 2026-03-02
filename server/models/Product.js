@@ -1,20 +1,96 @@
 import mongoose from 'mongoose';
 
 const variantSchema = new mongoose.Schema({
-  name: { type: String, required: true }, // e.g., "500g Pack" or "1 Liter Bottle"
-  weight: { type: Number, required: true },
-  unit: { type: String, enum: ['g', 'kg', 'ml', 'L', 'pcs'], required: true },
-  price: { type: Number, required: true },
-  stock: { type: Number, default: 0 },
-  sku: { type: String, unique: true } // Stock Keeping Unit
+  name: { 
+    type: String, 
+    required: true 
+  }, // e.g., "500g Pack" or "1 Liter Bottle"
+  weight: { 
+    type: Number 
+  },
+  unit: { 
+    type: String, 
+    enum: ['g', 'kg', 'ml', 'L', 'pcs'], 
+    default: 'pcs' 
+  },
+  
+  // Financial Valuation
+  costPrice: { 
+    type: Number, 
+    required: true, 
+    default: 0 
+  }, // What you paid the supplier
+  price: { 
+    type: Number, 
+    required: true 
+  }, // Sale price to the customer
+  
+  // Inventory Logistics
+  stock: { 
+    type: Number, 
+    default: 0 
+  },
+  sku: { 
+    type: String, 
+    unique: true, 
+    sparse: true 
+  }, // Stock Keeping Unit
+  barcode: { 
+    type: String 
+  }
 });
 
 const productSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  title: { type: String, required: true },
-  category: { type: String },
+  user: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+  title: { 
+    type: String, 
+    required: true,
+    trim: true 
+  },
+  category: { 
+    type: String,
+    required: true
+  },
+  supplier: { 
+    type: String,
+    trim: true 
+  }, // To know who to call for restock
+  
   variants: [variantSchema],
-  lowStockAlert: { type: Number, default: 10 } 
-}, { timestamps: true });
+
+  // Global thresholds for this product
+  lowStockAlert: { 
+    type: Number, 
+    default: 10 
+  }, 
+  reorderQuantity: { 
+    type: Number, 
+    default: 50 
+  } // Suggested amount to buy when stock is low
+}, { 
+  timestamps: true,
+  toJSON: { virtuals: true }, 
+  toObject: { virtuals: true } 
+});
+
+/**
+ * Virtual: Profit Margin
+ * Calculates the percentage of profit for each variant
+ */
+productSchema.virtual('margins').get(function() {
+  return this.variants.map(v => {
+    const profit = v.price - v.costPrice;
+    const percentage = v.price > 0 ? (profit / v.price) * 100 : 0;
+    return {
+      variant: v.name,
+      profit: profit.toFixed(2),
+      marginPercentage: percentage.toFixed(2) + '%'
+    };
+  });
+});
 
 export default mongoose.model('Product', productSchema);

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import InvoicePDF from './InvoicePDF';
 import { FileDown, Plus, Trash2 } from 'lucide-react';
-
+import { useContext } from 'react';
+import { CurrencyContext } from '../context/CurrencyContext';
 const CreateInvoice = () => {
   const [invoice, setInvoice] = useState({
     invoiceNumber: 'INV-001',
@@ -11,7 +12,7 @@ const CreateInvoice = () => {
     clientName: '',
     items: [{ description: '', quantity: 1, price: 0 }]
   });
-
+const { symbol } = useContext(CurrencyContext);
   const addItem = () => {
     setInvoice({ ...invoice, items: [...invoice.items, { description: '', quantity: 1, price: 0 }] });
   };
@@ -93,7 +94,7 @@ const CreateInvoice = () => {
         <div className="mt-8 pt-8 border-t border-slate-100 flex justify-end">
           <div className="text-right">
             <p className="text-slate-400 text-xs uppercase font-black">Total Amount</p>
-            <p className="text-4xl font-black text-slate-800">${calculateTotal().toLocaleString()}</p>
+            <p className="text-4xl font-black text-slate-800">{ symbol }{calculateTotal().toLocaleString()}</p>
           </div>
         </div>
       </div>

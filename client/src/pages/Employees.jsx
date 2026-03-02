@@ -1,10 +1,13 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../utils/api';
-import { Users, UserPlus, CalendarCheck, DollarSign, Trash2, Edit2, X, Search, Filter, Loader2, Receipt } from 'lucide-react';
+import { 
+  Users, UserPlus, CalendarCheck, DollarSign, Trash2, Edit2, 
+  X, Search, Filter, Loader2, Receipt, Landmark, Phone, Briefcase 
+} from 'lucide-react';
 import { toast } from 'react-toastify';
 import { exportToCSV } from '../utils/exportCSV';
-import { useContext } from 'react';
 import { CurrencyContext } from '../context/CurrencyContext';
+
 const Employees = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,17 +15,25 @@ const Employees = () => {
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
-  const [formData, setFormData] = useState({ name: '', role: '', dailyRate: '' });
+  
+  // Enhanced state to match your Enterprise Schema
+  const [formData, setFormData] = useState({ 
+    name: '', role: '', dailyRate: '', 
+    email: '', phone: '', employmentType: 'Full-time',
+    bankName: '', accountNumber: '' 
+  });
+
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const { symbol } = useContext(CurrencyContext);
+
   const fetchData = async () => {
     try {
       setLoading(true);
       const empRes = await api.get('/employees');
       setEmployees(empRes.data);
     } catch (err) {
-      toast.error("Sync failed");
+      toast.error("Cloud sync failed");
     } finally {
       setLoading(false);
     }
@@ -44,14 +55,21 @@ const Employees = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const payload = { ...formData, dailyRate: Number(formData.dailyRate) };
+      const payload = { 
+        ...formData, 
+        dailyRate: Number(formData.dailyRate),
+        bankDetails: {
+          bankName: formData.bankName,
+          accountNumber: formData.accountNumber
+        }
+      };
       
       if (isEditing) {
         await api.put(`/employees/${currentId}`, payload);
-        toast.success("Employee updated!");
+        toast.success("Profile Synchronized");
       } else {
         await api.post('/employees', payload);
-        toast.success("Employee onboarded!");
+        toast.success("New Member Onboarded");
       }
       closeModal();
       fetchData();
@@ -68,7 +86,16 @@ const Employees = () => {
   };
 
   const openEditModal = (emp) => {
-    setFormData({ name: emp.name, role: emp.role, dailyRate: emp.dailyRate });
+    setFormData({ 
+      name: emp.name, 
+      role: emp.role, 
+      dailyRate: emp.dailyRate,
+      email: emp.email || '',
+      phone: emp.phone || '',
+      employmentType: emp.employmentType || 'Full-time',
+      bankName: emp.bankDetails?.bankName || '',
+      accountNumber: emp.bankDetails?.accountNumber || ''
+    });
     setCurrentId(emp._id);
     setIsEditing(true);
     setShowModal(true);
@@ -77,28 +104,19 @@ const Employees = () => {
   const closeModal = () => {
     setShowModal(false);
     setIsEditing(false);
-    setFormData({ name: '', role: '', dailyRate: '' });
+    setFormData({ name: '', role: '', dailyRate: '', email: '', phone: '', employmentType: 'Full-time', bankName: '', accountNumber: '' });
   };
 
   const handleMarkAttendance = async (id) => {
     try {
       await api.put(`/employees/${id}/attendance`);
-      toast.success("Attendance marked");
+      toast.success("Attendance Captured");
       fetchData(); 
-    } catch (err) { toast.error("Update failed"); }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Remove this employee?")) return;
-    try {
-      await api.delete(`/employees/${id}`);
-      toast.success("Employee removed");
-      fetchData();
-    } catch (err) { toast.error("Delete failed"); }
+    } catch (err) { toast.error("Attendance update failed"); }
   };
 
   const handleCloseMonth = async () => {
-    if (!window.confirm("This will reset all working days and record payroll in accounts. Proceed?")) return;
+    if (!window.confirm("This will reset working days and record the payout as a Business Expense. Proceed?")) return;
     try {
       setProcessing(true);
       const { data } = await api.post('/employees/close-month'); 
@@ -113,118 +131,131 @@ const Employees = () => {
 
   const totalPayroll = employees.reduce((acc, emp) => acc + (Number(emp.dailyRate) * Number(emp.workingDays)), 0);
 
-  if (loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-blue-600" size={40}/></div>;
+  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-50"><Loader2 className="animate-spin text-blue-600" size={40}/></div>;
 
   return (
-    <div className="p-4 md:p-6 space-y-6 bg-slate-50 min-h-screen">
+    <div className="p-4 md:p-8 space-y-8 bg-slate-50 min-h-screen">
       
-      {/* Action Buttons & Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Staff</p>
-          <div className="flex items-center gap-3">
-            <Users className="text-blue-500" size={20} />
-            <p className="text-2xl font-black text-slate-800">{employees.length}</p>
-          </div>
+      {/* Header & Global Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Staffing Hub</h1>
+          <p className="text-slate-500 font-medium">Manage attendance, payroll, and banking details</p>
         </div>
-
-        <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payroll</p>
-          <div className="flex items-center gap-3">
-            <DollarSign className="text-rose-500" size={20} />
-            <p className="text-xl font-black text-slate-800">{ symbol }{totalPayroll.toLocaleString()}</p>
-          </div>
-        </div>
-
-        <button 
-          onClick={handleCloseMonth} 
-          disabled={processing}
-          className="bg-white text-rose-600 border border-rose-100 py-4 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-rose-50 transition-all shadow-sm disabled:opacity-50"
-        >
-          {processing ? <Loader2 className="animate-spin" size={18} /> : <CalendarCheck size={18} />} Close Month
-        </button>
-
-        <button 
-          onClick={() => setShowModal(true)} 
-          className="bg-slate-900 text-white py-4 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg"
-        >
-          <UserPlus size={18} /> Add Employee
-        </button>
-
-        <button   
-          onClick={() => exportToCSV(filteredEmployees, 'Employees')} 
-          className="bg-emerald-600 text-white py-4 rounded-3xl font-bold flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-lg"
-        >
-          <Receipt size={18} /> Export CSV
-        </button>
-      </div>
-
-      {/* Search & Filters Container */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center bg-white p-4 rounded-3xl shadow-sm border border-slate-100">
-        <div className="relative md:col-span-3">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" placeholder="Search name or role..." 
-            className="w-full pl-12 pr-4 py-3 bg-slate-50 rounded-2xl border-none outline-none font-bold text-sm"
-            value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2 bg-slate-50 px-4 py-1 rounded-2xl">
-          <Filter className="text-slate-400 shrink-0" size={16} />
-          <select 
-            className="w-full bg-transparent py-2 border-none outline-none font-bold text-slate-600 text-sm appearance-none"
-            value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
-          >
-            {roles.map(role => <option key={role} value={role}>{role}</option>)}
-          </select>
+        <div className="flex flex-wrap gap-3">
+            <button 
+              onClick={handleCloseMonth} 
+              disabled={processing}
+              className="bg-rose-50 text-rose-600 border border-rose-100 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-rose-600 hover:text-white transition-all disabled:opacity-50"
+            >
+              {processing ? <Loader2 className="animate-spin" size={16} /> : <CalendarCheck size={16} />} Close Month
+            </button>
+            <button 
+              onClick={() => setShowModal(true)} 
+              className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl shadow-slate-200"
+            >
+              <UserPlus size={16} /> Add Employee
+            </button>
         </div>
       </div>
 
-      {/* Responsive Table Wrapper */}
-      <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-        <div className="overflow-x-auto no-scrollbar">
-          <table className="w-full text-left border-collapse min-w-200">
-            <thead className="bg-slate-50/80 sticky top-0 backdrop-blur-md z-10">
-              <tr className="text-[10px] uppercase font-black text-slate-400">
-                <th className="px-8 py-5">Employee</th>
-                <th className="px-8 py-5">Role</th>
+      {/* Stats Dashboard */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-4xl border border-slate-100 shadow-sm">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Active Workforce</p>
+          <div className="flex items-center justify-between">
+            <p className="text-3xl font-black text-slate-800">{employees.length}</p>
+            <div className="p-3 bg-blue-50 rounded-2xl text-blue-600"><Users size={24}/></div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-4xl border border-slate-100 shadow-sm">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Monthly Accrual</p>
+          <div className="flex items-center justify-between">
+            <p className="text-3xl font-black text-slate-800">{symbol}{totalPayroll.toLocaleString()}</p>
+            <div className="p-3 bg-emerald-50 rounded-2xl text-emerald-600"><DollarSign size={24}/></div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-4xl border border-slate-100 shadow-sm flex items-center justify-center">
+            <button 
+              onClick={() => exportToCSV(filteredEmployees, 'Employees')}
+              className="w-full h-full border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 font-bold hover:border-emerald-500 hover:text-emerald-500 transition-all flex items-center justify-center gap-2"
+            >
+                <Receipt size={18}/> Export Ledger
+            </button>
+        </div>
+      </div>
+
+      {/* Table & Filtering */}
+      <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row gap-4">
+           <div className="relative flex-1">
+             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+             <input 
+               type="text" placeholder="Search by name, role or email..." 
+               className="w-full pl-12 pr-4 py-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-sm"
+               value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+             />
+           </div>
+           <select 
+             className="bg-slate-50 px-6 py-4 rounded-2xl border-none outline-none font-bold text-slate-600 text-sm appearance-none"
+             value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}
+           >
+             {roles.map(role => <option key={role} value={role}>{role}</option>)}
+           </select>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="text-[10px] uppercase font-black text-slate-400 bg-slate-50/50">
+                <th className="px-8 py-5">Personnel</th>
                 <th className="px-8 py-5">Daily Rate</th>
-                <th className="px-8 py-5">Attendance</th>
-                <th className="px-8 py-5 text-right">Action</th>
+                <th className="px-8 py-5">Current Session</th>
+                <th className="px-8 py-5 text-right">Operations</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
               {filteredEmployees.map((emp) => (
-                <tr key={emp._id} className="hover:bg-slate-50/50 transition-colors">
-                  <td className="px-8 py-5 font-bold text-slate-700 whitespace-nowrap">{emp.name}</td>
-                  <td className="px-8 py-5">
-                    <span className="text-[10px] font-black text-slate-400 bg-slate-100 px-2 py-1 rounded-md uppercase">
-                      {emp.role}
-                    </span>
-                  </td>
-                  <td className="px-8 py-5 font-mono text-sm font-bold text-slate-600">{ symbol }{Number(emp.dailyRate).toLocaleString()}</td>
+                <tr key={emp._id} className="group hover:bg-slate-50/50 transition-colors">
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-3">
-                      <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-black">{emp.workingDays} Days</span>
-                      <span className="font-black text-slate-800">{ symbol }{(Number(emp.dailyRate) * emp.workingDays).toLocaleString()}</span>
+                      <div className="h-10 w-10 bg-slate-100 rounded-full flex items-center justify-center font-black text-slate-400">
+                        {emp.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-black text-slate-800">{emp.name}</p>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{emp.role}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-8 py-5 font-mono font-bold text-slate-600">{symbol}{emp.dailyRate}</td>
+                  <td className="px-8 py-5">
+                    <div className="flex items-center gap-4">
+                      <div className="px-3 py-1 bg-blue-50 rounded-lg text-blue-600 text-xs font-black">
+                        {emp.workingDays} Units
+                      </div>
+                      <p className="font-black text-slate-900">{symbol}{(emp.dailyRate * emp.workingDays).toLocaleString()}</p>
                     </div>
                   </td>
                   <td className="px-8 py-5">
-                     <div className="flex justify-end gap-2">
+                    <div className="flex justify-end gap-2">
                       <button 
                         onClick={() => handleMarkAttendance(emp._id)} 
                         disabled={isAlreadyMarked(emp.lastAttendanceDate)} 
-                        className={`p-2.5 rounded-xl transition-all ${isAlreadyMarked(emp.lastAttendanceDate) ? 'bg-slate-50 text-slate-300' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-500 hover:text-white'}`}
+                        title="Mark Attendance"
+                        className={`p-3 rounded-xl transition-all ${isAlreadyMarked(emp.lastAttendanceDate) ? 'bg-slate-50 text-slate-200 cursor-not-allowed' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'}`}
                       >
                         <CalendarCheck size={18} />
                       </button>
-                      <button onClick={() => openEditModal(emp)} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-500 hover:text-white transition-all">
+                      <button onClick={() => openEditModal(emp)} className="p-3 bg-slate-50 text-slate-400 rounded-xl hover:bg-slate-900 hover:text-white transition-all">
                         <Edit2 size={18} />
                       </button>
-                      <button onClick={() => handleDelete(emp._id)} className="p-2.5 text-slate-300 hover:text-rose-500 transition-colors">
+                      <button onClick={() => handleDelete(emp._id)} className="p-3 text-slate-200 hover:text-rose-500 transition-colors">
                         <Trash2 size={18} />
                       </button>
-                     </div>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -233,20 +264,57 @@ const Employees = () => {
         </div>
       </div>
 
-      {/* --- ADD/EDIT MODAL --- */}
+      {/* Employee Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200">
-            <div className="p-6 md:p-8 border-b border-slate-50 flex justify-between items-center">
-              <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight">{isEditing ? 'Edit Profile' : 'New Hire'}</h3>
-              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600 p-2"><X /></button>
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-[100 p-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
+            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="text-xl font-black text-slate-900 uppercase tracking-tight">{isEditing ? 'Profile Management' : 'Global Onboarding'}</h3>
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">HR Data Collection</p>
+              </div>
+              <button onClick={closeModal} className="p-3 bg-white rounded-2xl text-slate-400 hover:text-slate-900 transition-all shadow-sm"><X size={20}/></button>
             </div>
-            <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-4">
-              <input required type="text" placeholder="Full Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none font-bold text-sm" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
-              <input required type="text" placeholder="Role (e.g. Sales)" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none font-bold text-sm" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} />
-              <input required type="number" placeholder={`Daily Rate (${symbol})`} className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none font-bold text-sm" value={formData.dailyRate} onChange={e => setFormData({...formData, dailyRate: e.target.value})} />
-              <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-blue-600 transition-all mt-4">
-                {isEditing ? 'Save Changes' : 'Onboard Employee'}
+            
+            <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto no-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Name</label>
+                  <input required className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-sm" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Email Address</label>
+                  <input type="email" required className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-sm" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Designation</label>
+                  <div className="relative">
+                    <Briefcase className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={16}/>
+                    <input required className="w-full pl-12 p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-sm" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Daily Payout</label>
+                  <div className="relative">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 font-black">{symbol}</span>
+                    <input required type="number" className="w-full pl-12 p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-sm" value={formData.dailyRate} onChange={e => setFormData({...formData, dailyRate: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 bg-slate-900 rounded-4xl space-y-4">
+                <div className="flex items-center gap-2 text-slate-400 mb-2">
+                  <Landmark size={14}/>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Bank Settlement Details</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input placeholder="Bank Name" className="w-full p-4 bg-slate-800 rounded-2xl border-none outline-none font-bold text-sm text-white" value={formData.bankName} onChange={e => setFormData({...formData, bankName: e.target.value})} />
+                  <input placeholder="Account Number" className="w-full p-4 bg-slate-800 rounded-2xl border-none outline-none font-bold text-sm text-white" value={formData.accountNumber} onChange={e => setFormData({...formData, accountNumber: e.target.value})} />
+                </div>
+              </div>
+
+              <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-4xl font-black uppercase tracking-widest shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all">
+                {isEditing ? 'Sync Profile Changes' : 'Finalize Onboarding'}
               </button>
             </form>
           </div>

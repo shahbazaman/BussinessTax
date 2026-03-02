@@ -8,33 +8,68 @@ const invoiceSchema = new mongoose.Schema({
   },
   client: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Client'
+    ref: 'Client',
+    required: true // Essential for linking revenue to specific clients
   },
   type: { 
     type: String, 
     enum: ['Sale', 'Purchase'], 
     default: 'Sale' 
   },
-  items: [{
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
-    variantId: { type: String }, 
-    name: String,
-    quantity: { type: Number, default: 1 },
-    price: { type: Number, default: 0 }
-  }],
   invoiceNumber: { 
     type: String, 
     required: true,
     unique: true 
   },
-  customerName: { type: String, required: true },
-  amount: { type: Number, required: true },
+  poNumber: { 
+    type: String // Purchase Order number for corporate clients
+  },
+  items: [{
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    name: { type: String, required: true },
+    quantity: { type: Number, default: 1 },
+    price: { type: Number, default: 0 },
+    taxRate: { type: Number, default: 0 } // Item-specific tax (VAT/GST)
+  }],
+
+  // Financial Breakdown for Accounting
+  subtotal: { 
+    type: Number, 
+    required: true,
+    default: 0
+  },
+  taxAmount: { 
+    type: Number, 
+    default: 0 
+  },
+  discount: { 
+    type: Number, 
+    default: 0 
+  },
+  shipping: { 
+    type: Number, 
+    default: 0 
+  },
+  totalAmount: { 
+    type: Number, 
+    required: true 
+  },
+
   status: { 
     type: String, 
-    enum: ['Paid', 'Pending', 'Overdue'], 
+    enum: ['Paid', 'Pending', 'Overdue', 'Draft', 'Cancelled'], 
     default: 'Pending' 
   },
-  dueDate: { type: Date, required: true },
+  date: { 
+    type: Date, 
+    default: Date.now 
+  },
+  dueDate: { 
+    type: Date, 
+    required: true 
+  },
+
+  // Payment Tracking
   razorpayOrderId: { 
     type: String, 
     unique: true, 
@@ -46,8 +81,14 @@ const invoiceSchema = new mongoose.Schema({
   },
   paymentDate: { 
     type: Date 
+  },
+  notes: {
+    type: String
   }
 }, { timestamps: true });
+
+// Pre-save index to ensure invoice numbers are unique per user
+invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 export default Invoice;
