@@ -11,18 +11,19 @@ export const getEmployees = async (req, res) => {
 };
 
 export const addEmployee = async (req, res) => {
-  const { name, role, dailyRate } = req.body;
-  try {
-    const employee = await Employee.create({
-      user: req.user.id,
-      name,
-      role,
-      dailyRate: Number(dailyRate)
-    });
-    res.status(201).json(employee);
-  } catch (error) {
-    res.status(400).json({ message: error.message });
-  }
+  const { 
+    name, email, phone, role, dailyRate, 
+    contactNumber, homeAddress, verificationIdType, idNumber, 
+    bankName, accountNumber 
+  } = req.body;
+  const employee = new Employee({
+    user: req.user._id,
+    name, email, phone, role, dailyRate,
+    contactNumber, homeAddress, verificationIdType, idNumber,
+    bankDetails: { bankName, accountNumber }
+  });
+  await employee.save();
+  res.status(201).json(employee);
 };
 
 export const deleteEmployee = async (req, res) => {

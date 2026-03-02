@@ -10,36 +10,44 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   const initialState = {
     title: '',
     category: '',
+    customCategory: '', // Track manual input
     supplier: '',
     lowStockAlert: 10,
-    reorderQuantity: 50, // ERP Requirement: Auto-suggestion for restock
+    reorderQuantity: 50,
     variants: [{ 
-      name: '', 
-      weight: '', 
-      unit: 'kg', 
-      costPrice: '', // Critical for Gross Profit
-      salePrice: '', 
-      stock: '', 
-      sku: '',
-      barcode: '' 
+      name: '', weight: '', unit: 'kg', costPrice: '', salePrice: '', stock: '', sku: '', barcode: '' 
     }]
   };
 
   const [productData, setProductData] = useState(initialState);
+  const [isOtherCategory, setIsOtherCategory] = useState(false);
   const isEditing = !!editingProduct;
 
   useEffect(() => {
     if (isOpen) {
       if (editingProduct) {
-        setProductData(editingProduct);
+        // Check if existing category is in our standard list
+        const standardCategories = ["Groceries", "Electronics", "Home & Kitchen"];
+        const isCustom = editingProduct.category && !standardCategories.includes(editingProduct.category);
+        
+        setProductData({
+          ...editingProduct,
+          customCategory: isCustom ? editingProduct.category : ''
+        });
+        setIsOtherCategory(isCustom);
       } else {
         setProductData(initialState);
+        setIsOtherCategory(false);
       }
     }
   }, [isOpen, editingProduct]);
 
   const handleChange = (e) => {
-    setProductData({ ...productData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    if (name === "category") {
+      setIsOtherCategory(value === "Other");
+    }
+    setProductData({ ...productData, [name]: value });
   };
 
   const handleVariantChange = (index, e) => {
@@ -67,6 +75,11 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    // Use customCategory if "Other" is selected
+    const finalCategory = isOtherCategory ? productData.customCategory : productData.category;
+
+    if (!finalCategory) return toast.error("Please specify a category");
+
     const validVariants = productData.variants
       .filter(v => v.name.trim() !== '' && v.salePrice !== '') 
       .map(v => ({
@@ -78,12 +91,9 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
         sku: v.sku?.trim() === "" ? `SKU-${Date.now()}` : v.sku
       }));
 
-    if (validVariants.length === 0) {
-      return toast.error("At least one complete variant is required.");
-    }
-
     const sanitizedData = {
       ...productData,
+      category: finalCategory,
       lowStockAlert: Number(productData.lowStockAlert),
       reorderQuantity: Number(productData.reorderQuantity),
       variants: validVariants
@@ -129,8 +139,6 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
-          
-          {/* Section 1: Core Logistics */}
           <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-2 block">General Information</label>
@@ -144,28 +152,43 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
               />
             </div>
             
-            <select
-              name="category"
-              value={productData.category}
-              className="p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-600 shadow-inner"
-              onChange={handleChange}
-              required
-            >
-              <option value="">Select Category</option>
-              <option value="Groceries">Groceries</option>
-              <option value="Electronics">Electronics</option>
-              <option value="Home & Kitchen">Home & Kitchen</option>
-            </select>
+            <div className="space-y-4">
+                <select
+                name="category"
+                value={isOtherCategory ? "Other" : productData.category}
+                className="w-full p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-600 shadow-inner"
+                onChange={handleChange}
+                required
+                >
+                <option value="">Select Category</option>
+                <option value="Groceries">Groceries</option>
+                <option value="Electronics">Electronics</option>
+                <option value="Home & Kitchen">Home & Kitchen</option>
+                <option value="Other">Other (Type manually)</option>
+                </select>
+
+                {isOtherCategory && (
+                    <input
+                        name="customCategory"
+                        value={productData.customCategory}
+                        placeholder="Type new category..."
+                        className="w-full p-5 bg-blue-50/50 rounded-3xl border-2 border-blue-200 outline-none font-bold text-blue-700 animate-in slide-in-from-top-2"
+                        onChange={handleChange}
+                        required
+                    />
+                )}
+            </div>
 
             <input
               name="supplier"
               value={productData.supplier}
               placeholder="Supplier/Manufacturer Name"
-              className="p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-700 shadow-inner"
+              className="p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-700 shadow-inner h-[68px]"
               onChange={handleChange}
             />
           </section>
 
+          {/* ... Rest of your variant section stays the same ... */}
           {/* Section 2: Reorder Rules */}
           <section className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
@@ -194,7 +217,7 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
             </div>
           </section>
 
-          {/* Section 3: Variants Pricing & Valuation */}
+          {/* Section 3: Variants */}
           <section className="space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <div className="flex items-center gap-2 text-slate-400">
@@ -230,7 +253,7 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
                     <div className="col-span-4 md:col-span-4 relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{symbol}</span>
                       <input 
-                        name="costPrice" type="number" value={variant.costPrice} placeholder="Cost Price (Internal)" 
+                        name="costPrice" type="number" value={variant.costPrice} placeholder="Cost Price" 
                         className="w-full pl-7 p-3 rounded-xl bg-rose-50/50 text-sm font-black text-rose-600 outline-none border border-rose-100" 
                         onChange={(e) => handleVariantChange(index, e)} required
                       />

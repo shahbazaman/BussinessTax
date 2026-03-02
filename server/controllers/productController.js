@@ -4,7 +4,7 @@ import Product from '../models/Product.js';
 export const getProducts = async (req, res) => {
   try {
     const products = await Product.find({ user: req.user.id });
-    res.json(products);
+    res.json(products.map(p => p.toJSON({ virtuals: true })));
   } catch (error) {
     res.status(500).json({ message: "Server error fetching products" });
   }

@@ -9,7 +9,7 @@ const invoiceSchema = new mongoose.Schema({
   client: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Client',
-    required: true // Essential for linking revenue to specific clients
+    required: true 
   },
   type: { 
     type: String, 
@@ -18,21 +18,18 @@ const invoiceSchema = new mongoose.Schema({
   },
   invoiceNumber: { 
     type: String, 
-    required: true,
-    unique: true 
+    required: true
   },
   poNumber: { 
-    type: String // Purchase Order number for corporate clients
+    type: String 
   },
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
     name: { type: String, required: true },
     quantity: { type: Number, default: 1 },
     price: { type: Number, default: 0 },
-    taxRate: { type: Number, default: 0 } // Item-specific tax (VAT/GST)
+    taxRate: { type: Number, default: 0 } 
   }],
-
-  // Financial Breakdown for Accounting
   subtotal: { 
     type: Number, 
     required: true,
@@ -68,8 +65,6 @@ const invoiceSchema = new mongoose.Schema({
     type: Date, 
     required: true 
   },
-
-  // Payment Tracking
   razorpayOrderId: { 
     type: String, 
     unique: true, 
@@ -77,7 +72,7 @@ const invoiceSchema = new mongoose.Schema({
   },
   paidIntoAccount: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Account'
+    ref: 'Account' // Updated to match your route: ./routes/accountRoutes.js
   },
   paymentDate: { 
     type: Date 
@@ -86,9 +81,16 @@ const invoiceSchema = new mongoose.Schema({
     type: String
   }
 }, { timestamps: true });
-
-// Pre-save index to ensure invoice numbers are unique per user
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true });
+invoiceSchema.pre('save', function(next) {
+  this.subtotal = this.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  this.taxAmount = this.items.reduce((acc, item) => {
+    return acc + (item.price * item.quantity * (item.taxRate / 100));
+  }, 0);
+  this.totalAmount = (this.subtotal + this.taxAmount + this.shipping) - this.discount;
+
+  next();
+});
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 export default Invoice;

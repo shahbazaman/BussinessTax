@@ -6,8 +6,6 @@ const employeeSchema = new mongoose.Schema({
     ref: 'User', 
     required: true 
   },
-  
-  // --- Core Identity & Contact ---
   name: { 
     type: String, 
     required: true,
@@ -22,18 +20,31 @@ const employeeSchema = new mongoose.Schema({
     type: String, 
     required: true 
   },
+  contactNumber: { 
+    type: String,
+    required: true 
+  },
   homeAddress: { 
-    type: String 
+    type: String,
+    required: true
   },
   emergencyContact: { 
     type: String 
   },
-
-  // --- Employment Details ---
+  verificationIdType: { 
+    type: String,
+    enum: ['National ID', 'Passport', 'Driving License', 'Voter ID', 'Other'],
+    default: 'National ID'
+  },
+  idNumber: {
+    type: String,
+    required: true,
+    trim: true
+  },
   role: { 
     type: String, 
     required: true 
-  }, // Designation
+  }, 
   employmentType: { 
     type: String, 
     enum: ['Full-time', 'Part-time', 'Contract', 'Commission-based'], 
@@ -48,8 +59,6 @@ const employeeSchema = new mongoose.Schema({
     type: Date, 
     default: Date.now 
   },
-
-  // --- Attendance & Payroll Logic ---
   dailyRate: { 
     type: Number, 
     required: true 
@@ -62,12 +71,10 @@ const employeeSchema = new mongoose.Schema({
     type: Date, 
     default: null 
   },
-
-  // --- Banking (For Account Integration) ---
   bankDetails: {
     bankName: { type: String },
     accountNumber: { type: String },
-    ifscCode: { type: String }, // Or SWIFT
+    ifscCode: { type: String }, 
     branchName: { type: String }
   }
 }, { 
@@ -76,10 +83,6 @@ const employeeSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-/**
- * Virtual: Salary Calculation
- * Dynamically computes total payable based on current session's working days
- */
 employeeSchema.virtual('totalSalary').get(function() {
   return (this.dailyRate * this.workingDays).toFixed(2);
 });

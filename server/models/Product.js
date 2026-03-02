@@ -4,7 +4,7 @@ const variantSchema = new mongoose.Schema({
   name: { 
     type: String, 
     required: true 
-  }, // e.g., "500g Pack" or "1 Liter Bottle"
+  },
   weight: { 
     type: Number 
   },
@@ -13,19 +13,15 @@ const variantSchema = new mongoose.Schema({
     enum: ['g', 'kg', 'ml', 'L', 'pcs'], 
     default: 'pcs' 
   },
-  
-  // Financial Valuation
   costPrice: { 
     type: Number, 
     required: true, 
     default: 0 
-  }, // What you paid the supplier
+  },
   price: { 
     type: Number, 
     required: true 
-  }, // Sale price to the customer
-  
-  // Inventory Logistics
+  },
   stock: { 
     type: Number, 
     default: 0 
@@ -34,8 +30,7 @@ const variantSchema = new mongoose.Schema({
     type: String, 
     unique: true, 
     sparse: true 
-  }, // Stock Keeping Unit
-  barcode: { 
+  },barcode: { 
     type: String 
   }
 });
@@ -58,11 +53,8 @@ const productSchema = new mongoose.Schema({
   supplier: { 
     type: String,
     trim: true 
-  }, // To know who to call for restock
-  
+  },
   variants: [variantSchema],
-
-  // Global thresholds for this product
   lowStockAlert: { 
     type: Number, 
     default: 10 
@@ -70,18 +62,16 @@ const productSchema = new mongoose.Schema({
   reorderQuantity: { 
     type: Number, 
     default: 50 
-  } // Suggested amount to buy when stock is low
+  } 
 }, { 
   timestamps: true,
   toJSON: { virtuals: true }, 
   toObject: { virtuals: true } 
 });
 
-/**
- * Virtual: Profit Margin
- * Calculates the percentage of profit for each variant
- */
 productSchema.virtual('margins').get(function() {
+  if (!this.variants) return [];
+  
   return this.variants.map(v => {
     const profit = v.price - v.costPrice;
     const percentage = v.price > 0 ? (profit / v.price) * 100 : 0;
