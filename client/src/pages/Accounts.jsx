@@ -4,6 +4,8 @@ import api from '../utils/api';
 import { toast } from 'react-toastify';
 import AddAccountModal from "../components/AddAccountModal";
 import TransferModal from '../components/TransferModal';
+import { useContext } from 'react';
+import { CurrencyContext } from '../context/CurrencyContext';
 
 const Accounts = () => {
   const [accounts, setAccounts] = useState([]);
@@ -11,8 +13,8 @@ const Accounts = () => {
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
-
-  // 1. Unified Fetch: Accounts + Recent Activity
+  const { symbol } = useContext(CurrencyContext);
+  
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -101,7 +103,7 @@ const Accounts = () => {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{acc.accountType}</p>
             <h3 className="text-xl font-black text-slate-800 mb-2">{acc.bankName}</h3>
             <h4 className="text-3xl font-black text-slate-900 tracking-tighter">
-              ${Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              {symbol}{Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </h4>
             <div className="mt-6 flex items-center gap-2 text-slate-300">
               <CreditCard size={14} />
@@ -149,7 +151,7 @@ const Accounts = () => {
                   'text-emerald-600'
                 }`}>
                   {isExpense ? '-' : isInvoice ? '+' : ''}
-                  ${Number(item.amount || item.total).toLocaleString()}
+                  {symbol}{Number(item.amount || item.total).toLocaleString()}
                 </p>
               </div>
             );

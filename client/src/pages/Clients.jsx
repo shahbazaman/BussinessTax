@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { Plus, Search, Mail, Phone, Trash2, X, User, ExternalLink, Loader2, Edit2 } from 'lucide-react'; // Added Edit2
 import { useNavigate } from 'react-router-dom';
+import { useContext } from 'react';
+import { CurrencyContext } from '../context/CurrencyContext';
 
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
-  
-  // New state to track if we are editing
+  const { symbol } = useContext(CurrencyContext);
   const [editingClient, setEditingClient] = useState(null);
   const [formData, setFormData] = useState({ name: '', email: '', phone: '' });
   const navigate = useNavigate();
@@ -166,7 +167,7 @@ const Clients = () => {
                   <div className="grid grid-cols-2 gap-4 py-4 border-t border-slate-50 bg-slate-50/50 rounded-3xl px-4 mb-4">
                     <div>
                       <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Revenue</p>
-                      <p className="font-bold text-slate-800 text-lg">${Number(client.totalInvoiced || 0).toLocaleString()}</p>
+                      <p className="font-bold text-slate-800 text-lg">{ symbol }{Number(client.totalInvoiced || 0).toLocaleString()}</p>
                     </div>
                     <div>
                       <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Invoices</p>

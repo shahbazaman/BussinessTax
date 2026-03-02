@@ -1,13 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import api from '../utils/api';
-import { Plus, Search, FileText, Filter, Trash2, Download, Edit2, X, Calendar, DollarSign, Loader2, CreditCard, ArrowRight } from 'lucide-react';
-import { exportToCSV } from '../utils/exportCSV';
-import { ToastContainer, toast } from 'react-toastify';
-import 'react-toastify/dist/ReactToastify.css';
+import { Plus, Search, Trash2, Download, Edit2, Loader2, CreditCard, Calendar } from 'lucide-react';
+import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
-// Import the advanced Modal component
 import InvoiceModal from '../components/InvoiceModal'; 
 
 const Invoices = () => {
@@ -22,7 +18,7 @@ const Invoices = () => {
   const [currency, setCurrency] = useState('USD');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
   const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
 
@@ -52,15 +48,22 @@ const Invoices = () => {
     fetchData();
   }, []);
 
-  // Razorpay Payment Logic (Restored to Table)
+  const handleEdit = (invoice) => {
+    setSelectedInvoice(invoice);
+    setShowModal(true);
+  };
+
+  const handleNewInvoice = () => {
+    setSelectedInvoice(null);
+    setShowModal(true);
+  };
+
   const initiatePayment = async (invoice) => {
     try {
       if (accounts.length === 0) {
         return toast.error("❌ No bank account found. Add one in Dashboard.");
       }
-
       const targetAccountId = accounts[0]._id;
-
       const { data: order } = await api.post('/payments/create-order', {
         amount: invoice.amount,
         currency: "INR" 
@@ -86,9 +89,7 @@ const Invoices = () => {
             toast.error("Verification failed");
           }
         },
-        prefill: {
-          name: invoice.customerName,
-        },
+        prefill: { name: invoice.customerName },
         theme: { color: "#0f172a" },
       };
       const rzp = new window.Razorpay(options);
@@ -162,39 +163,69 @@ const Invoices = () => {
             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Invoices</h2>
             <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Ledger System</p>
           </div>
-          <button onClick={() => setShowModal(true)} className="bg-slate-900 text-white px-8 py-4 rounded-3xl flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl font-black text-xs uppercase tracking-widest">
+          <button onClick={handleNewInvoice} className="bg-slate-900 text-white px-8 py-4 rounded-3xl flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl font-black text-xs uppercase tracking-widest">
             <Plus size={18} /> New Invoice
           </button>
         </div>
 
         {/* Filters */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-             <input 
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="relative col-span-1">
+              <input 
                 type="text" 
                 placeholder="Search customer..."
                 className="w-full px-6 py-4 bg-slate-50 border-none rounded-2xl outline-none font-bold text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
-              <select 
-                className="px-4 py-4 bg-slate-50 border-none rounded-2xl outline-none font-black text-[10px] uppercase cursor-pointer"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
-              >
-                <option value="All">All Status</option>
-                <option value="Paid">Paid</option>
-                <option value="Pending">Pending</option>
-                <option value="Overdue">Overdue</option>
-              </select>
-          </div>
-        </div>
+            </div>
 
-        {/* Table */}
+            {/* Date Range Filters */}
+            <div className="flex items-center bg-slate-50 rounded-2xl px-4">
+              <Calendar size={16} className="text-slate-400 mr-2" />
+              <input 
+                type="date" 
+                className="bg-transparent border-none outline-none font-bold text-[10px] uppercase w-full py-4"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+              />
+            </div>
+
+            <div className="flex items-center bg-slate-50 rounded-2xl px-4">
+              <Calendar size={16} className="text-slate-400 mr-2" />
+              <input 
+                type="date" 
+                className="bg-transparent border-none outline-none font-bold text-[10px] uppercase w-full py-4"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+              />
+            </div>
+
+            <select 
+              className="px-4 py-4 bg-slate-50 border-none rounded-2xl outline-none font-black text-[10px] uppercase cursor-pointer"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="All">All Status</option>
+              <option value="Paid">Paid</option>
+              <option value="Pending">Pending</option>
+              <option value="Overdue">Overdue</option>
+            </select>
+          </div>
+          {(startDate || endDate) && (
+            <button 
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="mt-3 text-[9px] font-black text-rose-500 uppercase ml-2"
+            >
+              Clear Date Filter
+            </button>
+          )}
+        </div>
         {loading ? (
            <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>
         ) : (
-          <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden">
+          <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden border border-slate-100">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50/50">
@@ -230,16 +261,22 @@ const Invoices = () => {
                     </td>
                     <td className="px-8 py-6 text-right">
                       <div className="flex justify-end gap-2">
-                        {/* PAY NOW BUTTON: Visible only for Pending/Overdue */}
                         {(inv.status === 'Pending' || inv.status === 'Overdue') && (
                            <button 
                             onClick={() => initiatePayment(inv)}
                             className="p-3 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
-                            title="Pay with Razorpay"
+                            title="Pay Now"
                            >
                             <CreditCard size={18} />
                            </button>
                         )}
+                        <button 
+                          onClick={() => handleEdit(inv)}
+                          className="p-3 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-xl transition-all"
+                          title="Edit Invoice"
+                        >
+                          <Edit2 size={18} />
+                        </button>
                         <button onClick={() => downloadPDF(inv)} className="p-3 text-slate-400 hover:text-slate-900"><Download size={18} /></button>
                         <button onClick={() => handleDelete(inv._id)} className="p-3 text-slate-400 hover:text-rose-600"><Trash2 size={18}/></button>
                       </div>
@@ -254,15 +291,13 @@ const Invoices = () => {
 
       <InvoiceModal 
         isOpen={showModal} 
-        onClose={() => setShowModal(false)} 
+        onClose={() => { setShowModal(false); setSelectedInvoice(null); }} 
         onRefresh={fetchData} 
         clients={clients} 
         products={products} 
-        accounts={accounts} 
+        accounts={accounts}
+        editData={selectedInvoice} 
       />
-
-      {/* Local Toast Container - only visible in this tab */}
-      {/* <ToastContainer position="bottom-right" theme="dark" /> */}
     </div>
   );
 };

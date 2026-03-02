@@ -3,18 +3,19 @@ import api from '../utils/api';
 import { Users, UserPlus, CalendarCheck, DollarSign, Trash2, Edit2, X, Search, Filter, Loader2, Receipt } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { exportToCSV } from '../utils/exportCSV';
-
+import { useContext } from 'react';
+import { CurrencyContext } from '../context/CurrencyContext';
 const Employees = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false); // New: Prevents double-clicks
+  const [processing, setProcessing] = useState(false); 
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
   const [formData, setFormData] = useState({ name: '', role: '', dailyRate: '' });
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
-
+  const { symbol } = useContext(CurrencyContext);
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -43,7 +44,6 @@ const Employees = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // Ensure dailyRate is a number
       const payload = { ...formData, dailyRate: Number(formData.dailyRate) };
       
       if (isEditing) {
@@ -132,7 +132,7 @@ const Employees = () => {
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Payroll</p>
           <div className="flex items-center gap-3">
             <DollarSign className="text-rose-500" size={20} />
-            <p className="text-xl font-black text-slate-800">${totalPayroll.toLocaleString()}</p>
+            <p className="text-xl font-black text-slate-800">{ symbol }{totalPayroll.toLocaleString()}</p>
           </div>
         </div>
 
@@ -202,11 +202,11 @@ const Employees = () => {
                       {emp.role}
                     </span>
                   </td>
-                  <td className="px-8 py-5 font-mono text-sm font-bold text-slate-600">${Number(emp.dailyRate).toLocaleString()}</td>
+                  <td className="px-8 py-5 font-mono text-sm font-bold text-slate-600">{ symbol }{Number(emp.dailyRate).toLocaleString()}</td>
                   <td className="px-8 py-5">
                     <div className="flex items-center gap-3">
                       <span className="bg-blue-50 text-blue-600 px-3 py-1 rounded-lg text-xs font-black">{emp.workingDays} Days</span>
-                      <span className="font-black text-slate-800">${(Number(emp.dailyRate) * emp.workingDays).toLocaleString()}</span>
+                      <span className="font-black text-slate-800">{ symbol }{(Number(emp.dailyRate) * emp.workingDays).toLocaleString()}</span>
                     </div>
                   </td>
                   <td className="px-8 py-5">
@@ -244,7 +244,7 @@ const Employees = () => {
             <form onSubmit={handleSubmit} className="p-6 md:p-8 space-y-4">
               <input required type="text" placeholder="Full Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none font-bold text-sm" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
               <input required type="text" placeholder="Role (e.g. Sales)" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none font-bold text-sm" value={formData.role} onChange={e => setFormData({...formData, role: e.target.value})} />
-              <input required type="number" placeholder="Daily Rate ($)" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none font-bold text-sm" value={formData.dailyRate} onChange={e => setFormData({...formData, dailyRate: e.target.value})} />
+              <input required type="number" placeholder={`Daily Rate (${symbol})`} className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none font-bold text-sm" value={formData.dailyRate} onChange={e => setFormData({...formData, dailyRate: e.target.value})} />
               <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black shadow-lg hover:bg-blue-600 transition-all mt-4">
                 {isEditing ? 'Save Changes' : 'Onboard Employee'}
               </button>

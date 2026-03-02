@@ -2,14 +2,15 @@ import React, { useState, useEffect, useMemo } from 'react';
 import api from '../utils/api';
 import { Plus, Receipt, Trash2, Tag, X, Calendar, Edit2 } from 'lucide-react';
 import { exportToCSV } from '../utils/exportCSV';
-
+import { useContext } from 'react';
+import { CurrencyContext } from '../context/CurrencyContext';
 const Expenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [editingId, setEditingId] = useState(null); // Track which expense is being edited
-
+  const [editingId, setEditingId] = useState(null); 
+  const { symbol } = useContext(CurrencyContext);
   const [formData, setFormData] = useState({ 
     title: '', 
     amount: '', 
@@ -65,7 +66,6 @@ const Expenses = () => {
       const cleanedData = {
         ...formData,
         amount: Number(formData.amount),
-        // Mapping expenseDate (frontend) to date (backend schema)
         date: formData.expenseDate 
       };
 
@@ -131,7 +131,7 @@ const Expenses = () => {
           <div>
             <h2 className="text-2xl font-bold text-slate-800">Business Expenses</h2>
             <p className="text-sm text-slate-500">Total spent this period: 
-              <span className="font-bold text-red-600 ml-1">-${totalSpent.toLocaleString()}</span>
+              <span className="font-bold text-red-600 ml-1">-{ symbol }{totalSpent.toLocaleString()}</span>
             </p>
           </div>
 
@@ -202,7 +202,7 @@ const Expenses = () => {
                 
                 <div className="flex items-center gap-2">
                   <span className="font-black text-slate-900 md:text-xl mr-4">
-                    -${Number(exp.amount).toLocaleString()}
+                    -{ symbol }{Number(exp.amount).toLocaleString()}
                   </span>
                   {/* EDIT BUTTON */}
                   <button 
@@ -254,7 +254,7 @@ const Expenses = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Amount ($)</label>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Amount ({ symbol })</label>
                   <input 
                     type="number" placeholder="0.00" required 
                     className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-red-500 bg-slate-50 text-sm" 

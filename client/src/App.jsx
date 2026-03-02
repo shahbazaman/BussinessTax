@@ -14,7 +14,7 @@ import Register from './pages/Register';
 import Inventory from './pages/Inventory'; 
 import Accounts from './pages/Accounts';  
 import Employees from './pages/Employees';
-
+import { CurrencyProvider } from './context/CurrencyContext';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   useEffect(() => {
@@ -39,6 +39,7 @@ useEffect(() => {
 }, []);
   return (
     <Router>
+      <CurrencyProvider>
       <div className="flex min-h-screen bg-slate-50">
         {isAuthenticated && <Sidebar />}        
         <main className="flex-1 overflow-x-hidden">
@@ -70,7 +71,9 @@ useEffect(() => {
         pauseOnHover
         theme="light"
       />
+      </CurrencyProvider>
     </Router>
+    
   );
 }
 

@@ -4,7 +4,8 @@ import api from '../utils/api';
 import { toast } from 'react-toastify';
 import AddProductModal from '../components/AddProductModal';
 import { exportToCSV } from '../utils/exportCSV';
-
+import { useContext } from 'react';
+import { CurrencyContext } from '../context/CurrencyContext';
 const Inventory = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -13,8 +14,8 @@ const Inventory = () => {
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [expandedRows, setExpandedRows] = useState({}); // Track which product's variants are shown
-
+  const [expandedRows, setExpandedRows] = useState({}); 
+  const { symbol } = useContext(CurrencyContext);
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
@@ -175,7 +176,7 @@ const Inventory = () => {
                                 <div key={idx} className={`p-4 rounded-2xl border ${isVariantLow ? 'bg-white border-rose-200' : 'bg-white border-slate-100'} shadow-sm flex justify-between items-center`}>
                                   <div>
                                     <p className="text-xs font-black text-slate-800">{v.weight} {v.unit}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 mt-1">${Number(v.price).toFixed(2)}</p>
+                                    <p className="text-[10px] font-bold text-slate-400 mt-1">{ symbol }{Number(v.price).toFixed(2)}</p>
                                   </div>
                                   <div className="text-right">
                                     <p className={`text-sm font-black ${isVariantLow ? 'text-rose-600' : 'text-emerald-600'}`}>
