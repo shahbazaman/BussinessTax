@@ -8,42 +8,24 @@ export const createInvoice = async (req, res) => {
       invoiceNumber, dueDate, status, notes, poNumber 
     } = req.body; 
 
-    // Safety check for Auth
-    if (!req.user || !req.user._id) {
-      return res.status(401).json({ message: "User authentication failed" });
-    }
+    if (!req.user?._id) return res.status(401).json({ message: "Auth failed" });
 
     const invoiceType = type || 'Sale';
-
-    // 1. DATA VALIDATION & STOCK CHECK
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ message: "Invoice must have at least one item" });
-    }
-
-    // Prepare a clean items array for the Database
     const validatedItems = [];
 
+    // 1. Validation & Stock Check
     for (const item of items) {
-      if (!item.productId || !item.variantId) {
-        return res.status(400).json({ message: "Product and Variant selection required for all items" });
-      }
-
       const product = await Product.findById(item.productId);
-      if (!product) return res.status(404).json({ message: `Product not found: ${item.name}` });
+      if (!product) return res.status(404).json({ message: `Product ${item.name} not found` });
 
       const variant = product.variants.id(item.variantId);
-      if (!variant) return res.status(404).json({ message: `Variant not found for: ${product.title}` });
+      if (!variant) return res.status(404).json({ message: "Variant not found" });
 
       const qty = Number(item.quantity || 0);
-
-      // Inventory check for Sales
       if (invoiceType === 'Sale' && variant.stock < qty) {
-        return res.status(400).json({ 
-          message: `Insufficient stock for ${product.title}. Available: ${variant.stock}` 
-        });
+        return res.status(400).json({ message: `Insufficient stock for ${product.title}` });
       }
 
-      // Push sanitized data to the array
       validatedItems.push({
         productId: item.productId,
         variantId: item.variantId,
@@ -54,9 +36,7 @@ export const createInvoice = async (req, res) => {
       });
     }
 
-    // 2. CREATE INVOICE 
-    // We use "new Invoice" + ".save()" to properly trigger the async pre-save hook 
-    // and avoid the "next is not a function" error.
+    // 2. Create Document
     const invoice = new Invoice({
       user: req.user._id,
       client: clientId, 
@@ -65,45 +45,34 @@ export const createInvoice = async (req, res) => {
       items: validatedItems,
       shipping: Number(shipping || 0),
       discount: Number(discount || 0),
-      dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
+      dueDate,
       status: status || 'Pending',
       type: invoiceType,
       notes,
-      totalAmount: 0 // This will be calculated by the Pre-Save Hook in Invoice.js
+      totalAmount: 0 // Pre-save hook will calculate this
     });
 
     const savedInvoice = await invoice.save();
 
-    // 3. ATOMIC STOCK UPDATE
+    // 3. Update Stock
     for (const item of validatedItems) {
       const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
-
-      await Product.findByIdAndUpdate(
-        item.productId, 
-        { $inc: { "variants.$[v].stock": adjustment } }, 
-        {
-          arrayFilters: [{ "v._id": item.variantId }],
-          new: true 
-        }
+      await Product.updateOne(
+        { _id: item.productId, "variants._id": item.variantId },
+        { $inc: { "variants.$.stock": adjustment } }
       );
     }
 
-    // Send back the populated invoice
     res.status(201).json(savedInvoice);
-
   } catch (error) {
-    console.error("CRITICAL ERROR IN CREATE_INVOICE:", error);
-    res.status(500).json({ 
-      message: "Internal Server Error during invoice creation", 
-      error: error.message 
-    });
+    res.status(500).json({ message: "Creation failed", error: error.message });
   }
 };
 
 export const getInvoices = async (req, res) => {
   try {
     const invoices = await Invoice.find({ user: req.user.id })
-      .populate('client', 'name email') // Added population for UI clarity
+      .populate('client', 'name email')
       .sort({ createdAt: -1 });
     res.json(invoices);
   } catch (error) {
@@ -111,55 +80,78 @@ export const getInvoices = async (req, res) => {
   }
 };
 
+export const updateInvoice = async (req, res) => {
+  try {
+    const oldInvoice = await Invoice.findById(req.params.id);
+    if (!oldInvoice) return res.status(404).json({ message: "Not found" });
+
+    // --- NEW: REVERT OLD STOCK BEFORE APPLYING NEW ---
+    // This ensures if you change quantity from 10 to 2, the 8 items go back to stock.
+    for (const item of oldInvoice.items) {
+      const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
+      await Product.updateOne(
+        { _id: item.productId, "variants._id": item.variantId },
+        { $inc: { "variants.$.stock": revertQty } }
+      );
+    }
+
+    // Apply updates (excluding user/id)
+    const { _id, user, ...updateData } = req.body;
+    
+    // Support both 'clientId' and 'client' from frontend
+    if (updateData.clientId) {
+        updateData.client = updateData.clientId;
+        delete updateData.clientId;
+    }
+
+    Object.assign(oldInvoice, updateData);
+    const updatedInvoice = await oldInvoice.save();
+
+    // --- APPLY NEW STOCK ---
+    for (const item of updatedInvoice.items) {
+      const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
+      await Product.updateOne(
+        { _id: item.productId, "variants._id": item.variantId },
+        { $inc: { "variants.$.stock": newAdjustment } }
+      );
+    }
+
+    res.json(updatedInvoice);
+  } catch (error) {
+    res.status(500).json({ message: "Update failed", error: error.message });
+  }
+};
+
 export const deleteInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) return res.status(404).json({ message: "Not found" });
 
-    if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-    if (invoice.user.toString() !== req.user.id) {
-      return res.status(401).json({ message: "Not authorized" });
-    }
+    // REVERT STOCK ON DELETE
+    for (const item of invoice.items) {
+        const revertQty = (invoice.type === 'Purchase') ? -item.quantity : item.quantity;
+        await Product.updateOne(
+          { _id: item.productId, "variants._id": item.variantId },
+          { $inc: { "variants.$.stock": revertQty } }
+        );
+      }
 
     await invoice.deleteOne();
-    res.json({ message: "Invoice removed" });
+    res.json({ message: "Invoice removed & stock reverted" });
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Deletion failed" });
   }
 };
 
-export const updateInvoice = async (req, res) => {
+export const updateInvoiceStatus = async (req, res) => {
   try {
-    const invoice = await Invoice.findById(req.params.id);
-
-    if (!invoice) return res.status(404).json({ message: "Invoice not found" });
-    if (invoice.user.toString() !== req.user.id) {
-      return res.status(401).json({ message: "Not authorized" });
-    }
-
-    // Update with new schema fields
-    Object.assign(invoice, req.body);
-
-    const updatedInvoice = await invoice.save(); // save() triggers the pre-save math hook
-    res.json(updatedInvoice);
-  } catch (error) {
-    res.status(500).json({ message: "Error updating invoice", error: error.message });
-  }
-};
-
-export const toggleInvoiceStatus = async (req, res) => {
-  try {
-    const { status } = req.body;
     const invoice = await Invoice.findOneAndUpdate(
       { _id: req.params.id, user: req.user.id }, 
-      { status }, 
+      { status: req.body.status }, 
       { new: true }
-    );
-    if (!invoice) return res.status(404).json({ message: "Invoice not found" });
+    ).populate('client', 'name email');
     res.json(invoice);
   } catch (err) {
-    res.status(500).json({ message: "Update failed" });
+    res.status(500).json({ message: "Status update failed" });
   }
 };
-
-// Simplified alias for toggleInvoiceStatus to match your existing frontend calls
-export const updateInvoiceStatus = toggleInvoiceStatus;

@@ -19,6 +19,7 @@ const Invoices = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+
   const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
 
@@ -63,9 +64,11 @@ const Invoices = () => {
       if (accounts.length === 0) {
         return toast.error("❌ No bank account found. Add one in Dashboard.");
       }
+      
       const targetAccountId = accounts[0]._id;
-      const { data: order } = await api.post('/payments/create-order', {
-        amount: invoice.amount,
+      // Using invoice.totalAmount as per your Mongoose schema
+      const { data: order } = await api.post('/payments/order', {
+        amount: invoice.totalAmount,
         currency: "INR" 
       });
 
@@ -74,7 +77,7 @@ const Invoices = () => {
         amount: order.amount,
         currency: "INR",
         name: "Business Ledger",
-        description: `Invoice #${invoice._id.slice(-6)}`,
+        description: `Invoice #${invoice.invoiceNumber || invoice._id.slice(-6)}`,
         order_id: order.id,
         handler: async (response) => {
           try {
@@ -89,7 +92,10 @@ const Invoices = () => {
             toast.error("Verification failed");
           }
         },
-        prefill: { name: invoice.customerName },
+        prefill: { 
+          name: invoice.client?.name || "Customer",
+          email: invoice.client?.email || ""
+        },
         theme: { color: "#0f172a" },
       };
       const rzp = new window.Razorpay(options);
@@ -105,7 +111,7 @@ const Invoices = () => {
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
       const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
       
-      const clientName = inv.customerName || "";
+      const clientName = inv.client?.name || inv.customerName || "";
       const matchesSearch = clientName.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = filterStatus === 'All' || inv.status === filterStatus;
       const matchesStart = start ? invDate >= start : true;
@@ -145,33 +151,44 @@ const Invoices = () => {
 
   const downloadPDF = (invoice) => {
     const doc = new jsPDF();
-    doc.text("INVOICE", 105, 25, { align: "center" });
+    doc.setFontSize(18);
+    doc.text("INVOICE", 105, 20, { align: "center" });
+    doc.setFontSize(10);
+    doc.text(`Invoice No: ${invoice.invoiceNumber || invoice._id}`, 20, 30);
+    doc.text(`Client: ${invoice.client?.name || "N/A"}`, 20, 35);
+    doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString()}`, 20, 40);
+
     autoTable(doc, {
-      startY: 40,
-      head: [['Item', 'Total']],
-      body: [[invoice.customerName, formatValue(invoice.amount)]],
+      startY: 50,
+      head: [['Product', 'Qty', 'Price', 'Total']],
+      body: invoice.items.map(item => [
+        item.name,
+        item.quantity,
+        formatValue(item.price),
+        formatValue(item.quantity * item.price)
+      ]),
+      foot: [['', '', 'Grand Total', formatValue(invoice.totalAmount)]]
     });
-    doc.save(`Invoice_${invoice._id}.pdf`);
+    doc.save(`Invoice_${invoice.invoiceNumber || invoice._id}.pdf`);
   };
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-4xl font-black text-slate-900 tracking-tighter">Invoices</h2>
-            <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Ledger System</p>
+            <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Cloud Ledger v3.0</p>
           </div>
           <button onClick={handleNewInvoice} className="bg-slate-900 text-white px-8 py-4 rounded-3xl flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl font-black text-xs uppercase tracking-widest">
             <Plus size={18} /> New Invoice
           </button>
         </div>
 
-        {/* Filters */}
+        {/* Filters Panel */}
         <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="relative col-span-1">
+            <div className="relative">
               <input 
                 type="text" 
                 placeholder="Search customer..."
@@ -180,8 +197,6 @@ const Invoices = () => {
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-
-            {/* Date Range Filters */}
             <div className="flex items-center bg-slate-50 rounded-2xl px-4">
               <Calendar size={16} className="text-slate-400 mr-2" />
               <input 
@@ -191,7 +206,6 @@ const Invoices = () => {
                 onChange={(e) => setStartDate(e.target.value)}
               />
             </div>
-
             <div className="flex items-center bg-slate-50 rounded-2xl px-4">
               <Calendar size={16} className="text-slate-400 mr-2" />
               <input 
@@ -201,7 +215,6 @@ const Invoices = () => {
                 onChange={(e) => setEndDate(e.target.value)}
               />
             </div>
-
             <select 
               className="px-4 py-4 bg-slate-50 border-none rounded-2xl outline-none font-black text-[10px] uppercase cursor-pointer"
               value={filterStatus}
@@ -213,78 +226,61 @@ const Invoices = () => {
               <option value="Overdue">Overdue</option>
             </select>
           </div>
-          {(startDate || endDate) && (
-            <button 
-              onClick={() => { setStartDate(''); setEndDate(''); }}
-              className="mt-3 text-[9px] font-black text-rose-500 uppercase ml-2"
-            >
-              Clear Date Filter
-            </button>
-          )}
         </div>
+
         {loading ? (
-           <div className="flex justify-center py-20"><Loader2 className="animate-spin" /></div>
+          <div className="flex justify-center py-20"><Loader2 className="animate-spin text-slate-300" size={48} /></div>
         ) : (
           <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden border border-slate-100">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-slate-50/50">
-                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase">Type</th>
-                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase">Client</th>
-                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase">Amount</th>
-                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase">Status</th>
-                  <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {filteredInvoices.map((inv) => (
-                  <tr key={inv._id} className="hover:bg-blue-50/30 transition-colors">
-                    <td className="px-8 py-6">
-                       <span className={`text-[9px] font-black px-3 py-1 rounded-full ${inv.type === 'Sale' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
-                         {(inv.type || 'SALE').toUpperCase()}
-                       </span>
-                    </td>
-                    <td className="px-8 py-6 font-black text-slate-800">{inv.client?.name || "Internal Record"}</td>
-                    <td className="px-8 py-6 font-black text-slate-900">{formatValue(inv.totalAmount)}</td>
-                    <td className="px-8 py-6">
-                      <select 
-                        value={inv.status} 
-                        onChange={(e) => updateStatus(inv._id, e.target.value)}
-                        className={`text-[10px] font-black px-4 py-2 rounded-xl border-none outline-none ${
-                          inv.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        <option value="Pending">PENDING</option>
-                        <option value="Paid">PAID</option>
-                        <option value="Overdue">OVERDUE</option>
-                      </select>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex justify-end gap-2">
-                        {(inv.status === 'Pending' || inv.status === 'Overdue') && (
-                           <button 
-                            onClick={() => initiatePayment(inv)}
-                            className="p-3 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
-                            title="Pay Now"
-                           >
-                            <CreditCard size={18} />
-                           </button>
-                        )}
-                        <button 
-                          onClick={() => handleEdit(inv)}
-                          className="p-3 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-xl transition-all"
-                          title="Edit Invoice"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button onClick={() => downloadPDF(inv)} className="p-3 text-slate-400 hover:text-slate-900"><Download size={18} /></button>
-                        <button onClick={() => handleDelete(inv._id)} className="p-3 text-slate-400 hover:text-rose-600"><Trash2 size={18}/></button>
-                      </div>
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50">
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase">Type</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase">Client</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase">Amount</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase">Status</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredInvoices.map((inv) => (
+                    <tr key={inv._id} className="hover:bg-blue-50/30 transition-colors">
+                      <td className="px-8 py-6">
+                        <span className={`text-[9px] font-black px-3 py-1 rounded-full ${inv.type === 'Sale' ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {(inv.type || 'SALE').toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 font-black text-slate-800">{inv.client?.name || "Walk-in Customer"}</td>
+                      <td className="px-8 py-6 font-black text-slate-900">{formatValue(inv.totalAmount)}</td>
+                      <td className="px-8 py-6">
+                        <select 
+                          value={inv.status} 
+                          onChange={(e) => updateStatus(inv._id, e.target.value)}
+                          className={`text-[10px] font-black px-4 py-2 rounded-xl border-none outline-none ${
+                            inv.status === 'Paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          <option value="Pending">PENDING</option>
+                          <option value="Paid">PAID</option>
+                          <option value="Overdue">OVERDUE</option>
+                        </select>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex justify-end gap-2">
+                          {inv.status !== 'Paid' && inv.type === 'Sale' && (
+                            <button onClick={() => initiatePayment(inv)} className="p-3 text-blue-600 bg-blue-50 rounded-xl hover:bg-blue-600 hover:text-white transition-all"><CreditCard size={18} /></button>
+                          )}
+                          <button onClick={() => handleEdit(inv)} className="p-3 text-slate-400 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 rounded-xl transition-all"><Edit2 size={18} /></button>
+                          <button onClick={() => downloadPDF(inv)} className="p-3 text-slate-400 hover:text-slate-900"><Download size={18} /></button>
+                          <button onClick={() => handleDelete(inv._id)} className="p-3 text-slate-400 hover:text-rose-600"><Trash2 size={18}/></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
