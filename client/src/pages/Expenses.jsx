@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../utils/api';
-import { Plus, Receipt, Trash2, Tag, X, Calendar, Edit2 } from 'lucide-react';
+import { Plus, Receipt, Trash2, Tag, X, Calendar, Edit2, ChevronDown } from 'lucide-react';
 import { exportToCSV } from '../utils/exportCSV';
-import { useContext } from 'react';
 import { CurrencyContext } from '../context/CurrencyContext';
+import { toast } from 'react-toastify';
+
 const Expenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [showModal, setShowModal] = useState(false);
@@ -11,28 +12,33 @@ const Expenses = () => {
   const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null); 
   const { symbol } = useContext(CurrencyContext);
+
+  // Standard categories
+  const categories = ['Software', 'Rent', 'Marketing', 'Travel', 'Salaries', 'Utilities', 'Other'];
+
   const [formData, setFormData] = useState({ 
     title: '', 
     amount: '', 
     category: 'Software', 
+    currency: 'USD',
     expenseDate: new Date().toISOString().split('T')[0],
     receiptUrl: '' 
   });
+
+  // State for the manual "Other" input
+  const [otherCategory, setOtherCategory] = useState('');
 
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  // 1. Fetch Expenses
   const fetchExpenses = async () => {
     try {
       setLoading(true);
-      setError(null);
       const res = await api.get('/expenses');
       setExpenses(res.data);
     } catch (err) { 
-      console.error("Error fetching expenses:", err);
-      setError("Failed to load expenses. Please check your connection.");
+      setError("Failed to load expenses.");
     } finally {
       setLoading(false);
     }
@@ -42,45 +48,60 @@ const Expenses = () => {
     fetchExpenses();
   }, []);
 
-  // 2. Prepare Edit Mode
   const handleEditClick = (exp) => {
     setEditingId(exp._id);
+    
+    // Check if the expense category is in our standard list
+    const isStandardCategory = categories.includes(exp.category);
+    
     setFormData({
       title: exp.title,
       amount: exp.amount,
-      category: exp.category,
-      // Handle the date conversion for the input field
-      expenseDate: new Date(exp.date || exp.expenseDate).toISOString().split('T')[0],
+      category: isStandardCategory ? exp.category : 'Other',
+      currency: exp.currency || 'USD',
+      expenseDate: new Date(exp.date).toISOString().split('T')[0],
       receiptUrl: exp.receiptUrl || ''
     });
+
+    // If it's a custom category, populate the "Other" field
+    if (!isStandardCategory) {
+      setOtherCategory(exp.category);
+    } else if (exp.category === 'Other') {
+        setOtherCategory('');
+    }
+
     setShowModal(true);
   };
 
-  // 3. Handle Create or Update
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.amount) return alert("Please fill in title and amount");
+    
+    // Validate custom category
+    const finalCategory = formData.category === 'Other' ? otherCategory : formData.category;
+    if (formData.category === 'Other' && !otherCategory.trim()) {
+        return toast.error("Please specify the category name");
+    }
 
-    setLoading(true);
     try {
-      const cleanedData = {
+      const payload = {
         ...formData,
         amount: Number(formData.amount),
+        category: finalCategory, // Use the custom name if "Other" was picked
         date: formData.expenseDate 
       };
 
       if (editingId) {
-        await api.put(`/expenses/${editingId}`, cleanedData);
+        await api.put(`/expenses/${editingId}`, payload);
+        toast.success("Expense updated");
       } else {
-        await api.post('/expenses', cleanedData);
+        await api.post('/expenses', payload);
+        toast.success("Expense recorded");
       }
 
       handleCloseModal(); 
       fetchExpenses();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to save");
-    } finally {
-      setLoading(false);
+      toast.error(err.response?.data?.message || "Failed to save");
     }
   };
 
@@ -89,8 +110,9 @@ const Expenses = () => {
       try {
         await api.delete(`/expenses/${id}`);
         fetchExpenses();
+        toast.success("Expense deleted");
       } catch (err) {
-        alert("Failed to delete expense");
+        toast.error("Failed to delete");
       }
     }
   };
@@ -98,12 +120,10 @@ const Expenses = () => {
   const handleCloseModal = () => {
     setShowModal(false);
     setEditingId(null);
+    setOtherCategory('');
     setFormData({ 
-      title: '', 
-      amount: '', 
-      category: 'Software', 
-      expenseDate: new Date().toISOString().split('T')[0],
-      receiptUrl: '' 
+      title: '', amount: '', category: 'Software', currency: 'USD',
+      expenseDate: new Date().toISOString().split('T')[0], receiptUrl: '' 
     });
   };
 
@@ -111,11 +131,9 @@ const Expenses = () => {
     return expenses.filter(exp => {
       const title = exp.title || "";
       const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const expDate = new Date(exp.date || exp.expenseDate || exp.createdAt).setHours(0, 0, 0, 0);
+      const expDate = new Date(exp.date).setHours(0, 0, 0, 0);
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
       const end = endDate ? new Date(endDate).setHours(0, 0, 0, 0) : null;
-
       return matchesSearch && (start ? expDate >= start : true) && (end ? expDate <= end : true);
     });
   }, [expenses, searchTerm, startDate, endDate]);
@@ -126,26 +144,25 @@ const Expenses = () => {
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-5xl mx-auto">
         
-        {/* Header & Stats */}
+        {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div>
-            <h2 className="text-2xl font-bold text-slate-800">Business Expenses</h2>
-            <p className="text-sm text-slate-500">Total spent this period: 
-              <span className="font-bold text-red-600 ml-1">-{ symbol }{totalSpent.toLocaleString()}</span>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Expenses</h2>
+            <p className="text-sm font-medium text-slate-500">
+              Outflow: <span className="font-bold text-rose-600">-{symbol}{totalSpent.toLocaleString()}</span>
             </p>
           </div>
 
           <div className="flex items-center gap-3">
             <button 
               onClick={() => setShowModal(true)} 
-              className="bg-slate-900 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 font-bold text-sm"
+              className="bg-slate-900 text-white px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-slate-800 transition-all shadow-xl shadow-slate-200 font-bold text-sm"
             >
               <Plus size={18} /> Record Expense
             </button>
-            
             <button 
               onClick={() => exportToCSV(filteredExpenses, 'Expenses')}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 transition-all font-bold text-sm"
+              className="bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-slate-50 transition-all font-bold text-sm"
             >
               Export CSV
             </button>
@@ -153,100 +170,72 @@ const Expenses = () => {
         </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+        <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm">
           <input 
-            type="text" placeholder="Search..." 
-            className="flex-1 px-4 py-2 bg-slate-50 rounded-xl outline-none text-sm"
+            type="text" placeholder="Search expenses..." 
+            className="flex-1 px-4 py-2 bg-slate-50 rounded-xl outline-none text-sm font-medium"
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
           />
           <div className="flex items-center gap-2">
-            <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            {(startDate || endDate || searchTerm) && (
-              <button onClick={() => {setStartDate(''); setEndDate(''); setSearchTerm('');}} className="p-2 text-red-500"><X size={18} /></button>
-            )}
+            <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold outline-none" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold outline-none" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
         </div>
 
-        {/* Expenses List */}
+        {/* Expense List */}
         <div className="grid gap-3">
           {loading ? (
-            <div className="text-center py-20 text-slate-400">
-               <div className="animate-spin w-6 h-6 border-2 border-red-500 border-t-transparent rounded-full mx-auto mb-2"></div>
-               Loading expenses...
-            </div>
-          ) : error ? (
-            <div className="text-center py-20 text-red-500 bg-red-50 rounded-3xl border border-red-100">
-              <p>{error}</p>
-              <button onClick={fetchExpenses} className="mt-4 text-sm font-bold underline">Try Again</button>
-            </div>
-          ) : filteredExpenses.length > 0 ? (
-            filteredExpenses.map((exp) => (
-              <div key={exp._id} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-center justify-between hover:border-red-100 transition-all group">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-slate-50 text-slate-400 group-hover:bg-red-50 group-hover:text-red-500 rounded-2xl flex items-center justify-center transition-colors">
-                    <Receipt size={22} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800 group-hover:text-red-600 transition-colors">{exp.title}</h3>
-                    <div className="flex flex-wrap gap-2 mt-1">
-                      <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-bold uppercase flex items-center gap-1">
-                        <Tag size={10} /> {exp.category}
-                      </span>
-                      <span className="text-[10px] text-slate-400 flex items-center gap-1 font-medium">
-                        <Calendar size={10} /> {new Date(exp.date || exp.expenseDate).toLocaleDateString()}
-                      </span>
-                    </div>
-                  </div>
+             <div className="text-center py-20 animate-pulse text-slate-400 font-medium">Fetching ledger...</div>
+          ) : filteredExpenses.map((exp) => (
+            <div key={exp._id} className="bg-white p-5 rounded-[1.5rem] border border-slate-100 flex items-center justify-between hover:shadow-md transition-all group">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-slate-50 text-slate-400 group-hover:bg-rose-50 group-hover:text-rose-500 rounded-2xl flex items-center justify-center transition-colors">
+                  <Receipt size={22} />
                 </div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="font-black text-slate-900 md:text-xl mr-4">
-                    -{ symbol }{Number(exp.amount).toLocaleString()}
-                  </span>
-                  {/* EDIT BUTTON */}
-                  <button 
-                    onClick={() => handleEditClick(exp)}
-                    className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
-                  >
-                    <Edit2 size={18}/>
-                  </button>
-                  {/* DELETE BUTTON */}
-                  <button 
-                    onClick={() => handleDelete(exp._id)}
-                    className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                  >
-                    <Trash2 size={18}/>
-                  </button>
+                <div>
+                  <h3 className="font-bold text-slate-800">{exp.title}</h3>
+                  <div className="flex gap-3 mt-1">
+                    <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-black uppercase flex items-center gap-1">
+                      <Tag size={10} /> {exp.category}
+                    </span>
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1 font-bold">
+                      <Calendar size={10} /> {new Date(exp.date).toLocaleDateString()}
+                    </span>
+                  </div>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-12 text-center">
-              <Receipt size={48} className="mx-auto text-slate-200 mb-4" />
-              <p className="text-slate-500 font-medium">No expenses found.</p>
+              
+              <div className="flex items-center gap-4">
+                <span className="font-black text-slate-900 text-lg">
+                  -{symbol}{Number(exp.amount).toLocaleString()}
+                </span>
+                <div className="flex gap-1">
+                  <button onClick={() => handleEditClick(exp)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors"><Edit2 size={16}/></button>
+                  <button onClick={() => handleDelete(exp._id)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
+                </div>
+              </div>
             </div>
-          )}
+          ))}
         </div>
       </div>
 
-      {/* Modal */}
+      {/* CREATE/EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden">
-            <div className="p-6 border-b border-slate-50 flex justify-between items-center">
-              <h3 className="text-xl font-bold text-slate-800">
-                {editingId ? 'Edit Expense' : 'New Expense'}
+          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden border border-white">
+            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+              <h3 className="text-xl font-black text-slate-900">
+                {editingId ? 'Edit Record' : 'New Expense'}
               </h3>
-              <button onClick={handleCloseModal} className="text-slate-400 hover:text-slate-600"><X size={20}/></button>
+              <button onClick={handleCloseModal} className="bg-white p-2 rounded-full shadow-sm text-slate-400 hover:text-slate-600"><X size={20}/></button>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} className="p-8 space-y-5">
               <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Expense Title</label>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Title</label>
                 <input 
-                  type="text" placeholder="e.g. AWS Cloud Services" required 
-                  className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-red-500 bg-slate-50 text-sm" 
+                  type="text" placeholder="e.g. Office Stationery" required 
+                  className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-rose-500/20 font-bold text-sm" 
                   value={formData.title}
                   onChange={(e) => setFormData({...formData, title: e.target.value})} 
                 />
@@ -254,54 +243,69 @@ const Expenses = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Amount ({ symbol })</label>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Amount</label>
                   <input 
                     type="number" placeholder="0.00" required 
-                    className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-red-500 bg-slate-50 text-sm" 
+                    className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-rose-500/20 font-bold text-sm" 
                     value={formData.amount}
                     onChange={(e) => setFormData({...formData, amount: e.target.value})} 
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Category</label>
-                  <select 
-                    className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-red-500 bg-slate-50 text-sm"
-                    value={formData.category}
-                    onChange={(e) => setFormData({...formData, category: e.target.value})}
-                  >
-                    <option value="Software">Software</option>
-                    <option value="Rent">Rent</option>
-                    <option value="Marketing">Marketing</option>
-                    <option value="Travel">Travel</option>
-                    <option value="Other">Other</option>
-                  </select>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Category</label>
+                  <div className="relative">
+                    <select 
+                      className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-rose-500/20 font-bold text-sm appearance-none"
+                      value={formData.category}
+                      onChange={(e) => setFormData({...formData, category: e.target.value})}
+                    >
+                      {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-4 top-5 text-slate-400 pointer-events-none" />
+                  </div>
                 </div>
               </div>
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Date</label>
-                <input 
-                  type="date" required 
-                  className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-red-500 bg-slate-50 text-sm" 
-                  value={formData.expenseDate}
-                  onChange={(e) => setFormData({...formData, expenseDate: e.target.value})} 
-                />
-              </div>
+              {/* CONDITIONAL "OTHER" INPUT */}
+              {formData.category === 'Other' && (
+                <div className="animate-in slide-in-from-top-2 duration-300">
+                  <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 block ml-1">Specify Category Name</label>
+                  <input 
+                    type="text" placeholder="Enter custom category..." required 
+                    className="w-full p-4 rounded-2xl bg-rose-50/30 border border-rose-100 outline-none focus:ring-2 focus:ring-rose-500/20 font-bold text-sm text-rose-700" 
+                    value={otherCategory}
+                    onChange={(e) => setOtherCategory(e.target.value)} 
+                  />
+                </div>
+              )}
 
-              <div>
-                <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Receipt URL (Optional)</label>
-                <input 
-                  type="text" placeholder="https://..." 
-                  className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-red-500 bg-slate-50 text-sm" 
-                  value={formData.receiptUrl}
-                  onChange={(e) => setFormData({...formData, receiptUrl: e.target.value})} 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                 <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Currency</label>
+                  <select 
+                    className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-sm"
+                    value={formData.currency}
+                    onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="INR">INR (₹)</option>
+                    <option value="EUR">EUR (€)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Date</label>
+                  <input 
+                    type="date" required 
+                    className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-sm" 
+                    value={formData.expenseDate}
+                    onChange={(e) => setFormData({...formData, expenseDate: e.target.value})} 
+                  />
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4">
-                <button type="button" onClick={handleCloseModal} className="flex-1 py-3 text-slate-500 font-bold text-sm">Cancel</button>
-                <button type="submit" className="flex-1 bg-red-500 text-white py-3 rounded-xl font-bold text-sm shadow-lg shadow-red-100 hover:bg-red-600 transition-all">
-                  {editingId ? 'Update Expense' : 'Save Expense'}
+                <button type="submit" className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-rose-600 transition-all">
+                  {editingId ? 'Update Record' : 'Confirm Expense'}
                 </button>
               </div>
             </form>

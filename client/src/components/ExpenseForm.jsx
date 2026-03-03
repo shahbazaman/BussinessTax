@@ -10,8 +10,6 @@ const ExpenseForm = ({ onRefresh }) => {
     currency: 'USD',
     date: new Date().toISOString().split('T')[0]
   });
-  
-  // State for custom category
   const [otherCategory, setOtherCategory] = useState('');
 
   const categories = ['Software', 'Rent', 'Marketing', 'Travel', 'Salaries', 'Utilities', 'Other'];
