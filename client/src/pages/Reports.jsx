@@ -10,7 +10,7 @@ const Reports = () => {
   const [taxRate, setTaxRate] = useState(15);
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState('USD');
-  const income = parseFloat(stats.totalIncome || 0);
+  const income = parseFloat(stats.totalIncome || 0);  
   const profit = parseFloat(stats.netProfit || 0);
   const currentTaxRate = parseFloat(taxRate || 0);
   const estimatedTax = profit > 0 ? (profit * (currentTaxRate / 100)) : 0;
@@ -20,12 +20,13 @@ const Reports = () => {
     const fetchStats = async () => {
       try {
         const [statsRes, profileRes] = await Promise.all([
-          api.get('/dashboard/stats'),
+          api.get('/analytics/monthly-report'), // FIX: Corrected Endpoint
           api.get('/auth/profile')
         ]);
         setStats(statsRes.data);
         setCurrency(profileRes.data.currency || 'USD');
       } catch (err) {
+        console.error(err);
         toast.error("Failed to fetch report data");
       } finally {
         setLoading(false);
