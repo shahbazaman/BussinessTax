@@ -7,7 +7,7 @@ import {
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area,
-  Legend, BarChart, Bar
+  Legend, BarChart, Bar, PieChart, Pie, Cell 
 } from 'recharts';
 import api from '../utils/api';
 import jsPDF from 'jspdf';
@@ -18,9 +18,6 @@ import InvoiceModal from '../components/InvoiceModal';
 import LowStockWidget from '../components/LowStockWidget';
 import { useNavigate } from 'react-router-dom';
 
-// ---------------------------------------------------------------------------
-// StatCard
-// ---------------------------------------------------------------------------
 const StatCard = ({ label, value, icon, color }) => (
   <div className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 flex items-center gap-4 group hover:border-blue-100 transition-all">
     <div className={`${color} p-4 rounded-2xl text-white shadow-lg transition-transform group-hover:scale-110`}>
@@ -32,12 +29,7 @@ const StatCard = ({ label, value, icon, color }) => (
     </div>
   </div>
 );
-
-// ---------------------------------------------------------------------------
-// Dashboard
-// ---------------------------------------------------------------------------
 const Dashboard = () => {
-  // ── State ──────────────────────────────────────────────────────────────────
   const [stats, setStats]                   = useState(null);
   const [accounts, setAccounts]             = useState([]);
   const [loading, setLoading]               = useState(true);
@@ -47,23 +39,18 @@ const Dashboard = () => {
   const [transactions, setTransactions]     = useState([]);
   const [products, setProducts]             = useState([]);
   const navigate = useNavigate();
-  // Modal visibility
+  const [spendingReport, setSpendingReport] = useState([]);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [showClientModal, setShowClientModal]     = useState(false);
   const [showAccountModal, setShowAccountModal]   = useState(false);
   const [showInvoiceModal, setShowInvoiceModal]   = useState(false);
-
-  // Form data
   const [transferData, setTransferData] = useState({ fromId: '', toId: '', amount: 0 });
   const [newClient, setNewClient]       = useState({ name: '', email: '', phone: '' });
   const [newAccount, setNewAccount]     = useState({
     bankName: '', balance: '', accountType: 'Checking', accountNumber: ''
   });
 
-  // Ref used for the hidden PDF print area
   const invoicePrintRef = useRef(null);
-
-  // ── Currency helpers ────────────────────────────────────────────────────────
   const CURRENCY_MAP   = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
 
@@ -73,50 +60,48 @@ const Dashboard = () => {
       maximumFractionDigits: 2,
     })}`;
 
-  // ── Data fetching ───────────────────────────────────────────────────────────
-  const fetchDashboardData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [
-        statsRes,
-        accountsRes,
-        clientsRes,
-        transactionsRes,
-        profileRes,
-        productsRes,
-      ] = await Promise.all([
-        api.get('/dashboard/stats'),
-        api.get('/dashboard/accounts'),
-        api.get('/clients'),
-        api.get('/accounts/transactions'),
-        api.get('/auth/profile'),
-        api.get('/products'),
-      ]);
+const fetchDashboardData = useCallback(async () => {
+  setLoading(true);
+  try {
+    const [
+      statsRes,
+      accountsRes,
+      clientsRes,
+      transactionsRes,
+      profileRes,
+      productsRes,
+      reportRes, 
+    ] = await Promise.all([
+      api.get('/dashboard/stats'),
+      api.get('/dashboard/accounts'),
+      api.get('/clients'),
+      api.get('/accounts/transactions'),
+      api.get('/auth/profile'),
+      api.get('/products'),
+      api.get('/transactions/reports/spending'), 
+    ]);
 
-      setStats(statsRes.data);
-      setAccounts(accountsRes.data);
-      setClients(clientsRes.data);
-      setTransactions(transactionsRes.data);
-      setCurrency(profileRes.data.currency || 'USD');
-      setUserTaxRate(profileRes.data.taxRate || 20);
-      setProducts(productsRes.data);
-    } catch (err) {
-      console.error('Dashboard Fetch Error:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+    setStats(statsRes.data);
+    setAccounts(accountsRes.data);
+    setClients(clientsRes.data);
+    setTransactions(transactionsRes.data);
+    setCurrency(profileRes.data.currency || 'USD');
+    setUserTaxRate(profileRes.data.taxRate || 20);
+    setProducts(productsRes.data);
+    setSpendingReport(reportRes.data); // Save the report data
+  } catch (err) {
+    console.error('Dashboard Fetch Error:', err);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   useEffect(() => {
     fetchDashboardData();
   }, [fetchDashboardData]);
-
-  // ── Tax calculations ────────────────────────────────────────────────────────
   const TAX_RATE     = userTaxRate / 100;
   const estimatedTax = stats?.netProfit > 0 ? stats.netProfit * TAX_RATE : 0;
   const finalTakeHome = (stats?.netProfit || 0) - estimatedTax;
-
-  // ── Low-stock helper ────────────────────────────────────────────────────────
   const lowStockItems = products
     .flatMap((p) =>
       p.variants
@@ -128,13 +113,6 @@ const Dashboard = () => {
         }))
     )
     .slice(0, 5);
-
-  // ── PDF Download ─────────────────────────────────────────────────────────────
-  /**
-   * Captures the hidden #invoice-print-area div and saves it as a PDF.
-   * Called from the "Download PDF" button inside the old inline invoice modal
-   * section (kept for backward-compat), OR can be wired to any button.
-   */
   const handleDownloadPDF = async () => {
     const element = invoicePrintRef.current;
     if (!element) {
@@ -156,7 +134,6 @@ const Dashboard = () => {
     }
   };
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
   const handleTransfer = async (e) => {
     e.preventDefault();
     if (transferData.fromId === transferData.toId) {
@@ -228,7 +205,6 @@ const Dashboard = () => {
     console.log(`Payment planned for: $${amount} (Invoice: ${invoiceId})`);
   };
 
-  // ── Loading screen ──────────────────────────────────────────────────────────
   if (loading)
     return (
       <div className="flex items-center justify-center min-h-screen bg-slate-50">
@@ -240,8 +216,6 @@ const Dashboard = () => {
         </div>
       </div>
     );
-
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen relative">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -491,7 +465,7 @@ const Dashboard = () => {
                 {new Date(tx.timestamp).toLocaleDateString()}
               </td>
               <td className="px-4 lg:px-6 py-4">
-                <span className="text-xs lg:text-sm font-bold text-slate-700 block truncate max-w-[150px]">
+                <span className="text-xs lg:text-sm font-bold text-slate-700 block truncate max-w-37.5">
                   {tx.title}
                 </span>
               </td>
@@ -548,7 +522,44 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </div>
           </div>
-
+          {/* Spending Breakdown - Powered by /reports/spending */}
+            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                  Expense Distribution
+                </h3>
+                <Receipt size={16} className="text-slate-300" />
+              </div>
+              <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={spendingReport} // Uses the state we added in Part 1
+                      dataKey="totalAmount"
+                      nameKey="_id"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={8}
+                    >
+                      {spendingReport.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={['#3b82f6', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6'][index % 5]} 
+                          stroke="none"
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)', fontWeight: 'bold' }}
+                      formatter={(value) => `${currencySymbol}${value.toLocaleString()}`}
+                    />
+                    <Legend verticalAlign="bottom" iconType="circle" />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
           {/* Revenue Growth Trend Area Chart */}
           <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
             <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-8">
@@ -579,15 +590,47 @@ const Dashboard = () => {
               </ResponsiveContainer>
             </div>
           </div>
+          {/* Spending Breakdown Pie Chart */}
+            <div className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm">
+              <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">
+                Spending by Category
+              </h3>
+              <div className="h-80 w-full">
+                
+                {spendingReport.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold uppercase">
+                    No expense data yet
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                                  <PieChart>
+                                    <Pie
+                                      data={spendingReport}
+                                      dataKey="totalAmount"
+                                      nameKey="_id"
+                                      cx="50%"
+                                      cy="50%"
+                                      outerRadius={80}
+                                      innerRadius={60}
+                                      paddingAngle={5}
+                                      label={({ _id, percent }) => `${_id} ${(percent * 100).toFixed(0)}%`}
+                                    >
+                                      {spendingReport.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={['#3b82f6', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6'][index % 5]} />
+                                      ))}
+                                    </Pie>
+                                    <Tooltip 
+                                      formatter={(value) => `${currencySymbol}${value.toLocaleString()}`}
+                                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)' }}
+                                    />
+                                    <Legend verticalAlign="bottom" height={36}/>
+                                  </PieChart>
+                                </ResponsiveContainer>
+                )}
+              </div>
+            </div>
         </div>
       </div>
-
-      {/* ── Toast ── */}
-      {/* <ToastContainer position="bottom-right" autoClose={3000} theme="light" /> */}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          MODALS
-      ══════════════════════════════════════════════════════════════════════ */}
 
       {/* Transfer Modal */}
       {showTransferModal && (
@@ -792,11 +835,6 @@ const Dashboard = () => {
           </div>
         </div>
       )}
-
-      {/* ══════════════════════════════════════════════════════════════════════
-          Hidden Invoice Print Area  (used by handleDownloadPDF)
-          Kept off-screen so html2canvas can capture it.
-      ══════════════════════════════════════════════════════════════════════ */}
       <div style={{ position: 'absolute', left: '-9999px', top: 0, zIndex: -10 }}>
         <div
           ref={invoicePrintRef}

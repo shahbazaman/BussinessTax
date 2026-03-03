@@ -1,25 +1,25 @@
 import express from 'express';
-import Transaction from '../models/Transaction.js';
 import auth from '../middleware/authMiddleware.js';
+import { 
+  addTransaction, 
+  getTransactions, 
+  deleteTransaction, 
+  getTransactionReports 
+} from '../controllers/transactionController.js';
 
 const router = express.Router();
 
-// @desc    Get all internal transfers for the logged-in user
-// @route   GET /api/transactions
-router.get('/', auth, async (req, res) => {
-  try {
-    // We find transactions belonging to the user
-    // We use .populate to get the names of the banks involved
-    const transactions = await Transaction.find({ userId: req.user.id })
-      .populate('fromAccount', 'bankName')
-      .populate('toAccount', 'bankName')
-      .sort({ timestamp: -1 }); // Newest first
+// @route   GET /api/transactions/reports/spending
+// NOTE: Must be ABOVE /:id routes
+router.get('/reports/spending', auth, getTransactionReports);
 
-    res.json(transactions);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Error fetching transaction history" });
-  }
-});
+// @route   GET /api/transactions
+router.get('/', auth, getTransactions);
+
+// @route   POST /api/transactions
+router.post('/', auth, addTransaction);
+
+// @route   DELETE /api/transactions/:id
+router.delete('/:id', auth, deleteTransaction);
 
 export default router;

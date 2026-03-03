@@ -170,7 +170,7 @@ const Expenses = () => {
         </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-[2rem] border border-slate-100 shadow-sm">
+        <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-4xl border border-slate-100 shadow-sm">
           <input 
             type="text" placeholder="Search expenses..." 
             className="flex-1 px-4 py-2 bg-slate-50 rounded-xl outline-none text-sm font-medium"
@@ -187,7 +187,7 @@ const Expenses = () => {
           {loading ? (
              <div className="text-center py-20 animate-pulse text-slate-400 font-medium">Fetching ledger...</div>
           ) : filteredExpenses.map((exp) => (
-            <div key={exp._id} className="bg-white p-5 rounded-[1.5rem] border border-slate-100 flex items-center justify-between hover:shadow-md transition-all group">
+            <div key={exp._id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center justify-between hover:shadow-md transition-all group">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-slate-50 text-slate-400 group-hover:bg-rose-50 group-hover:text-rose-500 rounded-2xl flex items-center justify-center transition-colors">
                   <Receipt size={22} />

@@ -1,7 +1,8 @@
 import mongoose from 'mongoose';
 
 const TransactionSchema = new mongoose.Schema({
-  userId: { //check for userId or user
+  // Use userId to match your Auth and Employee logic
+  userId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
     required: true 
@@ -11,14 +12,27 @@ const TransactionSchema = new mongoose.Schema({
     ref: 'Account', 
     required: true 
   },
+  // Made optional because Expenses (like Payroll) don't have a "toAccount" in the system
   toAccount: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Account', 
-    required: true 
+    ref: 'Account',
+    required: false 
   },
   amount: { 
     type: Number, 
     required: true 
+  },
+  // Added Type to distinguish between money moving in vs out
+  type: {
+    type: String,
+    enum: ['Income', 'Expense', 'Transfer'],
+    required: true,
+    default: 'Transfer'
+  },
+  // Added Category for your Reports tab
+  category: {
+    type: String,
+    default: 'General'
   },
   description: { 
     type: String, 
@@ -33,6 +47,6 @@ const TransactionSchema = new mongoose.Schema({
     type: Date, 
     default: Date.now 
   }
-});
+}, { timestamps: true });
 
 export default mongoose.model('Transaction', TransactionSchema);

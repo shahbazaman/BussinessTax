@@ -53,5 +53,5 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
-
+export const getSpendingReport = () => api.get('/accounts/reports/spending');
 export default api;
