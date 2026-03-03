@@ -72,30 +72,34 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
     }
   };
 
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Use customCategory if "Other" is selected
     const finalCategory = isOtherCategory ? productData.customCategory : productData.category;
-
     if (!finalCategory) return toast.error("Please specify a category");
 
+    // FIX: Map salePrice to price so the backend validation passes
     const validVariants = productData.variants
-      .filter(v => v.name.trim() !== '' && v.salePrice !== '') 
+      .filter(v => v.name.trim() !== '') 
       .map(v => ({
         ...v,
         weight: Number(v.weight) || 0,
         costPrice: Number(v.costPrice) || 0,
-        salePrice: Number(v.salePrice),
+        salePrice: Number(v.salePrice) || 0,
+        price: Number(v.salePrice) || 0, // MAP TO SCHEMA REQUIREMENT
         stock: Number(v.stock) || 0,
-        sku: v.sku?.trim() === "" ? `SKU-${Date.now()}` : v.sku
+        sku: v.sku?.trim() === "" ? `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}` : v.sku
       }));
+
+    if (validVariants.length === 0) {
+      return toast.error("Please add at least one variant with a label");
+    }
 
     const sanitizedData = {
       ...productData,
       category: finalCategory,
-      lowStockAlert: Number(productData.lowStockAlert),
-      reorderQuantity: Number(productData.reorderQuantity),
+      lowStockAlert: Number(productData.lowStockAlert) || 0,
+      reorderQuantity: Number(productData.reorderQuantity) || 0,
       variants: validVariants
     };
 

@@ -13,14 +13,16 @@ export const getProducts = async (req, res) => {
 // @desc Add a new product with variants
 export const addProduct = async (req, res) => {
   try {
-    const { title, category, variants, lowStockAlert } = req.body;
+    const { title, category, variants, lowStockAlert, supplier, reorderQuantity } = req.body;
     
     const product = new Product({
       user: req.user.id,
       title,
       category,
-      variants, // This should be an array of variant objects
-      lowStockAlert
+      supplier,
+      variants, 
+      lowStockAlert,
+      reorderQuantity
     });
 
     const savedProduct = await product.save();
@@ -31,6 +33,28 @@ export const addProduct = async (req, res) => {
   }
 };
 
+// @desc Update full product details and variants
+export const updateProduct = async (req, res) => {
+  try {
+    const { title, category, variants, lowStockAlert, supplier, reorderQuantity } = req.body;
+    const product = await Product.findById(req.params.id);
+
+    if (!product) return res.status(404).json({ message: "Product not found" });
+    if (product.user.toString() !== req.user.id) return res.status(401).json({ message: "Not authorized" });
+
+    product.title = title || product.title;
+    product.category = category || product.category;
+    product.supplier = supplier || product.supplier;
+    product.lowStockAlert = lowStockAlert ?? product.lowStockAlert;
+    product.reorderQuantity = reorderQuantity ?? product.reorderQuantity;
+    product.variants = variants || product.variants;
+
+    const updatedProduct = await product.save();
+    res.json(updatedProduct);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
 // @desc Update stock for a specific variant
 export const updateProductStock = async (req, res) => {
   try {
@@ -63,35 +87,5 @@ export const deleteProduct = async (req, res) => {
     res.json({ message: "Product removed" });
   } catch (error) {
     res.status(500).json({ message: "Server error" });
-  }
-};
-// @desc Update full product details and variants
-export const updateProduct = async (req, res) => {
-  try {
-    const { title, category, variants, lowStockAlert } = req.body;
-    
-    // 1. Find the product
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-      return res.status(404).json({ message: "Product not found" });
-    }
-
-    // 2. Check ownership
-    if (product.user.toString() !== req.user.id) {
-      return res.status(401).json({ message: "Not authorized" });
-    }
-
-    // 3. Update fields
-    product.title = title || product.title;
-    product.category = category || product.category;
-    product.lowStockAlert = lowStockAlert || product.lowStockAlert;
-    product.variants = variants || product.variants;
-
-    const updatedProduct = await product.save();
-    res.json(updatedProduct);
-  } catch (error) {
-    console.error("Update Error:", error);
-    res.status(400).json({ message: error.message });
   }
 };
