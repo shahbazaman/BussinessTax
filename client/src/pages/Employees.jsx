@@ -2,18 +2,21 @@ import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../utils/api';
 import { 
   Users, UserPlus, CalendarCheck, DollarSign, Trash2, Edit2, 
-  X, Search, Filter, Loader2, Receipt, Landmark, Phone, Briefcase, MapPin, Fingerprint, RefreshCcw
+  X, Search, Filter, Loader2, Receipt, Landmark, Phone, Briefcase, MapPin, Fingerprint, RefreshCcw, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { CurrencyContext } from '../context/CurrencyContext';
 
 const Employees = () => {
   const [employees, setEmployees] = useState([]);
+  const [accounts, setAccounts] = useState([]); // New: For bank selection
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showPayrollModal, setShowPayrollModal] = useState(false); // New: For Payroll Review
   const [isEditing, setIsEditing] = useState(false);
   const [currentId, setCurrentId] = useState(null);
-  
+  const [selectedAccountId, setSelectedAccountId] = useState(''); // New: To track source bank
+
   const initialState = { 
     name: '', role: '', dailyRate: '', 
     email: '', phone: '', contactNumber: '', 
@@ -29,11 +32,17 @@ const Employees = () => {
   const [roleFilter, setRoleFilter] = useState('All');
   const { symbol } = useContext(CurrencyContext);
 
+  // Fetch Employees and Accounts
   const fetchData = async () => {
     try {
       setLoading(true);
-      const empRes = await api.get('/employees');
+      const [empRes, accRes] = await Promise.all([
+        api.get('/employees'),
+        api.get('/accounts')
+      ]);
       setEmployees(empRes.data);
+      setAccounts(accRes.data);
+      if (accRes.data.length > 0) setSelectedAccountId(accRes.data[0]._id);
     } catch (err) {
       toast.error("Cloud sync failed");
     } finally {
@@ -42,6 +51,11 @@ const Employees = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  // Calculate Total Payroll Amount
+  const totalPayrollAmount = useMemo(() => {
+    return employees.reduce((sum, emp) => sum + (Number(emp.workingDays) * Number(emp.dailyRate)), 0);
+  }, [employees]);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
@@ -57,11 +71,10 @@ const Employees = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      // FIX: Structuring payload to match backend 'bankDetails' nesting
       const payload = { 
         ...formData, 
-        phone: formData.phone, 
-      contactNumber: formData.contactNumber,
+        phone: formData.phone || formData.contactNumber, 
+        contactNumber: formData.contactNumber,
         dailyRate: Number(formData.dailyRate),
         bankDetails: {
           bankName: formData.bankName,
@@ -84,10 +97,14 @@ const Employees = () => {
   };
 
   const handleCloseMonth = async () => {
-    if (!window.confirm("Process payroll and reset all attendance? This will deduct funds from your source account.")) return;
+    if (!selectedAccountId) {
+      toast.error("Please select a payment source");
+      return;
+    }
     try {
-      const res = await api.post('/employees/close-month');
+      const res = await api.post('/employees/close-month', { accountId: selectedAccountId });
       toast.success(res.data.message);
+      setShowPayrollModal(false);
       fetchData();
     } catch (err) {
       toast.error(err.response?.data?.message || "Payroll reset failed");
@@ -154,20 +171,31 @@ const Employees = () => {
 
   return (
     <div className="p-4 md:p-8 space-y-8 bg-slate-50 min-h-screen">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {/* Header & Payroll Summary */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Staffing Hub</h1>
           <p className="text-slate-500 font-medium">Manage attendance, payroll, and verification</p>
         </div>
-        <div className="flex flex-wrap gap-3">
-            {/* ADDED: Close Month Button */}
-            <button onClick={handleCloseMonth} className="bg-white text-rose-600 border border-rose-100 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-rose-50 transition-all active:scale-95 shadow-sm">
-              <RefreshCcw size={16} /> Close Month
-            </button>
-            <button onClick={() => setShowModal(true)} className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 active:scale-95">
-              <UserPlus size={16} /> Add Employee
-            </button>
+        
+        {/* NEW: Interactive Payroll Card */}
+        <div className="bg-emerald-50 p-4 rounded-3xl flex items-center gap-6 border border-emerald-100 shadow-sm">
+           <div>
+             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Pending Payroll</p>
+             <p className="text-2xl font-black text-slate-900">{symbol}{totalPayrollAmount.toLocaleString()}</p>
+           </div>
+           <button 
+             onClick={() => setShowPayrollModal(true)}
+             disabled={totalPayrollAmount === 0}
+             className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-bold text-xs uppercase hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center gap-2 shadow-lg shadow-emerald-100"
+           >
+             <RefreshCcw size={14} /> Review & Pay
+           </button>
         </div>
+
+        <button onClick={() => setShowModal(true)} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 active:scale-95 self-start md:self-center">
+          <UserPlus size={16} /> Add Employee
+        </button>
       </div>
 
       {/* Filters */}
@@ -198,6 +226,7 @@ const Employees = () => {
               <tr>
                 <th className="px-8 py-5">Personnel</th>
                 <th className="px-8 py-5">Worked</th>
+                <th className="px-8 py-5 text-emerald-600">Pending Wage</th>
                 <th className="px-8 py-5">Contact</th>
                 <th className="px-8 py-5 text-right">Operations</th>
               </tr>
@@ -215,6 +244,7 @@ const Employees = () => {
                     </div>
                   </td>
                   <td className="px-8 py-5 font-bold text-slate-700">{emp.workingDays} Days</td>
+                  <td className="px-8 py-5 font-black text-slate-900">{symbol}{(emp.workingDays * emp.dailyRate).toLocaleString()}</td>
                   <td className="px-8 py-5 text-sm font-bold text-slate-500">{emp.phone}</td>
                   <td className="px-8 py-5 flex justify-end gap-2">
                       <button 
@@ -235,7 +265,42 @@ const Employees = () => {
         </div>
       </div>
 
-      {/* MODAL */}
+      {/* NEW: PAYROLL REVIEW MODAL */}
+      {showPayrollModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-70 p-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200 border border-slate-100">
+            <div className="flex justify-center mb-6">
+              <div className="bg-emerald-100 p-4 rounded-full text-emerald-600">
+                <Landmark size={32} />
+              </div>
+            </div>
+            <h3 className="text-2xl font-black text-slate-900 text-center mb-2">Process Payroll</h3>
+            <p className="text-sm text-slate-500 text-center mb-8">Confirm total payout of <span className="font-black text-slate-900">{symbol}{totalPayrollAmount.toLocaleString()}</span> to all staff.</p>
+            
+            <div className="space-y-4 mb-8">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Payment Source</label>
+              <select 
+                className="w-full p-4 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-emerald-200 outline-none font-bold text-sm transition-all"
+                value={selectedAccountId}
+                onChange={(e) => setSelectedAccountId(e.target.value)}
+              >
+                {accounts.length === 0 ? <option>No accounts found</option> : accounts.map(acc => (
+                  <option key={acc._id} value={acc._id}>
+                    {acc.bankName} — Balance: {symbol}{acc.balance.toLocaleString()}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowPayrollModal(false)} className="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600 transition-colors">Cancel</button>
+              <button onClick={handleCloseMonth} className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-bold shadow-xl active:scale-95 transition-all">Confirm & Pay</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* EMPLOYEE ADD/EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-[3rem] w-full max-w-3xl shadow-2xl overflow-hidden animate-in zoom-in duration-200">
