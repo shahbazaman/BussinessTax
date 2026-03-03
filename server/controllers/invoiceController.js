@@ -4,87 +4,97 @@ import Product from '../models/Product.js';
 export const createInvoice = async (req, res) => {
   try {
     const { 
-      clientId, 
-      invoiceNumber,
-      poNumber,
-      items, // Array of { productId, variantId, name, quantity, price, taxRate }
-      subtotal,
-      taxAmount,
-      shipping,
-      discount,
-      totalAmount,
-      dueDate, 
-      status, 
-      type, // 'Sale' or 'Purchase'
-      notes
+      clientId, items, shipping, discount, type, 
+      invoiceNumber, dueDate, status, notes, poNumber 
     } = req.body; 
+
+    // Safety check for Auth
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({ message: "User authentication failed" });
+    }
 
     const invoiceType = type || 'Sale';
 
-    // 1. PRE-CHECK STOCK & VALIDATION
-    if (items && items.length > 0) {
-      for (const item of items) {
-        const product = await Product.findById(item.productId);
-        if (!product) {
-          return res.status(404).json({ message: `Product not found: ${item.productId}` });
-        }
+    // 1. DATA VALIDATION & STOCK CHECK
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Invoice must have at least one item" });
+    }
 
-        const variant = product.variants.id(item.variantId);
-        if (!variant) {
-          return res.status(404).json({ message: `Variant not found in product: ${product.title}` });
-        }
+    // Prepare a clean items array for the Database
+    const validatedItems = [];
 
-        const qty = Number(item.quantity);
-
-        // If it's a Sale, prevent overselling
-        if (invoiceType === 'Sale' && variant.stock < qty) {
-          return res.status(400).json({ 
-            message: `Insufficient stock for ${product.title} - ${variant.name}. Available: ${variant.stock}` 
-          });
-        }
+    for (const item of items) {
+      if (!item.productId || !item.variantId) {
+        return res.status(400).json({ message: "Product and Variant selection required for all items" });
       }
+
+      const product = await Product.findById(item.productId);
+      if (!product) return res.status(404).json({ message: `Product not found: ${item.name}` });
+
+      const variant = product.variants.id(item.variantId);
+      if (!variant) return res.status(404).json({ message: `Variant not found for: ${product.title}` });
+
+      const qty = Number(item.quantity || 0);
+
+      // Inventory check for Sales
+      if (invoiceType === 'Sale' && variant.stock < qty) {
+        return res.status(400).json({ 
+          message: `Insufficient stock for ${product.title}. Available: ${variant.stock}` 
+        });
+      }
+
+      // Push sanitized data to the array
+      validatedItems.push({
+        productId: item.productId,
+        variantId: item.variantId,
+        name: item.name || product.title,
+        quantity: qty,
+        price: Number(item.price || 0),
+        taxRate: Number(item.taxRate || 0)
+      });
     }
 
     // 2. CREATE INVOICE 
-    // The pre-save hook in our model will re-verify the totals automatically
-    const invoice = await Invoice.create({
+    // We use "new Invoice" + ".save()" to properly trigger the async pre-save hook 
+    // and avoid the "next is not a function" error.
+    const invoice = new Invoice({
       user: req.user._id,
       client: clientId, 
       invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
       poNumber,
-      items: items || [],
-      subtotal,
-      taxAmount,
-      shipping: Number(shipping) || 0,
-      discount: Number(discount) || 0,
-      totalAmount,
-      dueDate,
+      items: validatedItems,
+      shipping: Number(shipping || 0),
+      discount: Number(discount || 0),
+      dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days
       status: status || 'Pending',
       type: invoiceType,
-      notes
+      notes,
+      totalAmount: 0 // This will be calculated by the Pre-Save Hook in Invoice.js
     });
 
-    // 3. ATOMIC STOCK UPDATE
-    if (items && items.length > 0) {
-      for (const item of items) {
-        const qty = Number(item.quantity);
-        // Purchase increases stock (+), Sale decreases stock (-)
-        const adjustment = (invoiceType === 'Purchase') ? qty : -qty;
+    const savedInvoice = await invoice.save();
 
-        await Product.findByIdAndUpdate(item.productId, {
-          $inc: { "variants.$[v].stock": adjustment } 
-        }, {
+    // 3. ATOMIC STOCK UPDATE
+    for (const item of validatedItems) {
+      const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
+
+      await Product.findByIdAndUpdate(
+        item.productId, 
+        { $inc: { "variants.$[v].stock": adjustment } }, 
+        {
           arrayFilters: [{ "v._id": item.variantId }],
           new: true 
-        });
-      }
+        }
+      );
     }
 
-    res.status(201).json(invoice);
+    // Send back the populated invoice
+    res.status(201).json(savedInvoice);
+
   } catch (error) {
-    console.error("Invoice Creation Error:", error);
+    console.error("CRITICAL ERROR IN CREATE_INVOICE:", error);
     res.status(500).json({ 
-      message: "Error creating invoice and updating stock", 
+      message: "Internal Server Error during invoice creation", 
       error: error.message 
     });
   }

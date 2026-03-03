@@ -244,8 +244,8 @@ const Invoices = () => {
                          {(inv.type || 'SALE').toUpperCase()}
                        </span>
                     </td>
-                    <td className="px-8 py-6 font-black text-slate-800">{inv.customerName}</td>
-                    <td className="px-8 py-6 font-black text-slate-900">{formatValue(inv.amount)}</td>
+                    <td className="px-8 py-6 font-black text-slate-800">{inv.client?.name || "Internal Record"}</td>
+                    <td className="px-8 py-6 font-black text-slate-900">{formatValue(inv.totalAmount)}</td>
                     <td className="px-8 py-6">
                       <select 
                         value={inv.status} 

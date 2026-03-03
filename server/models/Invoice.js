@@ -24,7 +24,8 @@ const invoiceSchema = new mongoose.Schema({
     type: String 
   },
   items: [{
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    variantId: { type: String, required: true }, // Added required variantId for stock tracking
     name: { type: String, required: true },
     quantity: { type: Number, default: 1 },
     price: { type: Number, default: 0 },
@@ -51,7 +52,6 @@ const invoiceSchema = new mongoose.Schema({
     type: Number, 
     required: true 
   },
-
   status: { 
     type: String, 
     enum: ['Paid', 'Pending', 'Overdue', 'Draft', 'Cancelled'], 
@@ -72,7 +72,7 @@ const invoiceSchema = new mongoose.Schema({
   },
   paidIntoAccount: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Account' // Updated to match your route: ./routes/accountRoutes.js
+    ref: 'Account'
   },
   paymentDate: { 
     type: Date 
@@ -81,15 +81,32 @@ const invoiceSchema = new mongoose.Schema({
     type: String
   }
 }, { timestamps: true });
-invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true });
-invoiceSchema.pre('save', function(next) {
-  this.subtotal = this.items.reduce((acc, item) => acc + (item.price * item.quantity), 0);
-  this.taxAmount = this.items.reduce((acc, item) => {
-    return acc + (item.price * item.quantity * (item.taxRate / 100));
-  }, 0);
-  this.totalAmount = (this.subtotal + this.taxAmount + this.shipping) - this.discount;
 
-  next();
+// Ensure unique invoice numbers per user
+invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true });
+
+// Calculation Hook: Runs before .save() 
+// Removed 'next' to prevent "next is not a function" errors with async/await
+invoiceSchema.pre('save', async function() {
+  // Ensure we are working with numbers to prevent NaN in DB
+  const items = this.items || [];
+  
+  const calculatedSubtotal = items.reduce((acc, item) => {
+    return acc + (Number(item.price || 0) * Number(item.quantity || 0));
+  }, 0);
+
+  const calculatedTax = items.reduce((acc, item) => {
+    const itemTotal = Number(item.price || 0) * Number(item.quantity || 0);
+    return acc + (itemTotal * (Number(item.taxRate || 0) / 100));
+  }, 0);
+
+  this.subtotal = calculatedSubtotal;
+  this.taxAmount = calculatedTax;
+  this.shipping = Number(this.shipping || 0);
+  this.discount = Number(this.discount || 0);
+
+  // Final Total Calculation
+  this.totalAmount = (this.subtotal + this.taxAmount + this.shipping) - this.discount;
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);

@@ -1,0 +1,32 @@
+[33mdbaf234[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m)[m fix dashboard 2
+[33md50ce25[m updated dashboard
+[33m045a546[m updated _id to id
+[33mf9e8098[m fixed error
+[33m3ec6c8a[m updated form input 2
+[33m804c3cc[m updated form input 2
+[33mb6a2c86[m fixed error 1
+[33mea1a79a[m updated forms input(account,client,employee,ionvontry,invoice)
+[33mb39a82f[m updated currency symbols
+[33mb277650[m toast update
+[33m664a432[m toast error fixed , invoice tab add modal updated
+[33mb3a4836[m toast notification in every tabs,expenses table edit button,invontry cards to table
+[33m1e2bc3f[m updated employee controler
+[33m758b957[m fixed employee files
+[33mf4466d9[m name fix
+[33m54f0b63[m fixed responsiveness 1
+[33m2ba81ca[m updated sidebar.jsx
+[33m6b8af6c[m fixed code backend
+[33mad99b44[m updated index.css
+[33m3e8b178[m removed comments and fixed errors
+[33m3af7926[m fixed sidebar and removed comments
+[33m877dc8a[m report tab pdf export fix 2
+[33me4de5c9[m fixed errors 1
+[33m2f279cb[m updated invoices.jsx
+[33m011c671[m updated api.js invoice.js accountroute.js
+[33mb87fcf9[m fixed error
+[33m822241a[m updatesd invoice/razorpay related pages 3
+[33m5c12cf0[m added razorpay option
+[33mc16e2c4[m updated axios to api for localhost update 2
+[33m3cfb3ce[m Fixed hardcoded URLs/local host and added vercel config
+[33m04a85d8[m updated server 1
+[33mc363ba7[m Monorepo: Integrated Frontend and Backend of bussiness tax
