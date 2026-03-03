@@ -66,8 +66,10 @@ const Invoices = () => {
       }
       
       const targetAccountId = accounts[0]._id;
-      // Using invoice.totalAmount as per your Mongoose schema
-      const { data: order } = await api.post('/payments/order', {
+
+      // UPDATED: Endpoint changed from '/payments/order' to '/payments/create-order' 
+      // to match backend File #4
+      const { data: order } = await api.post('/payments/create-order', {
         amount: invoice.totalAmount,
         currency: "INR" 
       });
@@ -86,7 +88,7 @@ const Invoices = () => {
               invoiceId: invoice._id,
               accountId: targetAccountId 
             });
-            toast.success("Payment verified!");
+            toast.success("Payment verified and balance updated!");
             fetchData();
           } catch (err) {
             toast.error("Verification failed");
@@ -101,6 +103,7 @@ const Invoices = () => {
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (err) {
+      console.error("Payment Error:", err);
       toast.error("Could not initiate payment");
     }
   };
