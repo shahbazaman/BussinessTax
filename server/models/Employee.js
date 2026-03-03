@@ -17,8 +17,7 @@ const employeeSchema = new mongoose.Schema({
     lowercase: true 
   },
   phone: { 
-    type: String, 
-    required: true 
+    type: String
   },
   contactNumber: { 
     type: String,

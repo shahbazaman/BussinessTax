@@ -18,21 +18,20 @@ export const addEmployee = async (req, res) => {
     const { 
       name, email, phone, role, dailyRate, 
       contactNumber, homeAddress, verificationIdType, idNumber, 
-      bankName, accountNumber, employmentType 
+      bankName, accountNumber 
     } = req.body;
 
     const employee = new Employee({
       user: req.user._id,
       name, 
       email, 
-      phone, 
+      phone: phone || contactNumber, 
       role, 
       dailyRate: Number(dailyRate),
       contactNumber, 
       homeAddress, 
-      verificationIdType: verificationIdType || 'National ID', 
+      verificationIdType, 
       idNumber,
-      employmentType: employmentType || 'Full-time',
       bankDetails: {
         bankName: bankName || '',
         accountNumber: accountNumber || ''
@@ -42,7 +41,6 @@ export const addEmployee = async (req, res) => {
     await employee.save();
     res.status(201).json(employee);
   } catch (error) {
-    console.error("Creation Error:", error.message);
     res.status(400).json({ message: "Creation failed: " + error.message });
   }
 };

@@ -60,6 +60,8 @@ const Employees = () => {
       // FIX: Structuring payload to match backend 'bankDetails' nesting
       const payload = { 
         ...formData, 
+        phone: formData.phone, 
+      contactNumber: formData.contactNumber,
         dailyRate: Number(formData.dailyRate),
         bankDetails: {
           bankName: formData.bankName,
