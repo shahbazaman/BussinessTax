@@ -59,7 +59,7 @@ const Sidebar = () => {
           ${isMobileOpen ? 'flex' : 'hidden lg:flex'}`}>
           
           {!isCollapsed && (
-            <span className="text-lg md:text-xl font-bold italic tracking-tight text-slate-800 uppercase truncate max-w-[180px]">
+            <span className="text-lg md:text-xl font-bold italic tracking-tight text-slate-800 uppercase truncate max-w-45">
               BUSSINESS<span className="text-green-500">TAX</span>
             </span>
           )}

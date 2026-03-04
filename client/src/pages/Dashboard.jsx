@@ -304,7 +304,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
 
           {/* Liquidity Accounts */}
-          <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col h-[400px]">
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col h-100">
             <div className="p-6 border-b border-slate-50 flex items-center justify-between">
               <div className="flex items-center gap-2 font-bold text-slate-800 uppercase text-xs tracking-wider">
                 <Landmark size={16} className="text-blue-500" /> Liquidity Accounts
@@ -380,12 +380,12 @@ const Dashboard = () => {
           </div>
 
           {/* Recent Activity Table */}
-          <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden h-[400px] flex flex-col">
+          <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden h-100 flex flex-col">
             <div className="p-6 border-b border-slate-50 flex items-center gap-2 font-bold text-slate-800 uppercase text-xs tracking-wider shrink-0">
               <ArrowRightLeft size={16} className="text-blue-500" /> Recent Activity
             </div>
             <div className="overflow-x-auto overflow-y-auto flex-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              <table className="w-full text-left border-collapse min-w-[600px] lg:min-w-full">
+              <table className="w-full text-left border-collapse min-w-150 lg:min-w-full">
                 <thead className="bg-slate-50 text-[10px] uppercase font-bold text-slate-400 sticky top-0 z-10">
                   <tr>
                     <th className="px-4 lg:px-6 py-4">Date</th>
@@ -403,7 +403,7 @@ const Dashboard = () => {
                           {new Date(tx.timestamp || tx.createdAt).toLocaleDateString()}
                         </td>
                         <td className="px-4 lg:px-6 py-4">
-                          <span className="text-xs lg:text-sm font-bold text-slate-700 block truncate max-w-[150px]">
+                          <span className="text-xs lg:text-sm font-bold text-slate-700 block truncate max-w-37.5">
                             {tx.title || tx.description || '—'}
                           </span>
                         </td>
@@ -431,7 +431,7 @@ const Dashboard = () => {
           </div>
 
           {/* Low Stock Widget */}
-          <div className="h-[400px] flex flex-col">
+          <div className="h-100 flex flex-col">
             <LowStockWidget products={products} />
           </div>
         </div>
@@ -620,7 +620,7 @@ const Dashboard = () => {
           <div style={{ marginTop: '40px', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
             <div>
               <p style={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '8px' }}>Billed To</p>
-              <h3 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>— (use InvoiceModal to populate) —</h3>
+             <h3 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>{lastInvoice?.clientName || 'Valued Client'}</h3>
             </div>
             <div style={{ textAlign: 'right' }}>
               <p style={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '8px' }}>Due Date</p>

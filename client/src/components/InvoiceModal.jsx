@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Trash2, CreditCard, Save, Loader2, Plus } from 'lucide-react';
+import { X, Search, Trash2, CreditCard, Save, Loader2, Plus, ShoppingCart, ShoppingBag } from 'lucide-react';
 import api from '../utils/api.js';
 import { toast } from 'react-toastify';
 
 const INITIAL_INVOICE = { clientId: '', dueDate: '', status: 'Pending' };
 
-const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts = [], editData }) => {
+/**
+ * Unified Invoice Modal
+ * Handles: Sales Invoices, Purchase Invoices, and Dashboard Creations.
+ */
+const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts = [], editData, initialType = 'Sale' }) => {
   const [type, setType] = useState('Sale');
   const [invoiceData, setInvoiceData] = useState(INITIAL_INVOICE);
   const [selectedItems, setSelectedItems] = useState([]);
@@ -34,8 +38,9 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
       setTaxRate(editData.taxRate || 0);
     } else if (isOpen) {
       handleReset();
+      setType(initialType);
     }
-  }, [editData, isOpen]);
+  }, [editData, isOpen, initialType]);
 
   if (!isOpen) return null;
 
@@ -44,14 +49,13 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
   const taxAmount = subtotal * (Number(taxRate || 0) / 100);
   const totalAmount = subtotal + taxAmount;
 
-  // --- Product Selection Logic ---
   const filteredProducts = products.filter(p => 
     p.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const addItem = (product, variant) => {
     const exists = selectedItems.find(item => item.variantId === variant._id);
-    if (exists) return toast.info("Item already added. Adjust quantity below.");
+    if (exists) return toast.info("Item already added.");
     
     setSelectedItems([...selectedItems, {
       productId: product._id,
@@ -64,7 +68,6 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
   };
 
   const handleReset = () => {
-    setType('Sale');
     setInvoiceData(INITIAL_INVOICE);
     setSelectedItems([]);
     setSearchQuery('');
@@ -83,7 +86,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (isSubmitting) return;
-    if (!invoiceData.clientId) return toast.warning('Select a client/vendor.');
+    if (!invoiceData.clientId) return toast.warning(`Select a ${type === 'Sale' ? 'client' : 'vendor'}.`);
     if (selectedItems.length === 0) return toast.warning('Add at least one product.');
 
     setIsSubmitting(true);
@@ -91,13 +94,13 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
       const payload = { ...invoiceData, type, items: selectedItems, taxRate: Number(taxRate) };
       if (editData) {
         await api.put(`/invoices/${editData._id}`, payload);
-        toast.success("✅ Invoice updated!");
+        toast.success("✅ Record updated!");
         onRefresh();
         handleClose();
       } else {
         const res = await api.post('/invoices', payload);
         setSavedInvoiceId(res.data._id);
-        toast.success(`✅ ${type} saved!`);
+        toast.success(`✅ ${type} saved successfully!`);
         onRefresh();
       }
     } catch (err) {
@@ -145,62 +148,64 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         {/* Header */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <h2 className="text-xl font-black text-slate-800 uppercase">
-            {editData ? 'Edit Invoice' : 'Create Invoice'}
+            {editData ? `Edit ${type}` : `New ${type} Entry`}
           </h2>
           <button onClick={handleClose} className="p-2 hover:bg-slate-200 rounded-full"><X /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
-          {/* Client & Date */}
+          
+          {/* TYPE TOGGLE */}
+          {!editData && (
+            <div className="flex bg-slate-100 p-1 rounded-2xl w-full border border-slate-200">
+                <button type="button" onClick={() => setType('Sale')}
+                className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${type === 'Sale' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>
+                <ShoppingCart size={14}/> Sales Invoice
+                </button>
+                <button type="button" onClick={() => setType('Purchase')}
+                className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${type === 'Purchase' ? 'bg-white shadow-sm text-rose-600' : 'text-slate-400'}`}>
+                <ShoppingBag size={14}/> Purchase Invoice
+                </button>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Client/Vendor</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
+                {type === 'Sale' ? 'Client / Customer' : 'Vendor / Supplier'}
+              </label>
               <select className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold" value={invoiceData.clientId} onChange={(e) => setInvoiceData({ ...invoiceData, clientId: e.target.value })} required>
                 <option value="">Choose...</option>
                 {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Due Date</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Date</label>
               <input type="date" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold" value={invoiceData.dueDate} onChange={(e) => setInvoiceData({ ...invoiceData, dueDate: e.target.value })} required />
             </div>
           </div>
 
-          {/* PRODUCT SEARCH INPUT */}
+          {/* PRODUCT SEARCH */}
           <div className="space-y-2 relative">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Add Products</label>
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Add Items</label>
             <div className="relative">
               <Search className="absolute left-4 top-4 text-slate-400" size={20} />
-              <input 
-                type="text"
-                placeholder="Search product by name..."
-                className="w-full p-4 pl-12 bg-slate-100 rounded-2xl outline-none font-bold text-slate-800 border-2 border-transparent focus:border-indigo-500 transition-all"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+              <input type="text" placeholder="Search inventory..." className="w-full p-4 pl-12 bg-slate-100 rounded-2xl outline-none font-bold text-slate-800 border-2 border-transparent focus:border-indigo-500 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
-            
-            {/* Search Results Dropdown */}
             {searchQuery && (
               <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto mt-1">
-                {filteredProducts.map(p => 
-                  p.variants.map(v => (
-                    <div 
-                      key={v._id} 
-                      onClick={() => addItem(p, v)}
-                      className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0"
-                    >
-                      <div>
-                        <p className="font-bold text-slate-800">{p.title}</p>
-                        <p className="text-xs text-slate-500">{v.name} • Stock: {v.stock}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-black text-indigo-600">₹{v.price}</p>
-                        <Plus size={16} className="ml-auto text-slate-400" />
-                      </div>
+                {filteredProducts.map(p => p.variants.map(v => (
+                  <div key={v._id} onClick={() => addItem(p, v)} className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0">
+                    <div>
+                      <p className="font-bold text-slate-800">{p.title}</p>
+                      <p className="text-xs text-slate-500">{v.name} • Stock: {v.stock}</p>
                     </div>
-                  ))
-                )}
+                    <div className="text-right">
+                      <p className="font-black text-indigo-600">₹{v.price}</p>
+                      <Plus size={16} className="ml-auto text-slate-400" />
+                    </div>
+                  </div>
+                )))}
               </div>
             )}
           </div>
@@ -211,29 +216,23 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
               <div key={index} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <div className="flex-1">
                   <p className="font-bold text-slate-800 text-sm">{item.name}</p>
-                  <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Price: ₹{item.price}</p>
+                  <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Rate: ₹{item.price}</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Qty</label>
-                  <input 
-                    type="number" 
-                    min={1} 
-                    className="w-20 p-2 rounded-xl border text-center font-black text-slate-800" 
-                    value={item.quantity} 
-                    onChange={(e) => {
-                      const updated = [...selectedItems];
-                      updated[index].quantity = Number(e.target.value);
-                      setSelectedItems(updated);
-                    }} 
-                  />
+                  <input type="number" min={1} className="w-20 p-2 rounded-xl border text-center font-black text-slate-800" value={item.quantity} onChange={(e) => {
+                    const updated = [...selectedItems];
+                    updated[index].quantity = Number(e.target.value);
+                    setSelectedItems(updated);
+                  }} />
                 </div>
                 <button type="button" onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))} className="text-rose-500 hover:bg-rose-100 p-2 rounded-xl transition-colors"><Trash2 size={18} /></button>
               </div>
             ))}
           </div>
 
-          {/* Tax Section */}
-          <div className="p-6 bg-slate-50 border border-slate-100 grid grid-cols-2 gap-6 rounded-[2rem]">
+          {/* TAX & SUBTOTAL CALCULATION */}
+          <div className="p-6 bg-slate-50 border border-slate-100 grid grid-cols-3 gap-6 rounded-4xl">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tax Rate (%)</label>
               <div className="relative">
@@ -241,33 +240,41 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
                 <span className="absolute right-4 top-4 font-bold text-slate-400">%</span>
               </div>
             </div>
+            
+            {/* Subtotal Display */}
+            <div className="flex flex-col justify-center items-end border-r border-slate-200 pr-6">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</p>
+              <p className="text-lg font-bold text-slate-600">₹{subtotal.toLocaleString()}</p>
+            </div>
+
+            {/* Tax Amount Display */}
             <div className="flex flex-col justify-center items-end pr-4">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Amount</p>
-              <p className="text-lg font-black text-slate-800">₹{taxAmount.toLocaleString()}</p>
+              <p className="text-lg font-black text-indigo-600">₹{taxAmount.toLocaleString()}</p>
             </div>
           </div>
         </form>
 
-        {/* Footer */}
-        <div className="p-6 bg-slate-900 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto">
+        {/* Footer with Total Payable Amount */}
+        <div className={`p-6 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto transition-colors duration-500 ${type === 'Sale' ? 'bg-indigo-900' : 'bg-rose-900'}`}>
           <div className="text-center md:text-left">
-            <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Grand Total</p>
-            <p className="text-white text-3xl font-black">₹{totalAmount.toLocaleString()}</p>
+            <p className="text-slate-300 text-[10px] font-black uppercase tracking-widest">Total Payable Amount</p>
+            <p className="text-white text-4xl font-black tracking-tight">₹{totalAmount.toLocaleString()}</p>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
-            <button onClick={handleSubmit} disabled={isSubmitting} className="px-8 py-4 rounded-2xl font-black uppercase flex items-center gap-2 text-xs bg-emerald-500 text-white hover:bg-emerald-400 shadow-lg transition-all">
+            <button onClick={handleSubmit} disabled={isSubmitting} className="px-8 py-4 rounded-2xl font-black uppercase flex items-center gap-2 text-xs bg-white text-slate-900 hover:bg-slate-100 shadow-lg transition-all">
               {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              {editData ? 'Update Invoice' : 'Confirm & Save'}
+              {editData ? 'Update Record' : 'Save Entry'}
             </button>
 
-            {!editData && savedInvoiceId && !paymentDone && (
-              <button onClick={handleRazorpayPayment} disabled={paymentLoading} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-blue-600 text-white flex items-center gap-2 shadow-lg">
+            {!editData && savedInvoiceId && !paymentDone && type === 'Sale' && (
+              <button onClick={handleRazorpayPayment} disabled={paymentLoading} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-blue-500 text-white flex items-center gap-2 shadow-lg hover:bg-blue-400">
                 {paymentLoading ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
-                Pay Now
+                Pay via Razorpay
               </button>
             )}
-            <button onClick={handleClose} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-slate-700 text-slate-300">
-              {savedInvoiceId ? 'Close' : 'Cancel'}
+            <button onClick={handleClose} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-black/20 text-white/80 hover:bg-black/40">
+              {savedInvoiceId ? 'Finish' : 'Cancel'}
             </button>
           </div>
         </div>
