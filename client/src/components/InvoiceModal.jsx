@@ -5,10 +5,6 @@ import { toast } from 'react-toastify';
 
 const INITIAL_INVOICE = { clientId: '', dueDate: '', status: 'Pending' };
 
-/**
- * Unified Invoice Modal
- * Handles: Sales Invoices, Purchase Invoices, and Dashboard Creations.
- */
 const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts = [], editData, initialType = 'Sale' }) => {
   const [type, setType] = useState('Sale');
   const [invoiceData, setInvoiceData] = useState(INITIAL_INVOICE);
@@ -85,13 +81,23 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (isSubmitting) return;
+    
+    // Prevent multiple clicks and multiple saves for the same entry
+    if (isSubmitting || (savedInvoiceId && !editData)) return;
+
     if (!invoiceData.clientId) return toast.warning(`Select a ${type === 'Sale' ? 'client' : 'vendor'}.`);
     if (selectedItems.length === 0) return toast.warning('Add at least one product.');
 
     setIsSubmitting(true);
     try {
-      const payload = { ...invoiceData, type, items: selectedItems, taxRate: Number(taxRate) };
+      const payload = { 
+        ...invoiceData, 
+        type, 
+        items: selectedItems, 
+        taxRate: Number(taxRate),
+        totalAmount: Number(totalAmount) // Explicitly sending total to help backend
+      };
+
       if (editData) {
         await api.put(`/invoices/${editData._id}`, payload);
         toast.success("✅ Record updated!");
@@ -102,9 +108,11 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         setSavedInvoiceId(res.data._id);
         toast.success(`✅ ${type} saved successfully!`);
         onRefresh();
+        // We don't close immediately so they can Pay via Razorpay if it's a Sale
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save.');
+      console.error("Save Error:", err);
+      toast.error(err.response?.data?.message || 'Failed to save. Check console for details.');
     } finally {
       setIsSubmitting(false);
     }
@@ -153,8 +161,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
           <button onClick={handleClose} className="p-2 hover:bg-slate-200 rounded-full"><X /></button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
-          
+        <div className="p-6 overflow-y-auto space-y-6 flex-1">
           {/* TYPE TOGGLE */}
           {!editData && (
             <div className="flex bg-slate-100 p-1 rounded-2xl w-full border border-slate-200">
@@ -169,7 +176,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
                 {type === 'Sale' ? 'Client / Customer' : 'Vendor / Supplier'}
@@ -180,7 +187,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Date</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Due Date</label>
               <input type="date" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold" value={invoiceData.dueDate} onChange={(e) => setInvoiceData({ ...invoiceData, dueDate: e.target.value })} required />
             </div>
           </div>
@@ -232,7 +239,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
           </div>
 
           {/* TAX & SUBTOTAL CALCULATION */}
-          <div className="p-6 bg-slate-50 border border-slate-100 grid grid-cols-3 gap-6 rounded-4xl">
+          <div className="p-6 bg-slate-50 border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6 rounded-4xl">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tax Rate (%)</label>
               <div className="relative">
@@ -240,31 +247,32 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
                 <span className="absolute right-4 top-4 font-bold text-slate-400">%</span>
               </div>
             </div>
-            
-            {/* Subtotal Display */}
             <div className="flex flex-col justify-center items-end border-r border-slate-200 pr-6">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</p>
               <p className="text-lg font-bold text-slate-600">₹{subtotal.toLocaleString()}</p>
             </div>
-
-            {/* Tax Amount Display */}
             <div className="flex flex-col justify-center items-end pr-4">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Amount</p>
               <p className="text-lg font-black text-indigo-600">₹{taxAmount.toLocaleString()}</p>
             </div>
           </div>
-        </form>
+        </div>
 
-        {/* Footer with Total Payable Amount */}
+        {/* Footer */}
         <div className={`p-6 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto transition-colors duration-500 ${type === 'Sale' ? 'bg-indigo-900' : 'bg-rose-900'}`}>
           <div className="text-center md:text-left">
             <p className="text-slate-300 text-[10px] font-black uppercase tracking-widest">Total Payable Amount</p>
             <p className="text-white text-4xl font-black tracking-tight">₹{totalAmount.toLocaleString()}</p>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
-            <button onClick={handleSubmit} disabled={isSubmitting} className="px-8 py-4 rounded-2xl font-black uppercase flex items-center gap-2 text-xs bg-white text-slate-900 hover:bg-slate-100 shadow-lg transition-all">
+            {/* Disabled logic added here to prevent multiple invoices */}
+            <button 
+                onClick={handleSubmit} 
+                disabled={isSubmitting || (savedInvoiceId && !editData)} 
+                className="px-8 py-4 rounded-2xl font-black uppercase flex items-center gap-2 text-xs bg-white text-slate-900 hover:bg-slate-100 shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
               {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              {editData ? 'Update Record' : 'Save Entry'}
+              {editData ? 'Update Record' : (savedInvoiceId ? 'Entry Saved' : 'Save Entry')}
             </button>
 
             {!editData && savedInvoiceId && !paymentDone && type === 'Sale' && (

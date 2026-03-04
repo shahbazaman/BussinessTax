@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
 import { 
   Plus, Search, Trash2, Download, Edit2, Loader2, 
-  Calendar, Eye, ShoppingCart, ShoppingBag 
+  Calendar, Eye, ShoppingCart, ShoppingBag, CreditCard 
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
@@ -20,6 +20,7 @@ const Invoices = () => {
   const [accounts, setAccounts] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [paymentLoading, setPaymentLoading] = useState(false); 
   
   // Tabs & Filters
   const [activeTab, setActiveTab] = useState('Sale'); 
@@ -30,10 +31,11 @@ const Invoices = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
-  // Dynamic Theme Colors based on Active Tab
+  // Derived Values
   const themeColor = activeTab === 'Sale' ? 'indigo' : 'rose';
+  // Fixed ReferenceError: Defined safely here
+  const lastInvoice = invoices.length > 0 ? invoices[0] : null;
 
-  // Sync activeTab with URL (e.g., /invoices?type=Purchase)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const type = params.get('type');
@@ -52,7 +54,9 @@ const Invoices = () => {
         api.get('/accounts'),
         api.get('/products')
       ]);
-      setInvoices(invRes.data);
+      // Sort invoices by date descending to make 'lastInvoice' the newest one
+      const sortedInvoices = invRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setInvoices(sortedInvoices);
       setClients(clientRes.data);
       setCurrencySymbol(profileRes.data.currency === 'USD' ? '$' : '₹');
       setAccounts(accRes.data);
@@ -68,6 +72,52 @@ const Invoices = () => {
     fetchData();
   }, []);
 
+  const handlePayNow = async (invoice) => {
+    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
+    if (!razorpayKey) return toast.error("Razorpay Key missing in .env");
+    if (accounts.length === 0) return toast.error("Please link a bank account first");
+
+    setPaymentLoading(true);
+    try {
+      const { data: order } = await api.post('/payments/create-order', { 
+        amount: invoice.totalAmount, 
+        currency: 'INR' 
+      });
+
+      const options = {
+        key: razorpayKey,
+        amount: order.amount,
+        currency: order.currency,
+        name: 'Business Ledger',
+        description: `Payment for Inv #${invoice.invoiceNumber}`,
+        order_id: order.id,
+        handler: async (response) => {
+          try {
+            await api.post('/payments/verify', { 
+              ...response, 
+              invoiceId: invoice._id, 
+              accountId: accounts[0]._id 
+            });
+            toast.success("Payment Successful!");
+            fetchData();
+          } catch (err) { 
+            toast.error("Payment verification failed"); 
+          } finally {
+            setPaymentLoading(false);
+          }
+        },
+        modal: { ondismiss: () => setPaymentLoading(false) },
+        theme: { color: activeTab === 'Sale' ? "#4f46e5" : "#e11d48" },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch (err) {
+      toast.error("Could not initiate Razorpay");
+      setPaymentLoading(false);
+    }
+  };
+
   const handleEdit = (invoice) => {
     setSelectedInvoice(invoice);
     setShowModal(true);
@@ -78,7 +128,6 @@ const Invoices = () => {
     setShowModal(true);
   };
 
-  // Filter Logic
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
       const invDate = new Date(inv.createdAt).getTime();
@@ -236,6 +285,18 @@ const Invoices = () => {
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex justify-center gap-2">
+                          {/* Razorpay Button: Only for Sales that are Pending */}
+                          {activeTab === 'Sale' && inv.status === 'Pending' && (
+                            <button 
+                              onClick={() => handlePayNow(inv)} 
+                              disabled={paymentLoading}
+                              title="Pay Now with Razorpay"
+                              className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
+                            >
+                              <CreditCard size={16} />
+                            </button>
+                          )}
+                          
                           <button onClick={() => handleEdit(inv)} className={`p-3 bg-${themeColor}-50 text-${themeColor}-600 rounded-xl hover:bg-${themeColor}-600 hover:text-white transition-all`}>
                             <Edit2 size={16} />
                           </button>
@@ -267,7 +328,7 @@ const Invoices = () => {
         products={products} 
         accounts={accounts}
         editData={selectedInvoice} 
-        initialType={activeTab} // Crucial: passes current tab to modal
+        initialType={activeTab}
       />
     </div>
   );

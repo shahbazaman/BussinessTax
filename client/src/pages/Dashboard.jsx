@@ -53,9 +53,9 @@ const Dashboard = () => {
   const [newAccount,   setNewAccount]  = useState({
     bankName: '', balance: '', accountType: 'Checking', accountNumber: ''
   });
-
   const invoicePrintRef = useRef(null);
-
+  const [invoices, setInvoices] = useState([]); 
+  const lastInvoice = invoices.length > 0 ? invoices[0] : null;
   const CURRENCY_MAP   = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
 
