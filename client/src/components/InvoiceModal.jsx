@@ -3,7 +3,15 @@ import { X, Search, Trash2, CreditCard, Save, Loader2, Plus, ShoppingCart, Shopp
 import api from '../utils/api.js';
 import { toast } from 'react-toastify';
 
-const INITIAL_INVOICE = { clientId: '', dueDate: '', status: 'Pending' };
+const INITIAL_INVOICE = { 
+  clientId: '', 
+  dueDate: '', 
+  status: 'Pending',
+  gstNumber: '',
+  billingAddress: '',
+  shippingAddress: '',
+  discount: 0
+};
 
 const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts = [], editData, initialType = 'Sale' }) => {
   const [type, setType] = useState('Sale');
@@ -22,7 +30,11 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
       setInvoiceData({
         clientId: editData.client?._id || editData.client || '',
         dueDate: editData.dueDate ? new Date(editData.dueDate).toISOString().split('T')[0] : '',
-        status: editData.status || 'Pending'
+        status: editData.status || 'Pending',
+        gstNumber: editData.gstNumber || '',
+        billingAddress: editData.billingAddress || '',
+        shippingAddress: editData.shippingAddress || '',
+        discount: editData.discount || 0
       });
       setSelectedItems(editData.items.map(item => ({
         productId: item.productId?._id || item.productId,
@@ -43,7 +55,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
   // --- Calculations ---
   const subtotal = selectedItems.reduce((sum, item) => sum + item.price * Number(item.quantity), 0);
   const taxAmount = subtotal * (Number(taxRate || 0) / 100);
-  const totalAmount = subtotal + taxAmount;
+  const totalAmount = (subtotal + taxAmount) - Number(invoiceData.discount || 0);
 
   const filteredProducts = products.filter(p => 
     p.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -81,8 +93,6 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    
-    // Prevent multiple clicks and multiple saves for the same entry
     if (isSubmitting || (savedInvoiceId && !editData)) return;
 
     if (!invoiceData.clientId) return toast.warning(`Select a ${type === 'Sale' ? 'client' : 'vendor'}.`);
@@ -95,7 +105,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         type, 
         items: selectedItems, 
         taxRate: Number(taxRate),
-        totalAmount: Number(totalAmount) // Explicitly sending total to help backend
+        totalAmount: Number(totalAmount),
+        discount: Number(invoiceData.discount)
       };
 
       if (editData) {
@@ -108,11 +119,9 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         setSavedInvoiceId(res.data._id);
         toast.success(`✅ ${type} saved successfully!`);
         onRefresh();
-        // We don't close immediately so they can Pay via Razorpay if it's a Sale
       }
     } catch (err) {
-      console.error("Save Error:", err);
-      toast.error(err.response?.data?.message || 'Failed to save. Check console for details.');
+      toast.error(err.response?.data?.message || 'Failed to save.');
     } finally {
       setIsSubmitting(false);
     }
@@ -176,20 +185,42 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-1">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="space-y-1 md:col-span-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
                 {type === 'Sale' ? 'Client / Customer' : 'Vendor / Supplier'}
               </label>
-              <select className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold" value={invoiceData.clientId} onChange={(e) => setInvoiceData({ ...invoiceData, clientId: e.target.value })} required>
+              <select className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs" value={invoiceData.clientId} onChange={(e) => setInvoiceData({ ...invoiceData, clientId: e.target.value })} required>
                 <option value="">Choose...</option>
                 {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </div>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Due Date</label>
-              <input type="date" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold" value={invoiceData.dueDate} onChange={(e) => setInvoiceData({ ...invoiceData, dueDate: e.target.value })} required />
+              <input type="date" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs" value={invoiceData.dueDate} onChange={(e) => setInvoiceData({ ...invoiceData, dueDate: e.target.value })} required />
             </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
+                {type === 'Sale' ? 'Customer GST' : 'Vendor GST'}
+              </label>
+              <input type="text" placeholder="Optional" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs" value={invoiceData.gstNumber} onChange={(e) => setInvoiceData({ ...invoiceData, gstNumber: e.target.value })} />
+            </div>
+          </div>
+
+          {/* ADDRESS SECTION - Conditionally hide Shipping for Purchase */}
+          <div className={`grid grid-cols-1 ${type === 'Sale' ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-4`}>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
+                {type === 'Sale' ? 'Billing Address' : 'Vendor Address'}
+              </label>
+              <textarea placeholder="Full address..." rows="2" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs resize-none" value={invoiceData.billingAddress} onChange={(e) => setInvoiceData({ ...invoiceData, billingAddress: e.target.value })} />
+            </div>
+            {type === 'Sale' && (
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Shipping Address</label>
+                <textarea placeholder="Delivery address..." rows="2" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs resize-none" value={invoiceData.shippingAddress} onChange={(e) => setInvoiceData({ ...invoiceData, shippingAddress: e.target.value })} />
+              </div>
+            )}
           </div>
 
           {/* PRODUCT SEARCH */}
@@ -197,18 +228,18 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
             <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Add Items</label>
             <div className="relative">
               <Search className="absolute left-4 top-4 text-slate-400" size={20} />
-              <input type="text" placeholder="Search inventory..." className="w-full p-4 pl-12 bg-slate-100 rounded-2xl outline-none font-bold text-slate-800 border-2 border-transparent focus:border-indigo-500 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <input type="text" placeholder="Search inventory..." className="w-full p-4 pl-12 bg-slate-100 rounded-2xl outline-none font-bold text-slate-800 border-2 border-transparent focus:border-indigo-500 transition-all text-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
             </div>
             {searchQuery && (
               <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto mt-1">
                 {filteredProducts.map(p => p.variants.map(v => (
                   <div key={v._id} onClick={() => addItem(p, v)} className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0">
                     <div>
-                      <p className="font-bold text-slate-800">{p.title}</p>
-                      <p className="text-xs text-slate-500">{v.name} • Stock: {v.stock}</p>
+                      <p className="font-bold text-slate-800 text-sm">{p.title}</p>
+                      <p className="text-[10px] text-slate-500">{v.name} • Stock: {v.stock}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-black text-indigo-600">₹{v.price}</p>
+                      <p className="font-black text-indigo-600 text-sm">₹{v.price}</p>
                       <Plus size={16} className="ml-auto text-slate-400" />
                     </div>
                   </div>
@@ -227,7 +258,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
                 </div>
                 <div className="flex items-center gap-3">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Qty</label>
-                  <input type="number" min={1} className="w-20 p-2 rounded-xl border text-center font-black text-slate-800" value={item.quantity} onChange={(e) => {
+                  <input type="number" min={1} className="w-16 p-2 rounded-xl border text-center font-black text-slate-800 text-sm" value={item.quantity} onChange={(e) => {
                     const updated = [...selectedItems];
                     updated[index].quantity = Number(e.target.value);
                     setSelectedItems(updated);
@@ -238,22 +269,23 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
             ))}
           </div>
 
-          {/* TAX & SUBTOTAL CALCULATION */}
-          <div className="p-6 bg-slate-50 border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-6 rounded-4xl">
+          {/* TAX, DISCOUNT & SUBTOTAL CALCULATION */}
+          <div className="p-6 bg-slate-50 border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4 rounded-4xl">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tax Rate (%)</label>
-              <div className="relative">
-                <input type="number" className="w-full p-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
-                <span className="absolute right-4 top-4 font-bold text-slate-400">%</span>
-              </div>
+              <input type="number" className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
             </div>
-            <div className="flex flex-col justify-center items-end border-r border-slate-200 pr-6">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Discount (₹)</label>
+              <input type="number" className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm" value={invoiceData.discount} onChange={(e) => setInvoiceData({...invoiceData, discount: e.target.value})} />
+            </div>
+            <div className="flex flex-col justify-center items-end border-r border-slate-200 pr-4">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</p>
-              <p className="text-lg font-bold text-slate-600">₹{subtotal.toLocaleString()}</p>
+              <p className="text-sm font-bold text-slate-600">₹{subtotal.toLocaleString()}</p>
             </div>
-            <div className="flex flex-col justify-center items-end pr-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Amount</p>
-              <p className="text-lg font-black text-indigo-600">₹{taxAmount.toLocaleString()}</p>
+            <div className="flex flex-col justify-center items-end">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Amt</p>
+              <p className="text-sm font-black text-indigo-600">₹{taxAmount.toLocaleString()}</p>
             </div>
           </div>
         </div>
@@ -261,26 +293,29 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         {/* Footer */}
         <div className={`p-6 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto transition-colors duration-500 ${type === 'Sale' ? 'bg-indigo-900' : 'bg-rose-900'}`}>
           <div className="text-center md:text-left">
-            <p className="text-slate-300 text-[10px] font-black uppercase tracking-widest">Total Payable Amount</p>
+            <p className="text-slate-300 text-[10px] font-black uppercase tracking-widest">
+                {type === 'Sale' ? 'Final Amount to Collect' : 'Final Amount to Pay'}
+            </p>
             <p className="text-white text-4xl font-black tracking-tight">₹{totalAmount.toLocaleString()}</p>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
-            {/* Disabled logic added here to prevent multiple invoices */}
             <button 
                 onClick={handleSubmit} 
                 disabled={isSubmitting || (savedInvoiceId && !editData)} 
                 className="px-8 py-4 rounded-2xl font-black uppercase flex items-center gap-2 text-xs bg-white text-slate-900 hover:bg-slate-100 shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              {editData ? 'Update Record' : (savedInvoiceId ? 'Entry Saved' : 'Save Entry')}
+              {editData ? 'Update' : (savedInvoiceId ? 'Saved' : 'Save')}
             </button>
 
+            {/* ONLY SHOW RAZORPAY FOR SALES */}
             {!editData && savedInvoiceId && !paymentDone && type === 'Sale' && (
               <button onClick={handleRazorpayPayment} disabled={paymentLoading} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-blue-500 text-white flex items-center gap-2 shadow-lg hover:bg-blue-400">
                 {paymentLoading ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
-                Pay via Razorpay
+                Pay Now
               </button>
             )}
+            
             <button onClick={handleClose} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-black/20 text-white/80 hover:bg-black/40">
               {savedInvoiceId ? 'Finish' : 'Cancel'}
             </button>

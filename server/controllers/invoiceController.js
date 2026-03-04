@@ -5,7 +5,8 @@ export const createInvoice = async (req, res) => {
   try {
     const { 
       clientId, items, shipping, discount, type, 
-      invoiceNumber, dueDate, status, notes, poNumber ,taxRate
+      invoiceNumber, dueDate, status, notes, poNumber, taxRate,
+      gstNumber, billingAddress, shippingAddress // Added
     } = req.body; 
 
     if (!req.user?._id) return res.status(401).json({ message: "Auth failed" });
@@ -13,35 +14,30 @@ export const createInvoice = async (req, res) => {
     const invoiceType = type || 'Sale';
     const validatedItems = [];
 
-    // 1. Validation & Stock Check
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) return res.status(404).json({ message: `Product ${item.name} not found` });
-
       const variant = product.variants.id(item.variantId);
       if (!variant) return res.status(404).json({ message: "Variant not found" });
-
-      const qty = Number(item.quantity || 0);
-      if (invoiceType === 'Sale' && variant.stock < qty) {
-        return res.status(400).json({ message: `Insufficient stock for ${product.title}` });
-      }
 
       validatedItems.push({
         productId: item.productId,
         variantId: item.variantId,
         name: item.name || product.title,
-        quantity: qty,
+        quantity: Number(item.quantity || 0),
         price: Number(item.price || 0),
         taxRate: Number(item.taxRate || 0)
       });
     }
 
-    // 2. Create Document
     const invoice = new Invoice({
       user: req.user._id,
       client: clientId, 
       invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
       poNumber,
+      gstNumber,
+      billingAddress,
+      shippingAddress,
       items: validatedItems,
       shipping: Number(shipping || 0),
       discount: Number(discount || 0),
@@ -50,12 +46,11 @@ export const createInvoice = async (req, res) => {
       status: status || 'Pending',
       type: invoiceType,
       notes,
-      totalAmount: 0 // Pre-save hook will calculate this
+      totalAmount: 0 
     });
 
     const savedInvoice = await invoice.save();
 
-    // 3. Update Stock
     for (const item of validatedItems) {
       const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
       await Product.updateOne(
@@ -63,7 +58,6 @@ export const createInvoice = async (req, res) => {
         { $inc: { "variants.$.stock": adjustment } }
       );
     }
-
     res.status(201).json(savedInvoice);
   } catch (error) {
     res.status(500).json({ message: "Creation failed", error: error.message });

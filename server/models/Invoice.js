@@ -23,6 +23,9 @@ const invoiceSchema = new mongoose.Schema({
   poNumber: { 
     type: String 
   },
+  gstNumber: { type: String },
+  billingAddress: { type: String },
+  shippingAddress: { type: String },
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
     variantId: { type: String, required: true }, // Added required variantId for stock tracking

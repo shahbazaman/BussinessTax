@@ -155,19 +155,30 @@ const Invoices = () => {
     }
   };
 
-  const downloadPDF = (invoice) => {
-    const doc = new jsPDF();
-    const grandTotal = calculateGrandTotal(invoice);
-    doc.setFontSize(20); doc.text(`${activeTab.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
-    autoTable(doc, {
-      startY: 60,
-      head: [['Item Name', 'Qty', 'Rate', 'Total']],
-      body: invoice.items.map(i => [i.name, i.quantity, formatValue(i.price), formatValue(i.quantity * i.price)]),
-      foot: [['', '', 'Tax', formatValue(calculateTaxOnly(invoice))], ['', '', 'Total', formatValue(grandTotal)]],
-      headStyles: { fillColor: activeTab === 'Sale' ? [79, 70, 229] : [225, 29, 72] }
-    });
-    doc.save(`${activeTab}_${invoice._id.slice(-6)}.pdf`);
-  };
+const downloadPDF = (invoice) => {
+  const doc = new jsPDF();
+  doc.setFontSize(20); 
+  doc.text(`${activeTab.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
+  
+  doc.setFontSize(10);
+  doc.text(`GST: ${invoice.gstNumber || 'N/A'}`, 14, 30);
+  doc.text(`Billing: ${invoice.billingAddress || 'N/A'}`, 14, 40);
+  doc.text(`Shipping: ${invoice.shippingAddress || 'N/A'}`, 14, 50);
+
+  autoTable(doc, {
+    startY: 60,
+    head: [['Item Name', 'Qty', 'Rate', 'Total']],
+    body: invoice.items.map(i => [i.name, i.quantity, formatValue(i.price), formatValue(i.quantity * i.price)]),
+    foot: [
+      ['', '', 'Subtotal', formatValue(invoice.subtotal)],
+      ['', '', 'Tax', formatValue(invoice.taxAmount)],
+      ['', '', 'Discount', `- ${formatValue(invoice.discount)}`],
+      ['', '', 'Grand Total', formatValue(invoice.totalAmount)]
+    ],
+    headStyles: { fillColor: activeTab === 'Sale' ? [79, 70, 229] : [225, 29, 72] }
+  });
+  doc.save(`${activeTab}_${invoice.invoiceNumber}.pdf`);
+};
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
@@ -237,7 +248,7 @@ const Invoices = () => {
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-slate-300" size={40} /></div>
         ) : (
-          <div className="bg-white rounded-[2rem] shadow-sm overflow-hidden border border-slate-100">
+          <div className="bg-white rounded-4xl shadow-sm overflow-hidden border border-slate-100">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
@@ -293,7 +304,7 @@ const Invoices = () => {
                       </td>
                       {/* --- DROPDOWN STATUS END --- */}
 
-                      <td className="px-6 py-4 w-[200px]">
+                      <td className="px-6 py-4 w-50">
                         <div className="flex items-center gap-1.5">
                           {inv.status === 'Pending' && (
                             activeTab === 'Sale' ? (
