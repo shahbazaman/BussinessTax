@@ -5,7 +5,7 @@ export const createInvoice = async (req, res) => {
   try {
     const { 
       clientId, items, shipping, discount, type, 
-      invoiceNumber, dueDate, status, notes, poNumber 
+      invoiceNumber, dueDate, status, notes, poNumber ,taxRate
     } = req.body; 
 
     if (!req.user?._id) return res.status(401).json({ message: "Auth failed" });
@@ -45,6 +45,7 @@ export const createInvoice = async (req, res) => {
       items: validatedItems,
       shipping: Number(shipping || 0),
       discount: Number(discount || 0),
+      taxRate: Number(taxRate || 0),
       dueDate,
       status: status || 'Pending',
       type: invoiceType,

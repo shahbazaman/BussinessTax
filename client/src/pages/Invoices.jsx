@@ -160,7 +160,8 @@ const Invoices = () => {
     doc.text(`Invoice No: ${invoice.invoiceNumber || invoice._id}`, 20, 30);
     doc.text(`Client: ${invoice.client?.name || "N/A"}`, 20, 35);
     doc.text(`Date: ${new Date(invoice.createdAt).toLocaleDateString()}`, 20, 40);
-
+    const subtotal = invoice.items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
+    const tax = invoice.taxAmount || (subtotal * (invoice.taxRate / 100));
     autoTable(doc, {
       startY: 50,
       head: [['Product', 'Qty', 'Price', 'Total']],
@@ -170,10 +171,15 @@ const Invoices = () => {
         formatValue(item.price),
         formatValue(item.quantity * item.price)
       ]),
-      foot: [['', '', 'Grand Total', formatValue(invoice.totalAmount)]]
-    });
-    doc.save(`Invoice_${invoice.invoiceNumber || invoice._id}.pdf`);
-  };
+      foot: [
+      ['', '', 'Subtotal', formatValue(subtotal)],
+      ['', '', `Tax (${invoice.taxRate || 0}%)`, formatValue(tax)],
+      ['', '', 'Grand Total', formatValue(invoice.totalAmount)]
+    ],
+    footStyles: { fillColor: [248, 250, 252], textColor: [15, 23, 42], fontStyle: 'bold' }
+  });
+  doc.save(`Invoice_${invoice.invoiceNumber}.pdf`);
+};
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">

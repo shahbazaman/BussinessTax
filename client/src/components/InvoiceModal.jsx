@@ -11,8 +11,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
   const [invoiceData, setInvoiceData] = useState(INITIAL_INVOICE);
   const [selectedItems, setSelectedItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  
-  // Loading state to prevent duplicate submissions
+  const [taxRate, setTaxRate] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedInvoiceId, setSavedInvoiceId] = useState(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -33,8 +32,10 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         price: item.price,
         quantity: item.quantity,
       })));
+      setTaxRate(editData.taxRate || 0);
     } else if (isOpen) {
       handleReset();
+      setTaxRate(0);
     }
   }, [editData, isOpen]);
 
@@ -73,6 +74,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         ...invoiceData,
         type,
         items: selectedItems,
+        taxRate: Number(taxRate),
       };
 
       if (editData) {
@@ -203,6 +205,26 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
               </div>
             )}
           </div>
+          // Inside the return statement, above the Footer:
+<div className="px-6 py-4 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-6">
+  <div className="space-y-1">
+    <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Custom Tax (%)</label>
+    <div className="relative">
+      <input 
+        type="number" 
+        className="w-full p-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800"
+        placeholder="e.g. 18"
+        value={taxRate}
+        onChange={(e) => setTaxRate(e.target.value)}
+      />
+      <span className="absolute right-4 top-4 font-bold text-slate-400">%</span>
+    </div>
+  </div>
+  <div className="flex flex-col justify-center items-end pr-4">
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Calculated Tax</p>
+    <p className="text-lg font-black text-slate-800">₹{taxAmount.toLocaleString()}</p>
+  </div>
+</div>
         </form>
 
         <div className="p-6 bg-slate-900 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto">
