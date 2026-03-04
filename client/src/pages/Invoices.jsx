@@ -22,7 +22,7 @@ const Invoices = () => {
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false); 
-  const [activeStatusDropdown, setActiveStatusDropdown] = useState(null); // Track which row dropdown is open
+  const [activeStatusDropdown, setActiveStatusDropdown] = useState(null); 
   
   // Tabs & Filters
   const [activeTab, setActiveTab] = useState('Sale'); 
@@ -35,7 +35,6 @@ const Invoices = () => {
 
   const themeColor = activeTab === 'Sale' ? 'indigo' : 'rose';
 
-  // Handle outside click to close dropdown
   useEffect(() => {
     const handleClickOutside = () => setActiveStatusDropdown(null);
     window.addEventListener('click', handleClickOutside);
@@ -57,7 +56,7 @@ const Invoices = () => {
         api.get('/invoices'),
         api.get('/clients'),
         api.get('/auth/profile'),
-        api.get('/accounts'), // This uses the updated ./routes/accountRoutes.js'
+        api.get('/accounts'),
         api.get('/products')
       ]);
       const sortedInvoices = invRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
@@ -75,8 +74,6 @@ const Invoices = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- Logic Helpers ---
-
   const handleUpdateStatus = async (id, newStatus) => {
     try {
       await api.put(`/invoices/${id}`, { status: newStatus });
@@ -91,11 +88,6 @@ const Invoices = () => {
     const subtotal = invoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const taxAmount = subtotal * (Number(invoice.taxRate || 0) / 100);
     return subtotal + taxAmount;
-  };
-
-  const calculateTaxOnly = (invoice) => {
-    const subtotal = invoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    return subtotal * (Number(invoice.taxRate || 0) / 100);
   };
 
   const formatValue = (value) => {
@@ -120,7 +112,8 @@ const Invoices = () => {
   const stats = useMemo(() => {
     return filteredInvoices.reduce((acc, inv) => {
       acc.total += calculateGrandTotal(inv);
-      acc.tax += calculateTaxOnly(inv);
+      const sub = inv.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      acc.tax += sub * (Number(inv.taxRate || 0) / 100);
       return acc;
     }, { total: 0, tax: 0 });
   }, [filteredInvoices]);
@@ -155,30 +148,29 @@ const Invoices = () => {
     }
   };
 
-const downloadPDF = (invoice) => {
-  const doc = new jsPDF();
-  doc.setFontSize(20); 
-  doc.text(`${activeTab.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
-  
-  doc.setFontSize(10);
-  doc.text(`GST: ${invoice.gstNumber || 'N/A'}`, 14, 30);
-  doc.text(`Billing: ${invoice.billingAddress || 'N/A'}`, 14, 40);
-  doc.text(`Shipping: ${invoice.shippingAddress || 'N/A'}`, 14, 50);
+  const downloadPDF = (invoice) => {
+    const doc = new jsPDF();
+    doc.setFontSize(20); 
+    doc.text(`${activeTab.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
+    doc.setFontSize(10);
+    doc.text(`GST: ${invoice.gstNumber || 'N/A'}`, 14, 30);
+    doc.text(`Billing: ${invoice.billingAddress || 'N/A'}`, 14, 40);
+    doc.text(`Shipping: ${invoice.shippingAddress || 'N/A'}`, 14, 50);
 
-  autoTable(doc, {
-    startY: 60,
-    head: [['Item Name', 'Qty', 'Rate', 'Total']],
-    body: invoice.items.map(i => [i.name, i.quantity, formatValue(i.price), formatValue(i.quantity * i.price)]),
-    foot: [
-      ['', '', 'Subtotal', formatValue(invoice.subtotal)],
-      ['', '', 'Tax', formatValue(invoice.taxAmount)],
-      ['', '', 'Discount', `- ${formatValue(invoice.discount)}`],
-      ['', '', 'Grand Total', formatValue(invoice.totalAmount)]
-    ],
-    headStyles: { fillColor: activeTab === 'Sale' ? [79, 70, 229] : [225, 29, 72] }
-  });
-  doc.save(`${activeTab}_${invoice.invoiceNumber}.pdf`);
-};
+    autoTable(doc, {
+      startY: 60,
+      head: [['Item Name', 'Qty', 'Rate', 'Total']],
+      body: invoice.items.map(i => [i.name, i.quantity, formatValue(i.price), formatValue(i.quantity * i.price)]),
+      foot: [
+        ['', '', 'Subtotal', formatValue(invoice.subtotal)],
+        ['', '', 'Tax', formatValue(invoice.taxAmount)],
+        ['', '', 'Discount', `- ${formatValue(invoice.discount)}`],
+        ['', '', 'Grand Total', formatValue(invoice.totalAmount)]
+      ],
+      headStyles: { fillColor: activeTab === 'Sale' ? [79, 70, 229] : [225, 29, 72] }
+    });
+    doc.save(`${activeTab}_${invoice.invoiceNumber}.pdf`);
+  };
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
@@ -212,119 +204,117 @@ const downloadPDF = (invoice) => {
 
         {/* Stats Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
                 <div>
-                    <p className="text-slate-400 font-black text-[9px] uppercase tracking-widest mb-1">Gross Volume</p>
-                    <h3 className="text-2xl font-black text-slate-900">{formatValue(stats.total)}</h3>
+                    <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest mb-1">Gross Volume</p>
+                    <h3 className="text-3xl font-black text-slate-900">{formatValue(stats.total)}</h3>
                 </div>
-                <div className={`p-3 rounded-2xl ${activeTab === 'Sale' ? 'bg-indigo-50 text-indigo-500' : 'bg-rose-50 text-rose-500'}`}>
-                    <TrendingUp size={20} />
+                <div className={`p-4 rounded-2xl ${activeTab === 'Sale' ? 'bg-indigo-50 text-indigo-500' : 'bg-rose-50 text-rose-500'}`}>
+                    <TrendingUp size={24} />
                 </div>
             </div>
-            <div className="bg-white p-5 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
+            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
                 <div>
-                    <p className="text-slate-400 font-black text-[9px] uppercase tracking-widest mb-1">{activeTab === 'Sale' ? 'Tax Collected' : 'Tax Paid'}</p>
-                    <h3 className="text-2xl font-black text-slate-900">{formatValue(stats.tax)}</h3>
+                    <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest mb-1">{activeTab === 'Sale' ? 'Tax Collected' : 'Tax Paid'}</p>
+                    <h3 className="text-3xl font-black text-slate-900">{formatValue(stats.tax)}</h3>
                 </div>
-                <div className="p-3 bg-emerald-50 text-emerald-500 rounded-2xl">
-                    <PieChart size={20} />
+                <div className="p-4 bg-emerald-50 text-emerald-500 rounded-2xl">
+                    <PieChart size={24} />
                 </div>
             </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white p-4 rounded-3xl border border-slate-100 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-            <input type="text" placeholder="Search..." className="px-4 py-3 bg-slate-50 rounded-xl outline-none font-bold text-xs" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-            <input type="date" className="bg-slate-50 px-4 py-3 rounded-xl outline-none font-bold text-[10px] uppercase" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            <input type="date" className="bg-slate-50 px-4 py-3 rounded-xl outline-none font-bold text-[10px] uppercase" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-            <select className="px-4 py-3 bg-slate-50 rounded-xl font-black text-[10px] uppercase" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+        <div className="bg-white p-5 rounded-3xl border border-slate-100 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <input type="text" placeholder="Search party..." className="px-4 py-3 bg-slate-50 rounded-xl outline-none font-bold text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            <input type="date" className="bg-slate-50 px-4 py-3 rounded-xl outline-none font-bold text-xs uppercase" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+            <input type="date" className="bg-slate-50 px-4 py-3 rounded-xl outline-none font-bold text-xs uppercase" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+            <select className="px-4 py-3 bg-slate-50 rounded-xl font-black text-xs uppercase" value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
               <option value="All">All Status</option><option value="Paid">Paid</option><option value="Pending">Pending</option>
             </select>
           </div>
         </div>
 
-        {/* Table */}
+        {/* Table Section */}
         {loading ? (
           <div className="flex justify-center py-20"><Loader2 className="animate-spin text-slate-300" size={40} /></div>
         ) : (
-          <div className="bg-white rounded-4xl shadow-sm overflow-hidden border border-slate-100">
+          <div className="bg-white rounded-[2.5rem] shadow-sm overflow-hidden border border-slate-100">
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="bg-slate-50/50">
-                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Inv No.</th>
-                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Party</th>
-                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
-                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Status</th>
-                    <th className="px-6 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest">Actions</th>
+                  <tr className="bg-slate-50/80">
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Inv No.</th>
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Party Details</th>
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Total Amount</th>
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Status</th>
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em] text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-100">
                   {filteredInvoices.map((inv) => (
                     <tr key={inv._id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-6 py-4 font-bold text-slate-800 text-xs">#{inv.invoiceNumber?.slice(-6) || inv._id.slice(-6)}</td>
-                      <td className="px-6 py-4">
-                        <div className="font-black text-slate-800 text-xs">{inv.client?.name || "N/A"}</div>
-                        <div className="text-[9px] text-slate-400 font-bold uppercase">{new Date(inv.createdAt).toLocaleDateString()}</div>
+                      <td className="px-8 py-6 font-bold text-slate-800 text-sm">#{inv.invoiceNumber?.slice(-6) || inv._id.slice(-6)}</td>
+                      <td className="px-8 py-6">
+                        <div className="font-black text-slate-900 text-sm">{inv.client?.name || "N/A"}</div>
+                        <div className="text-xs text-slate-400 font-bold uppercase mt-0.5">{new Date(inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="font-black text-slate-900 text-xs">{formatValue(calculateGrandTotal(inv))}</div>
+                      <td className="px-8 py-6">
+                        <div className="font-black text-slate-900 text-sm">{formatValue(calculateGrandTotal(inv))}</div>
                       </td>
                       
-                      {/* --- DROPDOWN STATUS START --- */}
-                      <td className="px-6 py-4 relative">
+                      <td className="px-8 py-6 relative">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
                             setActiveStatusDropdown(activeStatusDropdown === inv._id ? null : inv._id);
                           }}
-                          className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[8px] font-black uppercase tracking-tighter transition-all hover:ring-2 hover:ring-offset-1 ${inv.status === 'Paid' ? 'bg-emerald-100 text-emerald-600 hover:ring-emerald-200' : 'bg-amber-100 text-amber-600 hover:ring-amber-200'}`}
+                          className={`group flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider transition-all hover:ring-2 hover:ring-offset-1 ${inv.status === 'Paid' ? 'bg-emerald-100 text-emerald-600 hover:ring-emerald-200' : 'bg-amber-100 text-amber-600 hover:ring-amber-200'}`}
                         >
                           {inv.status}
-                          <ChevronDown size={10} className={`transition-transform ${activeStatusDropdown === inv._id ? 'rotate-180' : ''}`} />
+                          <ChevronDown size={12} className={`transition-transform ${activeStatusDropdown === inv._id ? 'rotate-180' : ''}`} />
                         </button>
 
                         {activeStatusDropdown === inv._id && (
-                          <div className="absolute left-6 mt-1 w-28 bg-white border border-slate-100 rounded-xl shadow-xl z-50 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                          <div className="absolute left-8 mt-2 w-32 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden py-1" onClick={(e) => e.stopPropagation()}>
                             <button 
                               onClick={() => handleUpdateStatus(inv._id, 'Paid')}
-                              className="w-full text-left px-4 py-2.5 text-[9px] font-black uppercase text-emerald-600 hover:bg-emerald-50 transition-colors border-b border-slate-50"
+                              className="w-full text-left px-5 py-3 text-[10px] font-black uppercase text-emerald-600 hover:bg-emerald-50 transition-colors"
                             >
                               Set Paid
                             </button>
                             <button 
                               onClick={() => handleUpdateStatus(inv._id, 'Pending')}
-                              className="w-full text-left px-4 py-2.5 text-[9px] font-black uppercase text-amber-600 hover:bg-amber-50 transition-colors"
+                              className="w-full text-left px-5 py-3 text-[10px] font-black uppercase text-amber-600 hover:bg-amber-50 transition-colors"
                             >
                               Set Pending
                             </button>
                           </div>
                         )}
                       </td>
-                      {/* --- DROPDOWN STATUS END --- */}
 
-                      <td className="px-6 py-4 w-50">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-8 py-6">
+                        <div className="flex items-center justify-end gap-2">
                           {inv.status === 'Pending' && (
                             activeTab === 'Sale' ? (
-                              <button onClick={() => handlePayNow(inv)} disabled={paymentLoading} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all">
-                                <CreditCard size={14} />
+                              <button onClick={() => handlePayNow(inv)} disabled={paymentLoading} className="p-2.5 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                                <CreditCard size={16} />
                               </button>
                             ) : (
-                              <button onClick={() => handleUpdateStatus(inv._id, 'Paid')} className="p-2 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all">
-                                <CheckCircle size={14} />
+                              <button onClick={() => handleUpdateStatus(inv._id, 'Paid')} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm">
+                                <CheckCircle size={16} />
                               </button>
                             )
                           )}
-                          <button onClick={() => { setSelectedInvoice(inv); setShowModal(true); }} className={`p-2 bg-${themeColor}-50 text-${themeColor}-600 rounded-lg hover:bg-${themeColor}-600 hover:text-white transition-all`}>
-                            <Edit2 size={14} />
+                          <button onClick={() => { setSelectedInvoice(inv); setShowModal(true); }} className={`p-2.5 bg-${themeColor}-50 text-${themeColor}-600 rounded-xl hover:bg-${themeColor}-600 hover:text-white transition-all shadow-sm`}>
+                            <Edit2 size={16} />
                           </button>
-                          <button onClick={() => downloadPDF(inv)} className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-800 hover:text-white transition-all">
-                            <Download size={14} />
+                          <button onClick={() => downloadPDF(inv)} className="p-2.5 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-800 hover:text-white transition-all shadow-sm">
+                            <Download size={16} />
                           </button>
-                          <button onClick={() => handleDelete(inv._id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all">
-                            <Trash2 size={14} />
+                          <button onClick={() => handleDelete(inv._id)} className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm">
+                            <Trash2 size={16} />
                           </button>
                         </div>
                       </td>
