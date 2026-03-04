@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { jsPDF } from 'jspdf';
-import { X, Search, Trash2, ShoppingCart, CreditCard, Landmark, CheckCircle, Download, Save, Loader2 } from 'lucide-react';
+import { X, Search, Trash2, CreditCard, Save, Loader2, Plus } from 'lucide-react';
 import api from '../utils/api.js';
 import { toast } from 'react-toastify';
 
@@ -11,7 +10,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
   const [invoiceData, setInvoiceData] = useState(INITIAL_INVOICE);
   const [selectedItems, setSelectedItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [taxRate, setTaxRate] = useState(0); // Defined state
+  const [taxRate, setTaxRate] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedInvoiceId, setSavedInvoiceId] = useState(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -38,15 +37,31 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     }
   }, [editData, isOpen]);
 
-  // Handle Modal Closing early if not open
   if (!isOpen) return null;
 
-  // --- CALCULATIONS (Fixed: Defined before use in JSX) ---
-  const subtotal = selectedItems.reduce(
-    (sum, item) => sum + item.price * Number(item.quantity), 0
-  );
+  // --- Calculations ---
+  const subtotal = selectedItems.reduce((sum, item) => sum + item.price * Number(item.quantity), 0);
   const taxAmount = subtotal * (Number(taxRate || 0) / 100);
   const totalAmount = subtotal + taxAmount;
+
+  // --- Product Selection Logic ---
+  const filteredProducts = products.filter(p => 
+    p.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const addItem = (product, variant) => {
+    const exists = selectedItems.find(item => item.variantId === variant._id);
+    if (exists) return toast.info("Item already added. Adjust quantity below.");
+    
+    setSelectedItems([...selectedItems, {
+      productId: product._id,
+      variantId: variant._id,
+      name: `${product.title} (${variant.name})`,
+      price: variant.price,
+      quantity: 1
+    }]);
+    setSearchQuery('');
+  };
 
   const handleReset = () => {
     setType('Sale');
@@ -68,19 +83,12 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
     if (isSubmitting) return;
-
     if (!invoiceData.clientId) return toast.warning('Select a client/vendor.');
     if (selectedItems.length === 0) return toast.warning('Add at least one product.');
 
     setIsSubmitting(true);
     try {
-      const payload = {
-        ...invoiceData,
-        type,
-        items: selectedItems,
-        taxRate: Number(taxRate), // Send to backend
-      };
-
+      const payload = { ...invoiceData, type, items: selectedItems, taxRate: Number(taxRate) };
       if (editData) {
         await api.put(`/invoices/${editData._id}`, payload);
         toast.success("✅ Invoice updated!");
@@ -88,8 +96,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         handleClose();
       } else {
         const res = await api.post('/invoices', payload);
-        const createdId = res.data._id || res.data.invoice?._id;
-        setSavedInvoiceId(createdId);
+        setSavedInvoiceId(res.data._id);
         toast.success(`✅ ${type} saved!`);
         onRefresh();
       }
@@ -105,46 +112,30 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     if (!razorpayKey || !savedInvoiceId) return;
     if (accounts.length === 0) return toast.error("❌ No bank account found.");
     
-    const targetAccountId = accounts[0]._id;
     setPaymentLoading(true);
     try {
-      const { data: order } = await api.post('/payments/create-order', { 
-        amount: totalAmount, 
-        currency: 'INR' 
-      });
-
+      const { data: order } = await api.post('/payments/create-order', { amount: totalAmount, currency: 'INR' });
       const options = {
         key: razorpayKey,
         amount: order.amount,
         currency: order.currency,
         name: 'Business Ledger',
-        description: `Invoice #${savedInvoiceId.slice(-6)}`,
         order_id: order.id,
         handler: async (response) => {
           try {
-            await api.post('/payments/verify', { 
-              ...response, 
-              invoiceId: savedInvoiceId,
-              accountId: targetAccountId 
-            });
+            await api.post('/payments/verify', { ...response, invoiceId: savedInvoiceId, accountId: accounts[0]._id });
             setPaymentDone(true);
             toast.success("Payment Successful!");
             onRefresh();
             setTimeout(() => handleClose(), 1500);
-          } catch (err) {
-            toast.error("Verification failed");
-            setPaymentLoading(false);
-          }
+          } catch (err) { toast.error("Verification failed"); setPaymentLoading(false); }
         },
         modal: { ondismiss: () => setPaymentLoading(false) },
         theme: { color: "#0f172a" },
       };
       const rzp = new window.Razorpay(options);
       rzp.open();
-    } catch (err) { 
-      toast.error("Could not initiate payment");
-      setPaymentLoading(false); 
-    }
+    } catch (err) { toast.error("Could not initiate payment"); setPaymentLoading(false); }
   };
 
   return (
@@ -159,8 +150,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
           <button onClick={handleClose} className="p-2 hover:bg-slate-200 rounded-full"><X /></button>
         </div>
 
-        {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6">
+          {/* Client & Date */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Client/Vendor</label>
@@ -175,44 +166,83 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
             </div>
           </div>
 
-          {/* Items List */}
+          {/* PRODUCT SEARCH INPUT */}
+          <div className="space-y-2 relative">
+            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Add Products</label>
+            <div className="relative">
+              <Search className="absolute left-4 top-4 text-slate-400" size={20} />
+              <input 
+                type="text"
+                placeholder="Search product by name..."
+                className="w-full p-4 pl-12 bg-slate-100 rounded-2xl outline-none font-bold text-slate-800 border-2 border-transparent focus:border-indigo-500 transition-all"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            {/* Search Results Dropdown */}
+            {searchQuery && (
+              <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto mt-1">
+                {filteredProducts.map(p => 
+                  p.variants.map(v => (
+                    <div 
+                      key={v._id} 
+                      onClick={() => addItem(p, v)}
+                      className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-800">{p.title}</p>
+                        <p className="text-xs text-slate-500">{v.name} • Stock: {v.stock}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-black text-indigo-600">₹{v.price}</p>
+                        <Plus size={16} className="ml-auto text-slate-400" />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Selected Items List */}
           <div className="space-y-3">
             {selectedItems.map((item, index) => (
               <div key={index} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                 <div className="flex-1">
                   <p className="font-bold text-slate-800 text-sm">{item.name}</p>
-                  <p className="text-[10px] text-slate-400">Rate: ₹{item.price}</p>
+                  <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Price: ₹{item.price}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase">Qty</label>
-                  <input type="number" min={1} className="w-20 p-2 rounded-xl border text-center font-bold text-sm" value={item.quantity} onChange={(e) => {
-                    const updated = [...selectedItems];
-                    updated[index].quantity = Number(e.target.value);
-                    setSelectedItems(updated);
-                  }} />
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Qty</label>
+                  <input 
+                    type="number" 
+                    min={1} 
+                    className="w-20 p-2 rounded-xl border text-center font-black text-slate-800" 
+                    value={item.quantity} 
+                    onChange={(e) => {
+                      const updated = [...selectedItems];
+                      updated[index].quantity = Number(e.target.value);
+                      setSelectedItems(updated);
+                    }} 
+                  />
                 </div>
-                <button type="button" onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))} className="text-rose-500 hover:bg-rose-50 p-2 rounded-lg"><Trash2 size={18} /></button>
+                <button type="button" onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))} className="text-rose-500 hover:bg-rose-100 p-2 rounded-xl transition-colors"><Trash2 size={18} /></button>
               </div>
             ))}
           </div>
 
-          {/* Tax Section (The fix you requested) */}
-          <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-6 rounded-3xl">
+          {/* Tax Section */}
+          <div className="p-6 bg-slate-50 border border-slate-100 grid grid-cols-2 gap-6 rounded-[2rem]">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Custom Tax (%)</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tax Rate (%)</label>
               <div className="relative">
-                <input 
-                  type="number" 
-                  className="w-full p-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold text-slate-800"
-                  placeholder="0"
-                  value={taxRate}
-                  onChange={(e) => setTaxRate(e.target.value)}
-                />
+                <input type="number" className="w-full p-4 bg-white border border-slate-200 rounded-2xl outline-none font-bold" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
                 <span className="absolute right-4 top-4 font-bold text-slate-400">%</span>
               </div>
             </div>
             <div className="flex flex-col justify-center items-end pr-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Calculated Tax</p>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Amount</p>
               <p className="text-lg font-black text-slate-800">₹{taxAmount.toLocaleString()}</p>
             </div>
           </div>
@@ -225,27 +255,18 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
             <p className="text-white text-3xl font-black">₹{totalAmount.toLocaleString()}</p>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
-            <button 
-              onClick={handleSubmit} 
-              disabled={isSubmitting}
-              className={`px-6 py-4 rounded-2xl font-black uppercase flex items-center gap-2 text-xs tracking-widest text-white transition-all ${isSubmitting ? 'bg-slate-600' : 'bg-emerald-500 hover:bg-emerald-400 shadow-lg shadow-emerald-500/20'}`}
-            >
+            <button onClick={handleSubmit} disabled={isSubmitting} className="px-8 py-4 rounded-2xl font-black uppercase flex items-center gap-2 text-xs bg-emerald-500 text-white hover:bg-emerald-400 shadow-lg transition-all">
               {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              {editData ? 'Update and Close' : 'Confirm & Save'}
+              {editData ? 'Update Invoice' : 'Confirm & Save'}
             </button>
 
             {!editData && savedInvoiceId && !paymentDone && (
-              <button 
-                onClick={handleRazorpayPayment} 
-                disabled={paymentLoading} 
-                className="px-6 py-4 rounded-2xl font-black uppercase text-xs bg-blue-600 text-white flex items-center gap-2 shadow-lg"
-              >
+              <button onClick={handleRazorpayPayment} disabled={paymentLoading} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-blue-600 text-white flex items-center gap-2 shadow-lg">
                 {paymentLoading ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
                 Pay Now
               </button>
             )}
-
-            <button onClick={handleClose} className="px-6 py-4 rounded-2xl font-black uppercase text-xs bg-slate-700 text-slate-300">
+            <button onClick={handleClose} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-slate-700 text-slate-300">
               {savedInvoiceId ? 'Close' : 'Cancel'}
             </button>
           </div>
