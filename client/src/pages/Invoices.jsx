@@ -3,7 +3,8 @@ import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
 import { 
   Plus, Search, Trash2, Download, Edit2, Loader2, 
-  Calendar, Eye, ShoppingCart, ShoppingBag, CreditCard 
+  Calendar, Eye, ShoppingCart, ShoppingBag, CreditCard, CheckCircle,
+  TrendingUp, PieChart
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
@@ -33,8 +34,6 @@ const Invoices = () => {
 
   // Derived Values
   const themeColor = activeTab === 'Sale' ? 'indigo' : 'rose';
-  // Fixed ReferenceError: Defined safely here
-  const lastInvoice = invoices.length > 0 ? invoices[0] : null;
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -54,7 +53,6 @@ const Invoices = () => {
         api.get('/accounts'),
         api.get('/products')
       ]);
-      // Sort invoices by date descending to make 'lastInvoice' the newest one
       const sortedInvoices = invRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
       setInvoices(sortedInvoices);
       setClients(clientRes.data);
@@ -72,6 +70,51 @@ const Invoices = () => {
     fetchData();
   }, []);
 
+  // --- Logic Helpers ---
+
+  const calculateGrandTotal = (invoice) => {
+    const subtotal = invoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const taxAmount = subtotal * (Number(invoice.taxRate || 0) / 100);
+    return subtotal + taxAmount;
+  };
+
+  const calculateTaxOnly = (invoice) => {
+    const subtotal = invoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    return subtotal * (Number(invoice.taxRate || 0) / 100);
+  };
+
+  const formatValue = (value) => {
+    return `${currencySymbol}${Number(value || 0).toLocaleString('en-IN', {
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    })}`;
+  };
+
+  const filteredInvoices = useMemo(() => {
+    return invoices.filter(inv => {
+      const invDate = new Date(inv.createdAt).getTime();
+      const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
+      const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
+      
+      const clientName = inv.client?.name || "";
+      const matchesTab = inv.type === activeTab;
+      const matchesSearch = clientName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = filterStatus === 'All' || inv.status === filterStatus;
+      const matchesStart = start ? invDate >= start : true;
+      const matchesEnd = end ? invDate <= end : true;
+
+      return matchesTab && matchesSearch && matchesStatus && matchesStart && matchesEnd;
+    });
+  }, [invoices, activeTab, searchTerm, filterStatus, startDate, endDate]);
+
+  // --- Summary Calculations ---
+  const stats = useMemo(() => {
+    return filteredInvoices.reduce((acc, inv) => {
+      acc.total += calculateGrandTotal(inv);
+      acc.tax += calculateTaxOnly(inv);
+      return acc;
+    }, { total: 0, tax: 0 });
+  }, [filteredInvoices]);
+
   const handlePayNow = async (invoice) => {
     const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
     if (!razorpayKey) return toast.error("Razorpay Key missing in .env");
@@ -79,8 +122,9 @@ const Invoices = () => {
 
     setPaymentLoading(true);
     try {
+      const grandTotal = calculateGrandTotal(invoice);
       const { data: order } = await api.post('/payments/create-order', { 
-        amount: invoice.totalAmount, 
+        amount: grandTotal, 
         currency: 'INR' 
       });
 
@@ -118,37 +162,16 @@ const Invoices = () => {
     }
   };
 
-  const handleEdit = (invoice) => {
-    setSelectedInvoice(invoice);
-    setShowModal(true);
-  };
-
-  const handleNewInvoice = () => {
-    setSelectedInvoice(null);
-    setShowModal(true);
-  };
-
-  const filteredInvoices = useMemo(() => {
-    return invoices.filter(inv => {
-      const invDate = new Date(inv.createdAt).getTime();
-      const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
-      const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
-      
-      const clientName = inv.client?.name || "";
-      const matchesTab = inv.type === activeTab;
-      const matchesSearch = clientName.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesStatus = filterStatus === 'All' || inv.status === filterStatus;
-      const matchesStart = start ? invDate >= start : true;
-      const matchesEnd = end ? invDate <= end : true;
-
-      return matchesTab && matchesSearch && matchesStatus && matchesStart && matchesEnd;
-    });
-  }, [invoices, activeTab, searchTerm, filterStatus, startDate, endDate]);
-
-  const formatValue = (value) => {
-    return `${currencySymbol}${Number(value || 0).toLocaleString('en-IN', {
-      minimumFractionDigits: 2, maximumFractionDigits: 2
-    })}`;
+  const handleMarkAsPaid = async (id) => {
+    if (window.confirm("Mark this record as paid?")) {
+      try {
+        await api.put(`/invoices/${id}`, { status: 'Paid' });
+        toast.success("Updated to Paid");
+        fetchData();
+      } catch (err) {
+        toast.error("Update failed");
+      }
+    }
   };
 
   const handleDelete = async (id) => {
@@ -156,7 +179,7 @@ const Invoices = () => {
       try {
         await api.delete(`/invoices/${id}`);
         fetchData();
-        toast.success("Record deleted successfully.");
+        toast.success("Deleted successfully.");
       } catch (err) {
         toast.error("Deletion failed");
       }
@@ -165,6 +188,7 @@ const Invoices = () => {
 
   const downloadPDF = (invoice) => {
     const doc = new jsPDF();
+    const grandTotal = calculateGrandTotal(invoice);
     doc.setFontSize(20);
     doc.text(`${activeTab.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
     doc.setFontSize(10);
@@ -181,6 +205,10 @@ const Invoices = () => {
         formatValue(item.price),
         formatValue(item.quantity * item.price)
       ]),
+      foot: [
+        ['', '', 'Tax Amount', formatValue(calculateTaxOnly(invoice))],
+        ['', '', 'Grand Total', formatValue(grandTotal)]
+      ],
       theme: 'grid',
       headStyles: { fillColor: activeTab === 'Sale' ? [79, 70, 229] : [225, 29, 72] }
     });
@@ -200,11 +228,33 @@ const Invoices = () => {
             <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Transaction History</p>
           </div>
           <button 
-            onClick={handleNewInvoice} 
+            onClick={() => { setSelectedInvoice(null); setShowModal(true); }} 
             className={`px-8 py-4 rounded-3xl flex items-center gap-2 transition-all shadow-xl font-black text-xs uppercase tracking-widest text-white ${activeTab === 'Sale' ? 'bg-indigo-600 hover:bg-indigo-500' : 'bg-rose-600 hover:bg-rose-500'}`}
           >
             <Plus size={18} /> Create {activeTab}
           </button>
+        </div>
+
+        {/* Summary Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className={`bg-white p-6 rounded-[2.5rem] border-l-8 ${activeTab === 'Sale' ? 'border-indigo-500 shadow-indigo-100' : 'border-rose-500 shadow-rose-100'} shadow-2xl flex items-center justify-between`}>
+                <div>
+                    <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] mb-1">Total {activeTab} Volume</p>
+                    <h3 className="text-3xl font-black text-slate-900">{formatValue(stats.total)}</h3>
+                </div>
+                <div className={`p-4 rounded-3xl ${activeTab === 'Sale' ? 'bg-indigo-50 text-indigo-500' : 'bg-rose-50 text-rose-500'}`}>
+                    <TrendingUp size={24} />
+                </div>
+            </div>
+            <div className="bg-white p-6 rounded-[2.5rem] border-l-8 border-emerald-500 shadow-2xl shadow-emerald-100 flex items-center justify-between">
+                <div>
+                    <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.2em] mb-1">{activeTab === 'Sale' ? 'GST Collected' : 'Input Tax Credit'}</p>
+                    <h3 className="text-3xl font-black text-slate-900">{formatValue(stats.tax)}</h3>
+                </div>
+                <div className="p-4 bg-emerald-50 text-emerald-500 rounded-3xl">
+                    <PieChart size={24} />
+                </div>
+            </div>
         </div>
 
         {/* Sub-Tab Navigation */}
@@ -264,7 +314,7 @@ const Invoices = () => {
                   <tr className="bg-slate-50/50">
                     <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Inv No.</th>
                     <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">{activeTab === 'Sale' ? 'Customer' : 'Vendor'}</th>
-                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Amount</th>
+                    <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Grand Total</th>
                     <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                     <th className="px-8 py-6 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Actions</th>
                   </tr>
@@ -277,7 +327,10 @@ const Invoices = () => {
                         <div className="font-black text-slate-800 text-sm">{inv.client?.name || "N/A"}</div>
                         <div className="text-[10px] text-slate-400 font-bold uppercase">{new Date(inv.createdAt).toLocaleDateString()}</div>
                       </td>
-                      <td className="px-8 py-6 font-black text-slate-900">{formatValue(inv.totalAmount)}</td>
+                      <td className="px-8 py-6">
+                        <div className="font-black text-slate-900">{formatValue(calculateGrandTotal(inv))}</div>
+                        {inv.taxRate > 0 && <div className="text-[9px] text-indigo-500 font-bold">Incl. {inv.taxRate}% GST</div>}
+                      </td>
                       <td className="px-8 py-6">
                         <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-tighter ${inv.status === 'Paid' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
                           {inv.status}
@@ -285,19 +338,18 @@ const Invoices = () => {
                       </td>
                       <td className="px-8 py-6">
                         <div className="flex justify-center gap-2">
-                          {/* Razorpay Button: Only for Sales that are Pending */}
-                          {activeTab === 'Sale' && inv.status === 'Pending' && (
-                            <button 
-                              onClick={() => handlePayNow(inv)} 
-                              disabled={paymentLoading}
-                              title="Pay Now with Razorpay"
-                              className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm disabled:opacity-50"
-                            >
-                              <CreditCard size={16} />
-                            </button>
+                          {inv.status === 'Pending' && (
+                            activeTab === 'Sale' ? (
+                              <button onClick={() => handlePayNow(inv)} disabled={paymentLoading} className="p-3 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                                <CreditCard size={16} />
+                              </button>
+                            ) : (
+                              <button onClick={() => handleMarkAsPaid(inv._id)} className="p-3 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all">
+                                <CheckCircle size={16} />
+                              </button>
+                            )
                           )}
-                          
-                          <button onClick={() => handleEdit(inv)} className={`p-3 bg-${themeColor}-50 text-${themeColor}-600 rounded-xl hover:bg-${themeColor}-600 hover:text-white transition-all`}>
+                          <button onClick={() => { setSelectedInvoice(inv); setShowModal(true); }} className={`p-3 bg-${themeColor}-50 text-${themeColor}-600 rounded-xl hover:bg-${themeColor}-600 hover:text-white transition-all`}>
                             <Edit2 size={16} />
                           </button>
                           <button onClick={() => downloadPDF(inv)} className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-800 hover:text-white transition-all">
@@ -312,9 +364,6 @@ const Invoices = () => {
                   ))}
                 </tbody>
               </table>
-              {filteredInvoices.length === 0 && (
-                <div className="py-20 text-center text-slate-400 font-black uppercase text-xs tracking-widest">No Records Found</div>
-              )}
             </div>
           </div>
         )}
