@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
 import { 
   Plus, Search, Trash2, Download, Edit2, Loader2, 
-  Calendar, Eye, ShoppingCart, ShoppingBag, CreditCard, CheckCircle,
+  ShoppingCart, ShoppingBag, CreditCard, CheckCircle,
   TrendingUp, PieChart, ChevronDown
 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -59,7 +59,7 @@ const Invoices = () => {
         api.get('/accounts'),
         api.get('/products')
       ]);
-      const sortedInvoices = invRes.data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      const sortedInvoices = invRes.data.sort((a, b) => new Date(b.invoiceDate || b.createdAt) - new Date(a.invoiceDate || a.createdAt));
       setInvoices(sortedInvoices);
       setClients(clientRes.data);
       setCurrencySymbol(profileRes.data.currency === 'USD' ? '$' : '₹');
@@ -84,12 +84,6 @@ const Invoices = () => {
     }
   };
 
-  const calculateGrandTotal = (invoice) => {
-    const subtotal = invoice.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const taxAmount = subtotal * (Number(invoice.taxRate || 0) / 100);
-    return subtotal + taxAmount;
-  };
-
   const formatValue = (value) => {
     return `${currencySymbol}${Number(value || 0).toLocaleString('en-IN', {
       minimumFractionDigits: 2, maximumFractionDigits: 2
@@ -98,7 +92,7 @@ const Invoices = () => {
 
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => {
-      const invDate = new Date(inv.createdAt).getTime();
+      const invDate = new Date(inv.invoiceDate || inv.createdAt).getTime();
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
       const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
       const clientName = inv.client?.name || "";
@@ -111,9 +105,8 @@ const Invoices = () => {
 
   const stats = useMemo(() => {
     return filteredInvoices.reduce((acc, inv) => {
-      acc.total += calculateGrandTotal(inv);
-      const sub = inv.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      acc.tax += sub * (Number(inv.taxRate || 0) / 100);
+      acc.total += inv.totalAmount;
+      acc.tax += inv.taxAmount;
       return acc;
     }, { total: 0, tax: 0 });
   }, [filteredInvoices]);
@@ -124,7 +117,7 @@ const Invoices = () => {
     if (accounts.length === 0) return toast.error("Link a bank account first");
     setPaymentLoading(true);
     try {
-      const { data: order } = await api.post('/payments/create-order', { amount: calculateGrandTotal(invoice), currency: 'INR' });
+      const { data: order } = await api.post('/payments/create-order', { amount: invoice.totalAmount, currency: 'INR' });
       const options = {
         key: razorpayKey, amount: order.amount, currency: order.currency, name: 'Business Ledger',
         order_id: order.id,
@@ -152,13 +145,22 @@ const Invoices = () => {
     const doc = new jsPDF();
     doc.setFontSize(20); 
     doc.text(`${activeTab.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
+    
     doc.setFontSize(10);
-    doc.text(`GST: ${invoice.gstNumber || 'N/A'}`, 14, 30);
-    doc.text(`Billing: ${invoice.billingAddress || 'N/A'}`, 14, 40);
-    doc.text(`Shipping: ${invoice.shippingAddress || 'N/A'}`, 14, 50);
+    doc.text(`Invoice No: ${invoice.invoiceNumber}`, 14, 30);
+    doc.text(`Date: ${new Date(invoice.invoiceDate || invoice.createdAt).toLocaleDateString()}`, 14, 35);
+    doc.text(`GST: ${invoice.gstNumber || 'N/A'}`, 14, 40);
+    
+    doc.text(`Billing Address:`, 14, 50);
+    doc.text(`${invoice.billingAddress || 'N/A'}`, 14, 55, { maxWidth: 80 });
+    
+    if(activeTab === 'Sale') {
+        doc.text(`Shipping Address:`, 110, 50);
+        doc.text(`${invoice.shippingAddress || 'N/A'}`, 110, 55, { maxWidth: 80 });
+    }
 
     autoTable(doc, {
-      startY: 60,
+      startY: 75,
       head: [['Item Name', 'Qty', 'Rate', 'Total']],
       body: invoice.items.map(i => [i.name, i.quantity, formatValue(i.price), formatValue(i.quantity * i.price)]),
       foot: [
@@ -169,6 +171,13 @@ const Invoices = () => {
       ],
       headStyles: { fillColor: activeTab === 'Sale' ? [79, 70, 229] : [225, 29, 72] }
     });
+    
+    if (invoice.notes) {
+        const finalY = doc.lastAutoTable.finalY + 10;
+        doc.text("Notes:", 14, finalY);
+        doc.text(invoice.notes, 14, finalY + 5, { maxWidth: 180 });
+    }
+
     doc.save(`${activeTab}_${invoice.invoiceNumber}.pdf`);
   };
 
@@ -255,13 +264,13 @@ const Invoices = () => {
                 <tbody className="divide-y divide-slate-100">
                   {filteredInvoices.map((inv) => (
                     <tr key={inv._id} className="hover:bg-slate-50/50 transition-colors">
-                      <td className="px-8 py-6 font-bold text-slate-800 text-sm">#{inv.invoiceNumber?.slice(-6) || inv._id.slice(-6)}</td>
+                      <td className="px-8 py-6 font-bold text-slate-800 text-sm">{inv.invoiceNumber}</td>
                       <td className="px-8 py-6">
                         <div className="font-black text-slate-900 text-sm">{inv.client?.name || "N/A"}</div>
-                        <div className="text-xs text-slate-400 font-bold uppercase mt-0.5">{new Date(inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                        <div className="text-xs text-slate-400 font-bold uppercase mt-0.5">{new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="font-black text-slate-900 text-sm">{formatValue(calculateGrandTotal(inv))}</div>
+                        <div className="font-black text-slate-900 text-sm">{formatValue(inv.totalAmount)}</div>
                       </td>
                       
                       <td className="px-8 py-6 relative">

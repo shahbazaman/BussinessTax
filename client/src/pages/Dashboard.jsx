@@ -309,7 +309,7 @@ const Dashboard = () => {
               <div className="flex items-center gap-2 font-bold text-slate-800 uppercase text-xs tracking-wider">
                 <Landmark size={16} className="text-blue-500" /> Liquidity Accounts
               </div>
-              <button onClick={() => setShowAccountModal(true)} className="bg-blue-50 text-blue-600 p-1.5 rounded-lg hover:bg-blue-100 transition-all active:scale-95" title="Add New Account">
+              <button onClick={() => navigate('/accounts')} className="bg-blue-50 text-blue-600 p-1.5 rounded-lg hover:bg-blue-100 transition-all active:scale-95" title="Add New Account">
                 <Plus size={16} />
               </button>
             </div>

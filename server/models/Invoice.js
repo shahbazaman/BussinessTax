@@ -20,6 +20,23 @@ const invoiceSchema = new mongoose.Schema({
     type: String, 
     required: true
   },
+  // NEW FIELDS FROM REQUIREMENTS
+  invoiceDate: { 
+    type: Date, 
+    default: Date.now 
+  },
+  paymentTerms: { 
+    type: String 
+  },
+  paymentMethod: { 
+    type: String, 
+    enum: ['Cash', 'Bank Transfer', 'UPI', 'Card', 'Cheque'],
+    default: 'Cash'
+  },
+  referenceNumber: { 
+    type: String 
+  }, // Specifically for Purchase Invoices
+  
   poNumber: { 
     type: String 
   },
@@ -28,7 +45,7 @@ const invoiceSchema = new mongoose.Schema({
   shippingAddress: { type: String },
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    variantId: { type: String, required: true }, // Added required variantId for stock tracking
+    variantId: { type: String, required: true },
     name: { type: String, required: true },
     quantity: { type: Number, default: 1 },
     price: { type: Number, default: 0 },
@@ -60,10 +77,6 @@ const invoiceSchema = new mongoose.Schema({
     enum: ['Paid', 'Pending', 'Overdue', 'Draft', 'Cancelled'], 
     default: 'Pending' 
   },
-  date: { 
-    type: Date, 
-    default: Date.now 
-  },
   dueDate: { 
     type: Date, 
     required: true 
@@ -88,10 +101,8 @@ const invoiceSchema = new mongoose.Schema({
 // Ensure unique invoice numbers per user
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true });
 
-// Calculation Hook: Runs before .save() 
-// Removed 'next' to prevent "next is not a function" errors with async/await
+// Calculation Hook
 invoiceSchema.pre('save', async function() {
-  // Ensure we are working with numbers to prevent NaN in DB
   const items = this.items || [];
   
   const calculatedSubtotal = items.reduce((acc, item) => {
@@ -108,7 +119,6 @@ invoiceSchema.pre('save', async function() {
   this.shipping = Number(this.shipping || 0);
   this.discount = Number(this.discount || 0);
 
-  // Final Total Calculation
   this.totalAmount = (this.subtotal + this.taxAmount + this.shipping) - this.discount;
 });
 

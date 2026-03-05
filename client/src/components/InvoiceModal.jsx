@@ -1,15 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Trash2, CreditCard, Save, Loader2, Plus, ShoppingCart, ShoppingBag } from 'lucide-react';
+import { X, Search, Trash2, CreditCard, Save, Loader2, Plus, ShoppingCart, ShoppingBag, Hash, Calendar, FileText } from 'lucide-react';
 import api from '../utils/api.js';
 import { toast } from 'react-toastify';
 
 const INITIAL_INVOICE = { 
   clientId: '', 
+  invoiceNumber: '',
+  invoiceDate: new Date().toISOString().split('T')[0],
   dueDate: '', 
   status: 'Pending',
   gstNumber: '',
   billingAddress: '',
   shippingAddress: '',
+  paymentTerms: '',
+  paymentMethod: 'Cash',
+  referenceNumber: '', // For Purchase bills
   discount: 0
 };
 
@@ -29,11 +34,16 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
       setType(editData.type || 'Sale');
       setInvoiceData({
         clientId: editData.client?._id || editData.client || '',
+        invoiceNumber: editData.invoiceNumber || '',
+        invoiceDate: editData.invoiceDate ? new Date(editData.invoiceDate).toISOString().split('T')[0] : '',
         dueDate: editData.dueDate ? new Date(editData.dueDate).toISOString().split('T')[0] : '',
         status: editData.status || 'Pending',
         gstNumber: editData.gstNumber || '',
         billingAddress: editData.billingAddress || '',
         shippingAddress: editData.shippingAddress || '',
+        paymentTerms: editData.paymentTerms || '',
+        paymentMethod: editData.paymentMethod || 'Cash',
+        referenceNumber: editData.referenceNumber || '',
         discount: editData.discount || 0
       });
       setSelectedItems(editData.items.map(item => ({
@@ -47,24 +57,23 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     } else if (isOpen) {
       handleReset();
       setType(initialType);
+      // Auto-generate a draft invoice number for Sales
+      if (initialType === 'Sale') {
+        setInvoiceData(prev => ({ ...prev, invoiceNumber: `INV-${Date.now().toString().slice(-6)}` }));
+      }
     }
   }, [editData, isOpen, initialType]);
 
   if (!isOpen) return null;
 
-  // --- Calculations ---
   const subtotal = selectedItems.reduce((sum, item) => sum + item.price * Number(item.quantity), 0);
   const taxAmount = subtotal * (Number(taxRate || 0) / 100);
   const totalAmount = (subtotal + taxAmount) - Number(invoiceData.discount || 0);
 
-  const filteredProducts = products.filter(p => 
-    p.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredProducts = products.filter(p => p.title.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const addItem = (product, variant) => {
-    const exists = selectedItems.find(item => item.variantId === variant._id);
-    if (exists) return toast.info("Item already added.");
-    
+    if (selectedItems.find(item => item.variantId === variant._id)) return toast.info("Item already added.");
     setSelectedItems([...selectedItems, {
       productId: product._id,
       variantId: variant._id,
@@ -83,19 +92,15 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     setSavedInvoiceId(null);
     setIsSubmitting(false);
     setPaymentDone(false);
-    setPaymentLoading(false);
   };
 
-  const handleClose = () => {
-    handleReset();
-    onClose();
-  };
+  const handleClose = () => { handleReset(); onClose(); };
 
   const handleSubmit = async (e) => {
-    if (e && e.preventDefault) e.preventDefault();
+    if (e?.preventDefault) e.preventDefault();
     if (isSubmitting || (savedInvoiceId && !editData)) return;
-
-    if (!invoiceData.clientId) return toast.warning(`Select a ${type === 'Sale' ? 'client' : 'vendor'}.`);
+    if (!invoiceData.clientId) return toast.warning("Select a party.");
+    if (!invoiceData.invoiceNumber && type === 'Sale') return toast.warning("Invoice number is required.");
     if (selectedItems.length === 0) return toast.warning('Add at least one product.');
 
     setIsSubmitting(true);
@@ -105,220 +110,170 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         type, 
         items: selectedItems, 
         taxRate: Number(taxRate),
-        totalAmount: Number(totalAmount),
-        discount: Number(invoiceData.discount)
+        totalAmount: Number(totalAmount)
       };
 
       if (editData) {
         await api.put(`/invoices/${editData._id}`, payload);
-        toast.success("✅ Record updated!");
+        toast.success("Updated!");
         onRefresh();
         handleClose();
       } else {
         const res = await api.post('/invoices', payload);
         setSavedInvoiceId(res.data._id);
-        toast.success(`✅ ${type} saved successfully!`);
+        toast.success(`${type} Saved!`);
         onRefresh();
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to save.');
+      toast.error(err.response?.data?.message || 'Save failed.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleRazorpayPayment = async () => {
-    const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
-    if (!razorpayKey || !savedInvoiceId) return;
-    if (accounts.length === 0) return toast.error("❌ No bank account found.");
-    
-    setPaymentLoading(true);
-    try {
-      const { data: order } = await api.post('/payments/create-order', { amount: totalAmount, currency: 'INR' });
-      const options = {
-        key: razorpayKey,
-        amount: order.amount,
-        currency: order.currency,
-        name: 'Business Ledger',
-        order_id: order.id,
-        handler: async (response) => {
-          try {
-            await api.post('/payments/verify', { ...response, invoiceId: savedInvoiceId, accountId: accounts[0]._id });
-            setPaymentDone(true);
-            toast.success("Payment Successful!");
-            onRefresh();
-            setTimeout(() => handleClose(), 1500);
-          } catch (err) { toast.error("Verification failed"); setPaymentLoading(false); }
-        },
-        modal: { ondismiss: () => setPaymentLoading(false) },
-        theme: { color: "#0f172a" },
-      };
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-    } catch (err) { toast.error("Could not initiate payment"); setPaymentLoading(false); }
-  };
-
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-[2.5rem] w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+      <div className="bg-white rounded-[2.5rem] w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col shadow-2xl">
         
         {/* Header */}
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-          <h2 className="text-xl font-black text-slate-800 uppercase">
-            {editData ? `Edit ${type}` : `New ${type} Entry`}
-          </h2>
-          <button onClick={handleClose} className="p-2 hover:bg-slate-200 rounded-full"><X /></button>
+          <div>
+            <h2 className="text-xl font-black text-slate-800 uppercase">{editData ? `Edit ${type}` : `New ${type}`}</h2>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Professional Billing Module</p>
+          </div>
+          <button onClick={handleClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X /></button>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+        <div className="p-8 overflow-y-auto space-y-8 flex-1">
           {/* TYPE TOGGLE */}
           {!editData && (
-            <div className="flex bg-slate-100 p-1 rounded-2xl w-full border border-slate-200">
-                <button type="button" onClick={() => setType('Sale')}
-                className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${type === 'Sale' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-400'}`}>
-                <ShoppingCart size={14}/> Sales Invoice
-                </button>
-                <button type="button" onClick={() => setType('Purchase')}
-                className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${type === 'Purchase' ? 'bg-white shadow-sm text-rose-600' : 'text-slate-400'}`}>
-                <ShoppingBag size={14}/> Purchase Invoice
-                </button>
+            <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full border border-slate-200">
+              <button onClick={() => setType('Sale')} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${type === 'Sale' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}><ShoppingCart size={14}/> Sales Invoice</button>
+              <button onClick={() => setType('Purchase')} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${type === 'Purchase' ? 'bg-white shadow-md text-rose-600' : 'text-slate-400 hover:text-slate-600'}`}><ShoppingBag size={14}/> Purchase Invoice</button>
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* DOCUMENT DETAILS SECTION */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="space-y-1 md:col-span-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
-                {type === 'Sale' ? 'Client / Customer' : 'Vendor / Supplier'}
-              </label>
-              <select className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs" value={invoiceData.clientId} onChange={(e) => setInvoiceData({ ...invoiceData, clientId: e.target.value })} required>
-                <option value="">Choose...</option>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><Hash size={10}/> {type === 'Sale' ? 'Invoice No.' : 'Bill/Ref No.'}</label>
+              <input type="text" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs focus:ring-2 focus:ring-indigo-500/20" value={type === 'Sale' ? invoiceData.invoiceNumber : invoiceData.referenceNumber} onChange={(e) => setInvoiceData({ ...invoiceData, [type === 'Sale' ? 'invoiceNumber' : 'referenceNumber']: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><Calendar size={10}/> Date</label>
+              <input type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs" value={invoiceData.invoiceDate} onChange={(e) => setInvoiceData({ ...invoiceData, invoiceDate: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><Calendar size={10}/> Due Date</label>
+              <input type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs" value={invoiceData.dueDate} onChange={(e) => setInvoiceData({ ...invoiceData, dueDate: e.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><FileText size={10}/> Payment Terms</label>
+              <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs" value={invoiceData.paymentTerms} onChange={(e) => setInvoiceData({ ...invoiceData, paymentTerms: e.target.value })}>
+                <option value="">Due on Receipt</option>
+                <option value="Net 15">Net 15</option>
+                <option value="Net 30">Net 30</option>
+                <option value="Net 60">Net 60</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">{type === 'Sale' ? 'Customer' : 'Supplier'}</label>
+              <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs" value={invoiceData.clientId} onChange={(e) => setInvoiceData({ ...invoiceData, clientId: e.target.value })}>
+                <option value="">Choose Party...</option>
                 {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Due Date</label>
-              <input type="date" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs" value={invoiceData.dueDate} onChange={(e) => setInvoiceData({ ...invoiceData, dueDate: e.target.value })} required />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
-                {type === 'Sale' ? 'Customer GST' : 'Vendor GST'}
-              </label>
-              <input type="text" placeholder="Optional" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs" value={invoiceData.gstNumber} onChange={(e) => setInvoiceData({ ...invoiceData, gstNumber: e.target.value })} />
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">GST Number</label>
+              <input type="text" placeholder="Optional" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs uppercase" value={invoiceData.gstNumber} onChange={(e) => setInvoiceData({ ...invoiceData, gstNumber: e.target.value })} />
             </div>
           </div>
 
-          {/* ADDRESS SECTION - Conditionally hide Shipping for Purchase */}
-          <div className={`grid grid-cols-1 ${type === 'Sale' ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-4`}>
+          {/* Address Fields */}
+          <div className={`grid grid-cols-1 ${type === 'Sale' ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-6`}>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
-                {type === 'Sale' ? 'Billing Address' : 'Vendor Address'}
-              </label>
-              <textarea placeholder="Full address..." rows="2" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs resize-none" value={invoiceData.billingAddress} onChange={(e) => setInvoiceData({ ...invoiceData, billingAddress: e.target.value })} />
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Billing Address</label>
+              <textarea placeholder="Address..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs resize-none" value={invoiceData.billingAddress} onChange={(e) => setInvoiceData({ ...invoiceData, billingAddress: e.target.value })} />
             </div>
             {type === 'Sale' && (
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Shipping Address</label>
-                <textarea placeholder="Delivery address..." rows="2" className="w-full p-4 bg-slate-100 rounded-2xl outline-none font-bold text-xs resize-none" value={invoiceData.shippingAddress} onChange={(e) => setInvoiceData({ ...invoiceData, shippingAddress: e.target.value })} />
+                <textarea placeholder="Delivery address..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs resize-none" value={invoiceData.shippingAddress} onChange={(e) => setInvoiceData({ ...invoiceData, shippingAddress: e.target.value })} />
               </div>
             )}
           </div>
 
-          {/* PRODUCT SEARCH */}
-          <div className="space-y-2 relative">
-            <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Add Items</label>
+          {/* Search & Items List - Kept your original logic but styled better */}
+          <div className="space-y-4">
             <div className="relative">
-              <Search className="absolute left-4 top-4 text-slate-400" size={20} />
-              <input type="text" placeholder="Search inventory..." className="w-full p-4 pl-12 bg-slate-100 rounded-2xl outline-none font-bold text-slate-800 border-2 border-transparent focus:border-indigo-500 transition-all text-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
-            </div>
-            {searchQuery && (
-              <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-2xl shadow-xl max-h-60 overflow-y-auto mt-1">
-                {filteredProducts.map(p => p.variants.map(v => (
-                  <div key={v._id} onClick={() => addItem(p, v)} className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b border-slate-50 last:border-0">
-                    <div>
-                      <p className="font-bold text-slate-800 text-sm">{p.title}</p>
-                      <p className="text-[10px] text-slate-500">{v.name} • Stock: {v.stock}</p>
-                    </div>
-                    <div className="text-right">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input type="text" placeholder="Search products and add..." className="w-full p-4 pl-12 bg-white border-2 border-slate-100 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              {searchQuery && (
+                <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-60 overflow-y-auto mt-2">
+                  {filteredProducts.map(p => p.variants.map(v => (
+                    <div key={v._id} onClick={() => addItem(p, v)} className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b last:border-0 transition-colors">
+                      <div>
+                        <p className="font-bold text-slate-800 text-sm">{p.title}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">{v.name} • Stock: {v.stock}</p>
+                      </div>
                       <p className="font-black text-indigo-600 text-sm">₹{v.price}</p>
-                      <Plus size={16} className="ml-auto text-slate-400" />
                     </div>
+                  )))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {selectedItems.map((item, index) => (
+                <div key={index} className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                  <div className="flex-1">
+                    <p className="font-bold text-slate-800 text-sm">{item.name}</p>
+                    <p className="text-[10px] text-slate-400 font-black uppercase">Rate: ₹{item.price}</p>
                   </div>
-                )))}
-              </div>
-            )}
-          </div>
-
-          {/* Selected Items List */}
-          <div className="space-y-3">
-            {selectedItems.map((item, index) => (
-              <div key={index} className="flex items-center gap-4 bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <div className="flex-1">
-                  <p className="font-bold text-slate-800 text-sm">{item.name}</p>
-                  <p className="text-[10px] text-slate-400 font-bold tracking-widest uppercase">Rate: ₹{item.price}</p>
+                  <div className="flex items-center gap-4">
+                    <input type="number" min={1} className="w-20 p-2 rounded-xl border-2 border-slate-50 text-center font-black text-sm" value={item.quantity} onChange={(e) => {
+                      const updated = [...selectedItems];
+                      updated[index].quantity = Number(e.target.value);
+                      setSelectedItems(updated);
+                    }} />
+                    <button onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))} className="text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition-colors"><Trash2 size={18} /></button>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">Qty</label>
-                  <input type="number" min={1} className="w-16 p-2 rounded-xl border text-center font-black text-slate-800 text-sm" value={item.quantity} onChange={(e) => {
-                    const updated = [...selectedItems];
-                    updated[index].quantity = Number(e.target.value);
-                    setSelectedItems(updated);
-                  }} />
-                </div>
-                <button type="button" onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))} className="text-rose-500 hover:bg-rose-100 p-2 rounded-xl transition-colors"><Trash2 size={18} /></button>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer Totals */}
+          <div className="p-8 bg-slate-900 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 w-full md:w-auto">
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tax Rate</p>
+                <input type="number" className="bg-white/10 border border-white/20 rounded-xl p-2 w-20 text-white font-black text-sm outline-none" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
               </div>
-            ))}
-          </div>
-
-          {/* TAX, DISCOUNT & SUBTOTAL CALCULATION */}
-          <div className="p-6 bg-slate-50 border border-slate-100 grid grid-cols-1 md:grid-cols-4 gap-4 rounded-4xl">
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Tax Rate (%)</label>
-              <input type="number" className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Discount</p>
+                <input type="number" className="bg-white/10 border border-white/20 rounded-xl p-2 w-24 text-white font-black text-sm outline-none" value={invoiceData.discount} onChange={(e) => setInvoiceData({...invoiceData, discount: e.target.value})} />
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tax Amt</p>
+                <p className="text-lg font-bold">₹{taxAmount.toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Grand Total</p>
+                <p className="text-3xl font-black">₹{totalAmount.toLocaleString()}</p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Discount (₹)</label>
-              <input type="number" className="w-full p-3 bg-white border border-slate-200 rounded-xl outline-none font-bold text-sm" value={invoiceData.discount} onChange={(e) => setInvoiceData({...invoiceData, discount: e.target.value})} />
-            </div>
-            <div className="flex flex-col justify-center items-end border-r border-slate-200 pr-4">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Subtotal</p>
-              <p className="text-sm font-bold text-slate-600">₹{subtotal.toLocaleString()}</p>
-            </div>
-            <div className="flex flex-col justify-center items-end">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Amt</p>
-              <p className="text-sm font-black text-indigo-600">₹{taxAmount.toLocaleString()}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className={`p-6 flex flex-col md:flex-row justify-between items-center gap-4 mt-auto transition-colors duration-500 ${type === 'Sale' ? 'bg-indigo-900' : 'bg-rose-900'}`}>
-          <div className="text-center md:text-left">
-            <p className="text-slate-300 text-[10px] font-black uppercase tracking-widest">
-                {type === 'Sale' ? 'Final Amount to Collect' : 'Final Amount to Pay'}
-            </p>
-            <p className="text-white text-4xl font-black tracking-tight">₹{totalAmount.toLocaleString()}</p>
-          </div>
-          <div className="flex flex-wrap justify-center gap-3">
-            <button 
-                onClick={handleSubmit} 
-                disabled={isSubmitting || (savedInvoiceId && !editData)} 
-                className="px-8 py-4 rounded-2xl font-black uppercase flex items-center gap-2 text-xs bg-white text-slate-900 hover:bg-slate-100 shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-              {editData ? 'Update' : (savedInvoiceId ? 'Saved' : 'Save')}
-            </button>
-
-            {/* ONLY SHOW RAZORPAY FOR SALES */}
-            {!editData && savedInvoiceId && !paymentDone && type === 'Sale' && (
-              <button onClick={handleRazorpayPayment} disabled={paymentLoading} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-blue-500 text-white flex items-center gap-2 shadow-lg hover:bg-blue-400">
-                {paymentLoading ? <Loader2 className="animate-spin" size={18} /> : <CreditCard size={18} />}
-                Pay Now
-              </button>
-            )}
             
-            <button onClick={handleClose} className="px-8 py-4 rounded-2xl font-black uppercase text-xs bg-black/20 text-white/80 hover:bg-black/40">
-              {savedInvoiceId ? 'Finish' : 'Cancel'}
-            </button>
+            <div className="flex gap-3 w-full md:w-auto">
+              <button onClick={handleSubmit} disabled={isSubmitting} className="flex-1 md:flex-none px-10 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all">
+                {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
+                {editData ? 'Update' : 'Save Invoice'}
+              </button>
+              <button onClick={handleClose} className="px-6 py-4 bg-white/10 text-white rounded-2xl font-black uppercase text-xs hover:bg-white/20">Cancel</button>
+            </div>
           </div>
         </div>
       </div>

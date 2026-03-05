@@ -5,8 +5,9 @@ export const createInvoice = async (req, res) => {
   try {
     const { 
       clientId, items, shipping, discount, type, 
-      invoiceNumber, dueDate, status, notes, poNumber, taxRate,
-      gstNumber, billingAddress, shippingAddress // Added
+      invoiceNumber, invoiceDate, dueDate, status, notes, 
+      paymentMethod, paymentTerms, referenceNumber,
+      poNumber, taxRate, gstNumber, billingAddress, shippingAddress 
     } = req.body; 
 
     if (!req.user?._id) return res.status(401).json({ message: "Auth failed" });
@@ -17,6 +18,7 @@ export const createInvoice = async (req, res) => {
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) return res.status(404).json({ message: `Product ${item.name} not found` });
+      
       const variant = product.variants.id(item.variantId);
       if (!variant) return res.status(404).json({ message: "Variant not found" });
 
@@ -34,6 +36,10 @@ export const createInvoice = async (req, res) => {
       user: req.user._id,
       client: clientId, 
       invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
+      invoiceDate: invoiceDate || new Date(),
+      paymentMethod,
+      paymentTerms,
+      referenceNumber,
       poNumber,
       gstNumber,
       billingAddress,
@@ -46,11 +52,12 @@ export const createInvoice = async (req, res) => {
       status: status || 'Pending',
       type: invoiceType,
       notes,
-      totalAmount: 0 
+      totalAmount: 0 // Hook in model handles final calculation
     });
 
     const savedInvoice = await invoice.save();
 
+    // Adjust Stock
     for (const item of validatedItems) {
       const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
       await Product.updateOne(
@@ -58,6 +65,7 @@ export const createInvoice = async (req, res) => {
         { $inc: { "variants.$.stock": adjustment } }
       );
     }
+    
     res.status(201).json(savedInvoice);
   } catch (error) {
     res.status(500).json({ message: "Creation failed", error: error.message });
@@ -80,8 +88,7 @@ export const updateInvoice = async (req, res) => {
     const oldInvoice = await Invoice.findById(req.params.id);
     if (!oldInvoice) return res.status(404).json({ message: "Not found" });
 
-    // --- NEW: REVERT OLD STOCK BEFORE APPLYING NEW ---
-    // This ensures if you change quantity from 10 to 2, the 8 items go back to stock.
+    // Revert old stock before applying update
     for (const item of oldInvoice.items) {
       const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
       await Product.updateOne(
@@ -90,10 +97,9 @@ export const updateInvoice = async (req, res) => {
       );
     }
 
-    // Apply updates (excluding user/id)
     const { _id, user, ...updateData } = req.body;
     
-    // Support both 'clientId' and 'client' from frontend
+    // Map clientId to client for Mongoose
     if (updateData.clientId) {
         updateData.client = updateData.clientId;
         delete updateData.clientId;
@@ -102,7 +108,7 @@ export const updateInvoice = async (req, res) => {
     Object.assign(oldInvoice, updateData);
     const updatedInvoice = await oldInvoice.save();
 
-    // --- APPLY NEW STOCK ---
+    // Apply new stock levels
     for (const item of updatedInvoice.items) {
       const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
       await Product.updateOne(
@@ -122,7 +128,7 @@ export const deleteInvoice = async (req, res) => {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ message: "Not found" });
 
-    // REVERT STOCK ON DELETE
+    // Revert stock on deletion
     for (const item of invoice.items) {
         const revertQty = (invoice.type === 'Purchase') ? -item.quantity : item.quantity;
         await Product.updateOne(
