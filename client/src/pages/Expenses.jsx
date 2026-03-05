@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../utils/api';
-import { Plus, Receipt, Trash2, Tag, X, Calendar, Edit2, ChevronDown } from 'lucide-react';
+import { 
+  Plus, Receipt, Trash2, Tag, X, Calendar, Edit2, 
+  ChevronDown, CreditCard, FileText, Link as LinkIcon 
+} from 'lucide-react';
 import { exportToCSV } from '../utils/exportCSV';
 import { CurrencyContext } from '../context/CurrencyContext';
 import { toast } from 'react-toastify';
 
 const Expenses = () => {
   const [expenses, setExpenses] = useState([]);
+  const [accounts, setAccounts] = useState([]); // To link expenses to bank accounts
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [editingId, setEditingId] = useState(null); 
   const { symbol } = useContext(CurrencyContext);
 
-  // Standard categories
   const categories = ['Software', 'Rent', 'Marketing', 'Travel', 'Salaries', 'Utilities', 'Other'];
+  const paymentMethods = ['Bank Transfer', 'Cash', 'Credit Card', 'Debit Card', 'Check', 'Other'];
 
   const [formData, setFormData] = useState({ 
     title: '', 
@@ -22,36 +25,39 @@ const Expenses = () => {
     category: 'Software', 
     currency: 'USD',
     expenseDate: new Date().toISOString().split('T')[0],
-    receiptUrl: '' 
+    receiptUrl: '',
+    paymentMethod: 'Bank Transfer',
+    paidFromAccount: '', 
+    notes: ''
   });
 
-  // State for the manual "Other" input
   const [otherCategory, setOtherCategory] = useState('');
-
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const fetchExpenses = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/expenses');
-      setExpenses(res.data);
+      const [expRes, accRes] = await Promise.all([
+        api.get('/expenses'),
+        api.get('/accounts')
+      ]);
+      setExpenses(expRes.data);
+      setAccounts(accRes.data);
     } catch (err) { 
-      setError("Failed to load expenses.");
+      toast.error("Failed to load data.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchExpenses();
+    fetchData();
   }, []);
 
   const handleEditClick = (exp) => {
     setEditingId(exp._id);
-    
-    // Check if the expense category is in our standard list
     const isStandardCategory = categories.includes(exp.category);
     
     setFormData({
@@ -60,24 +66,20 @@ const Expenses = () => {
       category: isStandardCategory ? exp.category : 'Other',
       currency: exp.currency || 'USD',
       expenseDate: new Date(exp.date).toISOString().split('T')[0],
-      receiptUrl: exp.receiptUrl || ''
+      receiptUrl: exp.receiptUrl || '',
+      paymentMethod: exp.paymentMethod || 'Bank Transfer',
+      paidFromAccount: exp.paidFromAccount?._id || exp.paidFromAccount || '',
+      notes: exp.notes || ''
     });
 
-    // If it's a custom category, populate the "Other" field
-    if (!isStandardCategory) {
-      setOtherCategory(exp.category);
-    } else if (exp.category === 'Other') {
-        setOtherCategory('');
-    }
-
+    if (!isStandardCategory) setOtherCategory(exp.category);
     setShowModal(true);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Validate custom category
     const finalCategory = formData.category === 'Other' ? otherCategory : formData.category;
+    
     if (formData.category === 'Other' && !otherCategory.trim()) {
         return toast.error("Please specify the category name");
     }
@@ -86,7 +88,7 @@ const Expenses = () => {
       const payload = {
         ...formData,
         amount: Number(formData.amount),
-        category: finalCategory, // Use the custom name if "Other" was picked
+        category: finalCategory,
         date: formData.expenseDate 
       };
 
@@ -99,21 +101,9 @@ const Expenses = () => {
       }
 
       handleCloseModal(); 
-      fetchExpenses();
+      fetchData();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to save");
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (window.confirm("Delete this expense record?")) {
-      try {
-        await api.delete(`/expenses/${id}`);
-        fetchExpenses();
-        toast.success("Expense deleted");
-      } catch (err) {
-        toast.error("Failed to delete");
-      }
     }
   };
 
@@ -123,7 +113,8 @@ const Expenses = () => {
     setOtherCategory('');
     setFormData({ 
       title: '', amount: '', category: 'Software', currency: 'USD',
-      expenseDate: new Date().toISOString().split('T')[0], receiptUrl: '' 
+      expenseDate: new Date().toISOString().split('T')[0], receiptUrl: '',
+      paymentMethod: 'Bank Transfer', paidFromAccount: '', notes: ''
     });
   };
 
@@ -170,7 +161,7 @@ const Expenses = () => {
         </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-4xl border border-slate-100 shadow-sm">
+        <div className="flex flex-col md:flex-row gap-4 mb-6 bg-white p-4 rounded-3xl border border-slate-100 shadow-sm">
           <input 
             type="text" placeholder="Search expenses..." 
             className="flex-1 px-4 py-2 bg-slate-50 rounded-xl outline-none text-sm font-medium"
@@ -194,24 +185,36 @@ const Expenses = () => {
                 </div>
                 <div>
                   <h3 className="font-bold text-slate-800">{exp.title}</h3>
-                  <div className="flex gap-3 mt-1">
+                  <div className="flex flex-wrap gap-3 mt-1">
                     <span className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-black uppercase flex items-center gap-1">
                       <Tag size={10} /> {exp.category}
                     </span>
                     <span className="text-[10px] text-slate-400 flex items-center gap-1 font-bold">
                       <Calendar size={10} /> {new Date(exp.date).toLocaleDateString()}
                     </span>
+                    {exp.paidFromAccount && (
+                      <span className="text-[10px] text-blue-500 flex items-center gap-1 font-bold">
+                        <CreditCard size={10} /> {exp.paidFromAccount.bankName || 'Account'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
               
               <div className="flex items-center gap-4">
-                <span className="font-black text-slate-900 text-lg">
-                  -{symbol}{Number(exp.amount).toLocaleString()}
-                </span>
+                <div className="text-right">
+                  <span className="font-black text-slate-900 text-lg">
+                    -{symbol}{Number(exp.amount).toLocaleString()}
+                  </span>
+                  {exp.receiptUrl && (
+                    <a href={exp.receiptUrl} target="_blank" rel="noreferrer" className="text-[10px] text-indigo-500 hover:underline flex items-center justify-end gap-1">
+                      <LinkIcon size={10}/> View Receipt
+                    </a>
+                  )}
+                </div>
                 <div className="flex gap-1">
                   <button onClick={() => handleEditClick(exp)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors"><Edit2 size={16}/></button>
-                  <button onClick={() => handleDelete(exp._id)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
+                  <button onClick={() => api.delete(`/expenses/${exp._id}`).then(fetchData)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
                 </div>
               </div>
             </div>
@@ -221,8 +224,8 @@ const Expenses = () => {
 
       {/* CREATE/EDIT MODAL */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl overflow-hidden border border-white">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl my-auto border border-white">
             <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
               <h3 className="text-xl font-black text-slate-900">
                 {editingId ? 'Edit Record' : 'New Expense'}
@@ -231,17 +234,17 @@ const Expenses = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="p-8 space-y-5">
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Title</label>
-                <input 
-                  type="text" placeholder="e.g. Office Stationery" required 
-                  className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-rose-500/20 font-bold text-sm" 
-                  value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})} 
-                />
-              </div>
-
               <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Title</label>
+                  <input 
+                    type="text" placeholder="e.g. Office Stationery" required 
+                    className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-rose-500/20 font-bold text-sm" 
+                    value={formData.title}
+                    onChange={(e) => setFormData({...formData, title: e.target.value})} 
+                  />
+                </div>
+
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Amount</label>
                   <input 
@@ -251,6 +254,7 @@ const Expenses = () => {
                     onChange={(e) => setFormData({...formData, amount: e.target.value})} 
                   />
                 </div>
+
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Category</label>
                   <div className="relative">
@@ -266,32 +270,42 @@ const Expenses = () => {
                 </div>
               </div>
 
-              {/* CONDITIONAL "OTHER" INPUT */}
               {formData.category === 'Other' && (
-                <div className="animate-in slide-in-from-top-2 duration-300">
-                  <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest mb-2 block ml-1">Specify Category Name</label>
-                  <input 
-                    type="text" placeholder="Enter custom category..." required 
-                    className="w-full p-4 rounded-2xl bg-rose-50/30 border border-rose-100 outline-none focus:ring-2 focus:ring-rose-500/20 font-bold text-sm text-rose-700" 
-                    value={otherCategory}
-                    onChange={(e) => setOtherCategory(e.target.value)} 
-                  />
-                </div>
+                <input 
+                  type="text" placeholder="Specify category name..." required 
+                  className="w-full p-4 rounded-2xl bg-rose-50/30 border border-rose-100 outline-none font-bold text-sm text-rose-700" 
+                  value={otherCategory}
+                  onChange={(e) => setOtherCategory(e.target.value)} 
+                />
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Currency</label>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Paid From</label>
                   <select 
                     className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-sm"
-                    value={formData.currency}
-                    onChange={(e) => setFormData({...formData, currency: e.target.value})}
+                    value={formData.paidFromAccount}
+                    onChange={(e) => setFormData({...formData, paidFromAccount: e.target.value})}
                   >
-                    <option value="USD">USD ($)</option>
-                    <option value="INR">INR (₹)</option>
-                    <option value="EUR">EUR (€)</option>
+                    <option value="">Select Account</option>
+                    {accounts.map(acc => (
+                      <option key={acc._id} value={acc._id}>{acc.bankName} ({symbol}{acc.balance})</option>
+                    ))}
                   </select>
                 </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Payment Method</label>
+                  <select 
+                    className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-sm"
+                    value={formData.paymentMethod}
+                    onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})}
+                  >
+                    {paymentMethods.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Date</label>
                   <input 
@@ -301,13 +315,31 @@ const Expenses = () => {
                     onChange={(e) => setFormData({...formData, expenseDate: e.target.value})} 
                   />
                 </div>
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Receipt Link</label>
+                  <input 
+                    type="text" placeholder="https://..." 
+                    className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-sm" 
+                    value={formData.receiptUrl}
+                    onChange={(e) => setFormData({...formData, receiptUrl: e.target.value})} 
+                  />
+                </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <button type="submit" className="flex-1 bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-rose-600 transition-all">
-                  {editingId ? 'Update Record' : 'Confirm Expense'}
-                </button>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Notes</label>
+                <textarea 
+                  rows="2"
+                  placeholder="Additional details..."
+                  className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-sm resize-none" 
+                  value={formData.notes}
+                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                ></textarea>
               </div>
+
+              <button type="submit" className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-slate-200 hover:bg-rose-600 transition-all">
+                {editingId ? 'Update Record' : 'Confirm Expense'}
+              </button>
             </form>
           </div>
         </div>

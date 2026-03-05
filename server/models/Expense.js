@@ -15,19 +15,31 @@ const expenseSchema = new mongoose.Schema({
     type: Number, 
     required: true 
   },
-  // Added: Currency field to store what the user selected (USD, INR, etc.)
   currency: { 
     type: String, 
     default: 'USD' 
   },
-  // Added: The result of the exchange rate conversion for your charts
   convertedAmount: { 
     type: Number 
   },
   category: { 
     type: String, 
-    // Note: Removed 'enum' to allow custom "Other" categories from the frontend
     default: 'Other',
+    trim: true
+  },
+  // --- New Expense Tracking Fields ---
+  paymentMethod: {
+    type: String,
+    enum: ['Bank Transfer', 'Cash', 'Credit Card', 'Debit Card', 'Check', 'Other'],
+    default: 'Bank Transfer'
+  },
+  paidFromAccount: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Account',
+    required: false // Optional if paid by cash not tracked in a bank account
+  },
+  notes: {
+    type: String,
     trim: true
   },
   status: {
@@ -47,5 +59,4 @@ const expenseSchema = new mongoose.Schema({
 });
 
 const Expense = mongoose.model('Expense', expenseSchema);
-
 export default Expense;

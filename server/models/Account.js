@@ -25,11 +25,17 @@ const AccountSchema = new mongoose.Schema({
     type: String, 
     sparse: true 
   },
+  // --- New Info Field ---
+  notes: {
+    type: String,
+    trim: true
+  },
   createdAt: { 
     type: Date, 
     default: Date.now 
   }
 });
+
 AccountSchema.index({ userId: 1, accountNumber: 1 }, { unique: true });
 
 export default mongoose.model('Account', AccountSchema);

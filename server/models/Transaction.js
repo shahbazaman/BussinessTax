@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 const TransactionSchema = new mongoose.Schema({
-  // Use userId to match your Auth and Employee logic
   userId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User', 
@@ -12,7 +11,6 @@ const TransactionSchema = new mongoose.Schema({
     ref: 'Account', 
     required: true 
   },
-  // Made optional because Expenses (like Payroll) don't have a "toAccount" in the system
   toAccount: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Account',
@@ -22,14 +20,12 @@ const TransactionSchema = new mongoose.Schema({
     type: Number, 
     required: true 
   },
-  // Added Type to distinguish between money moving in vs out
   type: {
     type: String,
     enum: ['Income', 'Expense', 'Transfer'],
     required: true,
     default: 'Transfer'
   },
-  // Added Category for your Reports tab
   category: {
     type: String,
     default: 'General'
@@ -37,6 +33,18 @@ const TransactionSchema = new mongoose.Schema({
   description: { 
     type: String, 
     default: 'Internal Transfer' 
+  },
+  // --- New Detailed Fields ---
+  transferDate: {
+    type: Date,
+    default: Date.now
+  },
+  notes: {
+    type: String,
+    trim: true
+  },
+  receiptUrl: {
+    type: String
   },
   status: { 
     type: String, 

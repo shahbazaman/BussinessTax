@@ -7,7 +7,19 @@ export const addTransaction = async (req, res) => {
   session.startTransaction();
 
   try {
-    const { fromAccount, toAccount, amount, type, category, description, timestamp } = req.body;
+    const { 
+      fromAccount, 
+      toAccount, 
+      amount, 
+      type, 
+      category, 
+      description, 
+      timestamp,
+      notes,        // New field
+      transferDate, // New field (to allow custom dates)
+      receiptUrl    // New field
+    } = req.body;
+    
     const userId = req.user._id;
 
     // 1. Validation: Ensure the "fromAccount" exists and belongs to the user
@@ -16,22 +28,19 @@ export const addTransaction = async (req, res) => {
 
     // 2. Core Logic based on Transaction Type
     if (type === 'Expense') {
-      // Deduct from source
+      if (sourceAccount.balance < Number(amount)) throw new Error("Insufficient funds in source account.");
       sourceAccount.balance -= Number(amount);
       await sourceAccount.save({ session });
     } 
-    
     else if (type === 'Income') {
-      // Add to source
       sourceAccount.balance += Number(amount);
       await sourceAccount.save({ session });
     } 
-    
     else if (type === 'Transfer') {
-      // Must have a destination account
       if (!toAccount) throw new Error("Destination account required for transfers.");
       const destAccount = await Account.findOne({ _id: toAccount, userId });
       if (!destAccount) throw new Error("Destination account not found.");
+      if (sourceAccount.balance < Number(amount)) throw new Error("Insufficient funds for transfer.");
 
       sourceAccount.balance -= Number(amount);
       destAccount.balance += Number(amount);
@@ -40,7 +49,7 @@ export const addTransaction = async (req, res) => {
       await destAccount.save({ session });
     }
 
-    // 3. Create the Transaction Record
+    // 3. Create the Transaction Record with New Fields
     const newTransaction = new Transaction({
       userId,
       fromAccount,
@@ -49,6 +58,10 @@ export const addTransaction = async (req, res) => {
       type,
       category: category || 'General',
       description: description || `${type} recorded`,
+      notes: notes || '',
+      transferDate: transferDate || timestamp || new Date(),
+      receiptUrl: receiptUrl || '',
+      status: 'Completed',
       timestamp: timestamp || new Date()
     });
 
@@ -66,11 +79,11 @@ export const addTransaction = async (req, res) => {
 
 export const getTransactions = async (req, res) => {
   try {
-    // We populate the bank names so the frontend can show "Bank A -> Bank B"
+    // Populate account names for UI clarity
     const transactions = await Transaction.find({ userId: req.user._id })
       .populate('fromAccount', 'bankName')
       .populate('toAccount', 'bankName')
-      .sort({ timestamp: -1 });
+      .sort({ transferDate: -1, timestamp: -1 }); // Sorted by transfer date primarily
 
     res.json(transactions);
   } catch (error) {
@@ -92,15 +105,18 @@ export const deleteTransaction = async (req, res) => {
     if (transaction.type === 'Expense') {
       sourceAccount.balance += transaction.amount;
     } else if (transaction.type === 'Income') {
+      // Logic check: only revert if balance won't go negative, or allow it based on your policy
       sourceAccount.balance -= transaction.amount;
     } else if (transaction.type === 'Transfer') {
       const destAccount = await Account.findById(transaction.toAccount);
-      sourceAccount.balance += transaction.amount;
-      destAccount.balance -= transaction.amount;
-      await destAccount.save({ session });
+      if (destAccount) {
+        sourceAccount.balance += transaction.amount;
+        destAccount.balance -= transaction.amount;
+        await destAccount.save({ session });
+      }
     }
 
-    await sourceAccount.save({ session });
+    if (sourceAccount) await sourceAccount.save({ session });
     await Transaction.findByIdAndDelete(req.params.id).session(session);
 
     await session.commitTransaction();
@@ -112,19 +128,18 @@ export const deleteTransaction = async (req, res) => {
     session.endSession();
   }
 };
+
 export const getTransactionReports = async (req, res) => {
   try {
     const userId = req.user._id;
 
     const report = await Transaction.aggregate([
-      // 1. Filter: Only this user's Expenses
       { 
         $match: { 
           userId: new mongoose.Types.ObjectId(userId), 
           type: 'Expense' 
         } 
       },
-      // 2. Group: Group by category and sum the amounts
       { 
         $group: { 
           _id: "$category", 
@@ -132,7 +147,6 @@ export const getTransactionReports = async (req, res) => {
           count: { $sum: 1 }
         } 
       },
-      // 3. Sort: Highest spending first
       { $sort: { totalAmount: -1 } }
     ]);
 

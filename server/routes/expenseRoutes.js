@@ -6,13 +6,21 @@ import { deleteExpense } from '../controllers/expenseController.js';
 
 const router = express.Router();
 
+// @desc    Create new expense with Payment Details & Currency Conversion
+// @route   POST /api/expenses
 router.post('/', protect, async (req, res) => {
   try {
-    const { title, category, amount, currency, date } = req.body;
+    const { 
+      title, category, amount, currency, date, 
+      paymentMethod, paidFromAccount, notes, receiptUrl 
+    } = req.body;
+    
     const userId = req.user._id;
     if (!userId) {
       return res.status(401).json({ message: 'User context missing' });
     }
+
+    // --- Currency Conversion Logic ---
     let convertedAmount = amount;
     const homeCurrency = process.env.HOME_CURRENCY || 'USD';
 
@@ -35,6 +43,10 @@ router.post('/', protect, async (req, res) => {
       amount,
       currency,
       convertedAmount,
+      paymentMethod: paymentMethod || 'Bank Transfer',
+      paidFromAccount: paidFromAccount || null,
+      notes: notes || '',
+      receiptUrl: receiptUrl || '',
       date: date || new Date()
     });
 
@@ -45,10 +57,15 @@ router.post('/', protect, async (req, res) => {
   }
 });
 
+// @desc    Get all user expenses
+// @route   GET /api/expenses
 router.get('/', protect, async (req, res) => {
   try {
     const userId = req.user._id;
-    const expenses = await Expense.find({ user: userId }).sort({ date: -1 });
+    // Population allows us to see the Bank Name instead of just an ID in the frontend
+    const expenses = await Expense.find({ user: userId })
+      .populate('paidFromAccount', 'bankName')
+      .sort({ date: -1 });
     res.json(expenses);
   } catch (error) {
     console.error('Get Expenses Error:', error.message);
@@ -56,6 +73,8 @@ router.get('/', protect, async (req, res) => {
   }
 });
 
+// @desc    Update an expense
+// @route   PUT /api/expenses/:id
 router.put('/:id', protect, async (req, res) => {
   try {
     const expense = await Expense.findById(req.params.id);    
@@ -65,12 +84,22 @@ router.put('/:id', protect, async (req, res) => {
     if (expense.user.toString() !== req.user._id.toString()) {
       return res.status(401).json({ message: 'Not authorized' });
     }
-    const { title, amount, category, date, receiptUrl } = req.body;
+
+    const { 
+      title, amount, category, date, 
+      receiptUrl, paymentMethod, paidFromAccount, notes 
+    } = req.body;
+
+    // Update with new fields
     expense.title = title || expense.title;
     expense.amount = amount || expense.amount;
     expense.category = category || expense.category;
     expense.date = date || expense.date;
     expense.receiptUrl = receiptUrl || expense.receiptUrl;
+    expense.paymentMethod = paymentMethod || expense.paymentMethod;
+    expense.paidFromAccount = paidFromAccount || expense.paidFromAccount;
+    expense.notes = notes || expense.notes;
+
     const updatedExpense = await expense.save();
     res.json(updatedExpense);
   } catch (error) {

@@ -265,7 +265,7 @@ const Clients = () => {
                 {showAdvanced && (
                   <div className="mt-6 space-y-8 animate-in slide-in-from-top-4 duration-300">
                     {/* Financials */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-[2rem]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-4xl">
                       <div className="space-y-3">
                         <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1"><CreditCard size={12}/> Payment Terms</label>
                         <select className="w-full p-3 bg-white rounded-xl font-bold text-sm outline-none shadow-sm" value={formData.paymentTerms} onChange={(e) => setFormData({...formData, paymentTerms: e.target.value})}>

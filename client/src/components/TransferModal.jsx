@@ -1,55 +1,83 @@
-import React, { useState } from 'react';
-import { X, ArrowRightLeft, Send } from 'lucide-react';
+import React, { useState, useContext } from 'react';
+import { X, ArrowRightLeft, Send, AlertCircle } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
+import { CurrencyContext } from '../context/CurrencyContext';
 
 const TransferModal = ({ isOpen, onClose, accounts, onRefresh }) => {
+  const { symbol } = useContext(CurrencyContext);
   const [transferData, setTransferData] = useState({
     fromId: '',
     toId: '',
     amount: '',
     description: ''
   });
-  // Inside TransferModal.jsx
-const sourceAccount = accounts.find(a => a._id === transferData.fromId);
-const isInvalid = !sourceAccount || Number(transferData.amount) > sourceAccount.balance;
+  const [loading, setLoading] = useState(false);
+
+  if (!isOpen) return null;
+
+  // Validation Logic
+  const sourceAccount = accounts.find(a => a._id === transferData.fromId);
+  const isInsufficient = sourceAccount && Number(transferData.amount) > sourceAccount.balance;
+  const isSameAccount = transferData.fromId && transferData.fromId === transferData.toId;
+  const isInvalid = !transferData.fromId || !transferData.toId || !transferData.amount || isInsufficient || isSameAccount;
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isInvalid) return;
+
+    setLoading(true);
     try {
-        const payload = { 
-      ...transferData, 
-      amount: Number(transferData.amount)};
-      await api.post('/accounts/transfer', transferData);
-      toast.success("Transfer Completed!");
+      const payload = { 
+        ...transferData, 
+        amount: Number(transferData.amount)
+      };
+      
+      await api.post('/accounts/transfer', payload);
+      toast.success("Internal transfer successful!");
+      
+      // Reset and close
+      setTransferData({ fromId: '', toId: '', amount: '', description: '' });
       onRefresh();
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || "Transfer failed");
+    } finally {
+      setLoading(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-[3rem] w-full max-w-md p-8 shadow-2xl">
+      <div className="bg-white rounded-[3rem] w-full max-w-md p-8 shadow-2xl animate-in zoom-in duration-200">
         <div className="flex justify-between items-center mb-8">
           <h2 className="text-2xl font-black text-slate-800 flex items-center gap-3">
             <ArrowRightLeft className="text-blue-600" /> Internal Move
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full"><X /></button>
+          <button 
+            onClick={onClose} 
+            className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"
+          >
+            <X size={24} />
+          </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {/* Source Account */}
           <div>
-            <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block">Source Account</label>
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block tracking-widest">Source Account</label>
             <select 
-              className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold"
+              className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-slate-700 focus:ring-2 focus:ring-blue-500/20"
+              value={transferData.fromId}
               onChange={(e) => setTransferData({...transferData, fromId: e.target.value})}
               required
             >
               <option value="">Select Source</option>
-              {accounts.map(a => <option key={a._id} value={a._id}>{a.bankName} (${a.balance})</option>)}
+              {accounts.map(a => (
+                <option key={a._id} value={a._id}>
+                  {a.bankName} ({symbol}{a.balance.toLocaleString()})
+                </option>
+              ))}
             </select>
           </div>
 
@@ -59,35 +87,65 @@ const isInvalid = !sourceAccount || Number(transferData.amount) > sourceAccount.
             </div>
           </div>
 
+          {/* Destination Account */}
           <div>
-            <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block">Destination Account</label>
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block tracking-widest">Destination Account</label>
             <select 
-              className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold"
+              className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-slate-700 focus:ring-2 focus:ring-blue-500/20"
+              value={transferData.toId}
               onChange={(e) => setTransferData({...transferData, toId: e.target.value})}
               required
             >
               <option value="">Select Destination</option>
-              {accounts.map(a => <option key={a._id} value={a._id}>{a.bankName}</option>)}
+              {accounts.filter(a => a._id !== transferData.fromId).map(a => (
+                <option key={a._id} value={a._id}>{a.bankName}</option>
+              ))}
             </select>
           </div>
 
+          {/* Amount */}
           <div className="pt-4">
-            <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block">Amount to Transfer</label>
-            <input 
-              type="number"
-              placeholder="0.00"
-              className="w-full p-5 bg-blue-50/50 rounded-2xl border-none outline-none font-black text-2xl text-blue-600"
-              onChange={(e) => setTransferData({...transferData, amount: e.target.value})}
-              required
-            />
+            <label className="text-[10px] font-black uppercase text-slate-400 ml-4 mb-2 block tracking-widest">Amount to Transfer</label>
+            <div className="relative">
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 font-black text-2xl text-blue-400">{symbol}</span>
+              <input 
+                type="number"
+                placeholder="0.00"
+                className={`w-full p-5 pl-12 bg-blue-50/50 rounded-2xl border-none outline-none font-black text-2xl transition-colors ${
+                  isInsufficient ? 'text-rose-500 bg-rose-50' : 'text-blue-600'
+                }`}
+                value={transferData.amount}
+                onChange={(e) => setTransferData({...transferData, amount: e.target.value})}
+                required
+              />
+            </div>
+            {isInsufficient && (
+              <p className="text-rose-500 text-[10px] font-bold mt-2 ml-4 flex items-center gap-1">
+                <AlertCircle size={12} /> Exceeds available balance
+              </p>
+            )}
           </div>
 
-          {/* <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-3xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all mt-4 shadow-xl shadow-blue-100">
-            <Send size={20} /> Execute Transfer
-          </button> */}
-<button disabled={isInvalid} className={`w-full bg-blue-600 text-white py-5 rounded-3xl font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 transition-all mt-4 shadow-xl shadow-blue-100 ${isInvalid ? 'bg-slate-200 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} ...`}>
-  {isInvalid ? 'Insufficient Funds' : <><Send size={20} />Execute Transfer</>}
-</button>
+          {/* Submit Button */}
+          <button 
+            type="submit"
+            disabled={isInvalid || loading} 
+            className={`w-full py-5 rounded-3xl font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all mt-6 shadow-xl ${
+              isInvalid || loading
+                ? 'bg-slate-100 text-slate-400 cursor-not-allowed shadow-none' 
+                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-100 active:scale-95'
+            }`}
+          >
+            {loading ? (
+              "Processing..."
+            ) : isInsufficient ? (
+              "Insufficient Funds"
+            ) : isSameAccount ? (
+              "Invalid Destination"
+            ) : (
+              <><Send size={20} /> Execute Transfer</>
+            )}
+          </button>
         </form>
       </div>
     </div>
