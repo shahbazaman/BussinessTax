@@ -3,7 +3,7 @@ import api from '../utils/api';
 import { 
   Plus, Search, Mail, Phone, Trash2, X, User, ExternalLink, 
   Loader2, Edit2, Building2, ShieldCheck, MapPin, ChevronDown, 
-  CreditCard, Landmark 
+  CreditCard, Truck, Copy
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CurrencyContext } from '../context/CurrencyContext';
@@ -19,23 +19,19 @@ const Clients = () => {
   
   const navigate = useNavigate();
 
-  // Advanced Form State
+  // Updated Form State with Shipping & Client Type
   const initialFormState = {
     name: '',
     email: '',
     phone: '',
+    clientType: 'Individual', 
     businessName: '',
     taxId: '',
     paymentTerms: 'Immediate',
     creditLimit: 0,
     openingBalance: 0,
-    billingAddress: {
-      street: '',
-      city: '',
-      state: '',
-      zip: '',
-      country: ''
-    }
+    billingAddress: { street: '', city: '', state: '', zip: '', country: '' },
+    shippingAddress: { street: '', city: '', state: '', zip: '', country: '' }
   };
 
   const [formData, setFormData] = useState(initialFormState);
@@ -67,7 +63,8 @@ const Clients = () => {
     setFormData({
       ...initialFormState,
       ...client,
-      billingAddress: client.billingAddress || initialFormState.billingAddress
+      billingAddress: client.billingAddress || initialFormState.billingAddress,
+      shippingAddress: client.shippingAddress || initialFormState.shippingAddress
     });
     setShowModal(true);
   };
@@ -83,12 +80,12 @@ const Clients = () => {
       setShowModal(false);
       fetchClients();
     } catch (err) {
-      alert(`Failed to ${editingClient ? 'update' : 'add'} client`);
+      alert(`Failed to save client data`);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure? This will not delete their invoices but will remove them from this directory.")) {
+    if (window.confirm("Are you sure? This will remove the client from the directory.")) {
       try {
         await api.delete(`/clients/${id}`);
         fetchClients();
@@ -96,6 +93,13 @@ const Clients = () => {
         alert("Delete failed");
       }
     }
+  };
+
+  const copyBillingToShipping = () => {
+    setFormData({
+      ...formData,
+      shippingAddress: { ...formData.billingAddress }
+    });
   };
 
   const filteredClients = clients.filter(c => 
@@ -120,8 +124,8 @@ const Clients = () => {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
               <input 
                 type="text" 
-                placeholder="Search clients or companies..."
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500/20 focus:border-green-500 text-sm transition-all"
+                placeholder="Search clients..."
+                className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm transition-all"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -145,12 +149,11 @@ const Clients = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredClients.length > 0 ? (
               filteredClients.map((client) => (
-                <div key={client._id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl hover:border-green-100 transition-all group relative">
+                <div key={client._id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition-all group relative">
                   <div className="flex justify-between items-start mb-5">
-                    <div className="w-14 h-14 bg-linear-to-br from-green-50 to-emerald-50 text-green-600 rounded-2xl flex items-center justify-center font-black text-2xl shadow-inner border border-green-100">
-                      {client.name.charAt(0).toUpperCase()}
+                    <div className="w-14 h-14 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center font-black text-2xl border border-slate-100 uppercase">
+                      {client.name.charAt(0)}
                     </div>
-                    
                     <div className="flex gap-1">
                       <button onClick={() => handleEdit(client)} className="p-2 text-slate-200 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-all">
                         <Edit2 size={18} />
@@ -161,7 +164,12 @@ const Clients = () => {
                     </div>
                   </div>
                   
-                  <h3 className="font-bold text-slate-800 text-xl mb-1">{client.name}</h3>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-bold text-slate-800 text-xl">{client.name}</h3>
+                    <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter ${client.clientType === 'Business' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                      {client.clientType}
+                    </span>
+                  </div>
                   <p className="text-xs font-bold text-green-600 mb-4 flex items-center gap-1 uppercase tracking-wider">
                     <Building2 size={12} /> {client.businessName || 'Individual Account'}
                   </p>
@@ -170,14 +178,8 @@ const Clients = () => {
                     <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
                       <Mail size={14} className="text-slate-300" /> {client.email}
                     </div>
-                    {client.phone && (
-                      <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-                        <Phone size={14} className="text-slate-300" /> {client.phone}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Stats Section */}
                   <div className="grid grid-cols-2 gap-4 py-4 border-t border-slate-50 bg-slate-50/50 rounded-3xl px-4 mb-4">
                     <div>
                       <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Revenue</p>
@@ -191,7 +193,7 @@ const Clients = () => {
 
                   <button 
                     onClick={() => navigate(`/invoices?clientId=${client._id}`)} 
-                    className="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-bold hover:bg-slate-900 hover:text-white hover:border-slate-900 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-bold hover:bg-slate-900 hover:text-white transition-all flex items-center justify-center gap-2"
                   >
                     <ExternalLink size={14} /> View History
                   </button>
@@ -208,78 +210,48 @@ const Clients = () => {
         )}
       </div>
 
-      {/* Add/Edit Client Modal - ADVANCED VERSION */}
+      {/* Add/Edit Client Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-white rounded-[3rem] w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in duration-200 my-auto overflow-hidden">
-            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10">
-              <div>
-                <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
-                  {editingClient ? 'Edit Professional Profile' : 'New Client Onboarding'}
-                </h3>
-              </div>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm transition-colors">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[3rem] w-full max-w-2xl max-h-[90vh] shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden flex flex-col">
+            <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+              <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">
+                {editingClient ? 'Edit Client Profile' : 'New Client Onboarding'}
+              </h3>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm">
                 <X size={20}/>
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-8 max-h-[70vh] overflow-y-auto">
+            <form onSubmit={handleSubmit} className="p-8 overflow-y-auto no-scrollbar flex-1">
+              {/* Client Type Toggle */}
+              <div className="flex p-1 bg-slate-100 rounded-2xl w-fit mb-8">
+                {['Individual', 'Business'].map((type) => (
+                  <button key={type} type="button" onClick={() => setFormData({...formData, clientType: type})}
+                    className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${formData.clientType === type ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>
+                    {type}
+                  </button>
+                ))}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* --- Primary Contact Section --- */}
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-[0.2em] mb-4">Contact Information</h4>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Full Name *</label>
-                    <div className="relative group">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
-                      <input required type="text" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
-                        value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Email *</label>
-                    <div className="relative group">
-                      <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
-                      <input required type="email" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
-                        value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Phone</label>
-                    <div className="relative group">
-                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
-                      <input type="tel" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
-                        value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
-                    </div>
-                  </div>
+                  <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Core Identity</h4>
+                  <input required placeholder="Full Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                    value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
+                  <input required type="email" placeholder="Email Address" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                    value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
                 </div>
 
-                {/* --- Business Identification Section --- */}
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em] mb-4">Business ID</h4>
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Company Name</label>
-                    <div className="relative group">
-                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
-                      <input type="text" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
-                        value={formData.businessName} onChange={(e) => setFormData({...formData, businessName: e.target.value})} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block ml-1">Tax ID / VAT / GST</label>
-                    <div className="relative group">
-                      <ShieldCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-green-500 transition-colors" size={18} />
-                      <input type="text" placeholder="e.g. TAX-99800" className="w-full pl-11 p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
-                        value={formData.taxId} onChange={(e) => setFormData({...formData, taxId: e.target.value})} />
-                    </div>
-                  </div>
+                  <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1">Business Specs</h4>
+                  <input placeholder="Company Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                    value={formData.businessName} onChange={(e) => setFormData({...formData, businessName: e.target.value})} disabled={formData.clientType === 'Individual'} />
+                  <input placeholder="Tax ID / GST" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                    value={formData.taxId} onChange={(e) => setFormData({...formData, taxId: e.target.value})} />
                 </div>
               </div>
 
-              {/* --- Advanced Settings Toggle --- */}
               <div className="mt-8 pt-6 border-t border-slate-100">
                 <button 
                   type="button" 
@@ -287,46 +259,51 @@ const Clients = () => {
                   className="flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-all font-black text-[10px] uppercase tracking-widest"
                 >
                   <ChevronDown className={`transition-transform duration-300 ${showAdvanced ? 'rotate-180' : ''}`} size={16} />
-                  Financial & Address Details
+                  Financials & Addresses
                 </button>
 
                 {showAdvanced && (
-                  <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-8 animate-in slide-in-from-top-4 duration-300">
-                    <div className="space-y-4">
-                      <h5 className="text-[10px] font-bold text-slate-800 flex items-center gap-2"><CreditCard size={12}/> Billing Defaults</h5>
-                      <select 
-                        className="w-full p-4 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold border-r-8 border-transparent"
-                        value={formData.paymentTerms} onChange={(e) => setFormData({...formData, paymentTerms: e.target.value})}
-                      >
-                        <option value="Immediate">Due on Receipt</option>
-                        <option value="Net 15">Net 15 Days</option>
-                        <option value="Net 30">Net 30 Days</option>
-                        <option value="Net 60">Net 60 Days</option>
-                      </select>
-                      
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Credit Limit ({symbol})</label>
-                          <input type="number" className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm font-bold" 
-                            value={formData.creditLimit} onChange={(e) => setFormData({...formData, creditLimit: e.target.value})} />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Opening Bal ({symbol})</label>
-                          <input type="number" className="w-full p-3 bg-slate-50 rounded-xl outline-none text-sm font-bold" 
-                            value={formData.openingBalance} onChange={(e) => setFormData({...formData, openingBalance: e.target.value})} />
-                        </div>
+                  <div className="mt-6 space-y-8 animate-in slide-in-from-top-4 duration-300">
+                    {/* Financials */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-[2rem]">
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1"><CreditCard size={12}/> Payment Terms</label>
+                        <select className="w-full p-3 bg-white rounded-xl font-bold text-sm outline-none shadow-sm" value={formData.paymentTerms} onChange={(e) => setFormData({...formData, paymentTerms: e.target.value})}>
+                          <option value="Immediate">Due on Receipt</option>
+                          <option value="Net 15">Net 15</option>
+                          <option value="Net 30">Net 30</option>
+                          <option value="Net 60">Net 60</option>
+                        </select>
+                      </div>
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1"><ShieldCheck size={12}/> Credit Limit</label>
+                        <input type="number" className="w-full p-3 bg-white rounded-xl font-bold text-sm outline-none" value={formData.creditLimit} onChange={(e) => setFormData({...formData, creditLimit: e.target.value})} />
                       </div>
                     </div>
 
-                    <div className="space-y-4">
-                      <h5 className="text-[10px] font-bold text-slate-800 flex items-center gap-2"><MapPin size={12}/> Billing Address</h5>
-                      <input placeholder="Street Address" className="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-green-500/20" 
-                        value={formData.billingAddress.street} onChange={(e) => setFormData({...formData, billingAddress: {...formData.billingAddress, street: e.target.value}})} />
-                      <div className="grid grid-cols-2 gap-2">
-                        <input placeholder="City" className="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none" 
-                          value={formData.billingAddress.city} onChange={(e) => setFormData({...formData, billingAddress: {...formData.billingAddress, city: e.target.value}})} />
-                        <input placeholder="Country" className="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none" 
-                          value={formData.billingAddress.country} onChange={(e) => setFormData({...formData, billingAddress: {...formData.billingAddress, country: e.target.value}})} />
+                    {/* Addresses */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* Billing */}
+                      <div className="space-y-4">
+                        <h5 className="text-[10px] font-black text-slate-800 flex items-center gap-2"><MapPin size={14}/> BILLING ADDRESS</h5>
+                        <input placeholder="Street" className="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none" value={formData.billingAddress.street} onChange={(e) => setFormData({...formData, billingAddress: {...formData.billingAddress, street: e.target.value}})} />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input placeholder="City" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none" value={formData.billingAddress.city} onChange={(e) => setFormData({...formData, billingAddress: {...formData.billingAddress, city: e.target.value}})} />
+                          <input placeholder="Country" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none" value={formData.billingAddress.country} onChange={(e) => setFormData({...formData, billingAddress: {...formData.billingAddress, country: e.target.value}})} />
+                        </div>
+                      </div>
+
+                      {/* Shipping */}
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center">
+                          <h5 className="text-[10px] font-black text-slate-800 flex items-center gap-2"><Truck size={14}/> SHIPPING ADDRESS</h5>
+                          <button type="button" onClick={copyBillingToShipping} className="text-[8px] font-black text-blue-600 uppercase flex items-center gap-1 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all"><Copy size={10}/> Same as billing</button>
+                        </div>
+                        <input placeholder="Street" className="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none" value={formData.shippingAddress.street} onChange={(e) => setFormData({...formData, shippingAddress: {...formData.shippingAddress, street: e.target.value}})} />
+                        <div className="grid grid-cols-2 gap-2">
+                          <input placeholder="City" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none" value={formData.shippingAddress.city} onChange={(e) => setFormData({...formData, shippingAddress: {...formData.shippingAddress, city: e.target.value}})} />
+                          <input placeholder="Country" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none" value={formData.shippingAddress.country} onChange={(e) => setFormData({...formData, shippingAddress: {...formData.shippingAddress, country: e.target.value}})} />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -334,10 +311,7 @@ const Clients = () => {
               </div>
 
               <div className="pt-8">
-                <button 
-                  type="submit" 
-                  className={`w-full text-white py-5 rounded-4xl font-black text-sm shadow-xl transition-all ${editingClient ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-100' : 'bg-slate-900 hover:bg-emerald-600 shadow-slate-200'}`}
-                >
+                <button type="submit" className={`w-full text-white py-5 rounded-4xl font-black text-sm shadow-xl transition-all ${editingClient ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900 hover:bg-emerald-600'}`}>
                   {editingClient ? 'Synchronize Client Data' : 'Authorize & Create Profile'}
                 </button>
               </div>
