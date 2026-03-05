@@ -6,6 +6,22 @@ const employeeSchema = new mongoose.Schema({
     ref: 'User', 
     required: true 
   },
+  employeeId: {
+    type: String,
+    required: true,
+    unique: true,
+    trim: true
+  },
+  department: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  joiningDate: { 
+    type: Date, 
+    required: true,
+    default: Date.now 
+  },
   name: { 
     type: String, 
     required: true,
@@ -46,18 +62,20 @@ const employeeSchema = new mongoose.Schema({
   }, 
   employmentType: { 
     type: String, 
-    enum: ['Full-time', 'Part-time', 'Contract', 'Commission-based'], 
-    default: 'Full-time' 
+    enum: ['Full Time', 'Part Time', 'Contract'], 
+    default: 'Full Time' 
+  },
+  salaryType: {
+    type: String,
+    enum: ['Monthly', 'Daily'],
+    default: 'Monthly'
   },
   status: { 
     type: String, 
     enum: ['Active', 'On Leave', 'Terminated'], 
     default: 'Active' 
   },
-  joinDate: { 
-    type: Date, 
-    default: Date.now 
-  },
+  // --- Financial Logic ---
   dailyRate: { 
     type: Number, 
     required: true 
@@ -83,7 +101,10 @@ const employeeSchema = new mongoose.Schema({
 });
 
 employeeSchema.virtual('totalSalary').get(function() {
-  return (this.dailyRate * this.workingDays).toFixed(2);
+  if (this.salaryType === 'Daily') {
+    return (this.dailyRate * this.workingDays).toFixed(2);
+  }
+  return this.dailyRate.toFixed(2);
 });
 
 export default mongoose.model('Employee', employeeSchema);

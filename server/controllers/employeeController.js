@@ -12,17 +12,23 @@ export const getEmployees = async (req, res) => {
   }
 };
 
-// @desc    Add new employee with nested bank details
+// @desc    Add new employee with expanded identification fields
 export const addEmployee = async (req, res) => {
   try {
     const { 
       name, email, phone, role, dailyRate, 
       contactNumber, homeAddress, verificationIdType, idNumber, 
-      bankName, accountNumber 
+      bankName, accountNumber,
+      employeeId, joiningDate, department, employmentType, salaryType 
     } = req.body;
 
     const employee = new Employee({
       user: req.user._id,
+      employeeId,
+      joiningDate,
+      department,
+      employmentType,
+      salaryType,
       name, 
       email, 
       phone: phone || contactNumber, 
@@ -77,21 +83,16 @@ export const updateAttendance = async (req, res) => {
   try {
     const employee = await Employee.findOne({ _id: req.params.id, user: req.user._id });
     if (!employee) return res.status(404).json({ message: "Employee record not found" });
-
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
     const lastDate = employee.lastAttendanceDate ? new Date(employee.lastAttendanceDate) : null;
     if (lastDate) lastDate.setHours(0, 0, 0, 0);
-
     if (lastDate && lastDate.getTime() === today.getTime()) {
       return res.status(400).json({ message: "Attendance already marked for today" });
     }
-
     employee.workingDays += 1;
     employee.lastAttendanceDate = new Date();
     await employee.save();
-
     res.json(employee);
   } catch (error) {
     res.status(400).json({ message: "Attendance update failed: " + error.message });
@@ -102,20 +103,21 @@ export const updateAttendance = async (req, res) => {
 export const closeMonth = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { accountId } = req.body; // Receive the chosen account ID
-
+    const { accountId } = req.body; 
     if (!accountId) {
       return res.status(400).json({ message: "Please select a bank account for payment." });
     }
-
     const sourceAccount = await Account.findOne({ _id: accountId, userId });
-
     if (!sourceAccount) {
       return res.status(404).json({ message: "Selected account not found." });
     }
-
-    const employees = await Employee.find({ user: userId });    
-    const totalPayroll = employees.reduce((sum, emp) => sum + (Number(emp.workingDays) * Number(emp.dailyRate)), 0);
+    const employees = await Employee.find({ user: userId, status: 'Active' });
+    const totalPayroll = employees.reduce((sum, emp) => {
+      const amount = emp.salaryType === 'Daily' 
+        ? (Number(emp.workingDays) * Number(emp.dailyRate)) 
+        : Number(emp.dailyRate); // Monthly is a flat rate
+      return sum + amount;
+    }, 0);
 
     if (totalPayroll <= 0) {
       return res.status(400).json({ message: "No pending wages to process." });
@@ -123,7 +125,7 @@ export const closeMonth = async (req, res) => {
 
     if (sourceAccount.balance < totalPayroll) {
       return res.status(400).json({ 
-        message: `Insufficient Funds: Needs ${totalPayroll}, but only ${sourceAccount.balance} available in ${sourceAccount.bankName}.` 
+        message: `Insufficient Funds: Needs ${totalPayroll}, but only ${sourceAccount.balance} available.` 
       });
     }
 
@@ -134,15 +136,14 @@ export const closeMonth = async (req, res) => {
       toAccount: sourceAccount._id, 
       amount: totalPayroll,
       category: 'Salaries',
-      description: `Monthly Payroll - ${new Date().toLocaleString('default', { month: 'long' })}`,
+      description: `Payroll: ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`,
       status: 'Completed',
       type: 'Expense'
     });
 
     sourceAccount.balance -= totalPayroll;
     await sourceAccount.save();
-
-    await Employee.updateMany({ user: userId }, { $set: { workingDays: 0, lastAttendanceDate: null } });
+  await Employee.updateMany({ user: userId }, { $set: { workingDays: 0, lastAttendanceDate: null } });
 
     res.json({ success: true, message: "Payroll processed successfully!", payout: totalPayroll });
   } catch (error) {
