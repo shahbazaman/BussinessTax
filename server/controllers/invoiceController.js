@@ -15,12 +15,13 @@ export const createInvoice = async (req, res) => {
     const invoiceType = type || 'Sale';
     const validatedItems = [];
 
+    // 1. Validate Products & Variants
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) return res.status(404).json({ message: `Product ${item.name} not found` });
       
       const variant = product.variants.id(item.variantId);
-      if (!variant) return res.status(404).json({ message: "Variant not found" });
+      if (!variant) return res.status(404).json({ message: `Variant for ${product.title} not found` });
 
       validatedItems.push({
         productId: item.productId,
@@ -32,14 +33,21 @@ export const createInvoice = async (req, res) => {
       });
     }
 
+    // 2. Setup Invoice Numbering Logic
+    // If Sale: needs invoiceNumber. If Purchase: uses referenceNumber primarily.
+    let finalInvoiceNumber = invoiceNumber;
+    if (invoiceType === 'Sale' && !finalInvoiceNumber) {
+        finalInvoiceNumber = `INV-${Date.now()}`;
+    }
+
     const invoice = new Invoice({
       user: req.user._id,
       client: clientId, 
-      invoiceNumber: invoiceNumber || `INV-${Date.now()}`,
+      invoiceNumber: finalInvoiceNumber,
       invoiceDate: invoiceDate || new Date(),
       paymentMethod,
       paymentTerms,
-      referenceNumber,
+      referenceNumber, // Crucial for Purchase
       poNumber,
       gstNumber,
       billingAddress,
@@ -47,17 +55,16 @@ export const createInvoice = async (req, res) => {
       items: validatedItems,
       shipping: Number(shipping || 0),
       discount: Number(discount || 0),
-      taxRate: Number(taxRate || 0),
       dueDate,
       status: status || 'Pending',
       type: invoiceType,
       notes,
-      totalAmount: 0 // Hook in model handles final calculation
+      totalAmount: 0 // Handled by pre-save hook in model
     });
 
     const savedInvoice = await invoice.save();
 
-    // Adjust Stock
+    // 3. Adjust Stock (Purchase increases stock, Sale decreases it)
     for (const item of validatedItems) {
       const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
       await Product.updateOne(
@@ -88,7 +95,7 @@ export const updateInvoice = async (req, res) => {
     const oldInvoice = await Invoice.findById(req.params.id);
     if (!oldInvoice) return res.status(404).json({ message: "Not found" });
 
-    // Revert old stock before applying update
+    // 1. Revert old stock levels before applying update
     for (const item of oldInvoice.items) {
       const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
       await Product.updateOne(
@@ -99,16 +106,17 @@ export const updateInvoice = async (req, res) => {
 
     const { _id, user, ...updateData } = req.body;
     
-    // Map clientId to client for Mongoose
+    // Map clientId to client field for the model
     if (updateData.clientId) {
         updateData.client = updateData.clientId;
         delete updateData.clientId;
     }
 
+    // 2. Apply updates and trigger pre-save hook for re-calculation
     Object.assign(oldInvoice, updateData);
     const updatedInvoice = await oldInvoice.save();
 
-    // Apply new stock levels
+    // 3. Apply new stock levels based on updated quantities/type
     for (const item of updatedInvoice.items) {
       const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
       await Product.updateOne(
@@ -128,7 +136,7 @@ export const deleteInvoice = async (req, res) => {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ message: "Not found" });
 
-    // Revert stock on deletion
+    // Revert stock levels (Sale deletion adds back, Purchase deletion removes)
     for (const item of invoice.items) {
         const revertQty = (invoice.type === 'Purchase') ? -item.quantity : item.quantity;
         await Product.updateOne(
@@ -138,7 +146,7 @@ export const deleteInvoice = async (req, res) => {
       }
 
     await invoice.deleteOne();
-    res.json({ message: "Invoice removed & stock reverted" });
+    res.json({ message: "Invoice removed & stock updated accordingly" });
   } catch (error) {
     res.status(500).json({ message: "Deletion failed" });
   }

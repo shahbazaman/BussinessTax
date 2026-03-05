@@ -18,9 +18,8 @@ const invoiceSchema = new mongoose.Schema({
   },
   invoiceNumber: { 
     type: String, 
-    required: true
+    required: function() { return this.type === 'Sale'; } 
   },
-  // NEW FIELDS FROM REQUIREMENTS
   invoiceDate: { 
     type: Date, 
     default: Date.now 
@@ -35,8 +34,7 @@ const invoiceSchema = new mongoose.Schema({
   },
   referenceNumber: { 
     type: String 
-  }, // Specifically for Purchase Invoices
-  
+  }, 
   poNumber: { 
     type: String 
   },
@@ -74,7 +72,7 @@ const invoiceSchema = new mongoose.Schema({
   },
   status: { 
     type: String, 
-    enum: ['Paid', 'Pending', 'Overdue', 'Draft', 'Cancelled'], 
+    enum: ['Paid', 'Pending', 'Partially Paid', 'Overdue', 'Draft', 'Cancelled'], 
     default: 'Pending' 
   },
   dueDate: { 
@@ -98,11 +96,11 @@ const invoiceSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// Ensure unique invoice numbers per user
-invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true });
+invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
+invoiceSchema.index({ user: 1, referenceNumber: 1 });
 
 // Calculation Hook
-invoiceSchema.pre('save', async function() {
+invoiceSchema.pre('save', async function(next) {
   const items = this.items || [];
   
   const calculatedSubtotal = items.reduce((acc, item) => {
@@ -120,6 +118,8 @@ invoiceSchema.pre('save', async function() {
   this.discount = Number(this.discount || 0);
 
   this.totalAmount = (this.subtotal + this.taxAmount + this.shipping) - this.discount;
+  
+  next();
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);

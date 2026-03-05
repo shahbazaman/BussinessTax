@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Trash2, CreditCard, Save, Loader2, Plus, ShoppingCart, ShoppingBag, Hash, Calendar, FileText } from 'lucide-react';
+import { X, Search, Trash2, Save, Loader2, Plus, ShoppingCart, ShoppingBag, Hash, Calendar, FileText } from 'lucide-react';
 import api from '../utils/api.js';
 import { toast } from 'react-toastify';
 
@@ -26,8 +26,6 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
   const [taxRate, setTaxRate] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [savedInvoiceId, setSavedInvoiceId] = useState(null);
-  const [paymentLoading, setPaymentLoading] = useState(false);
-  const [paymentDone, setPaymentDone] = useState(false);
 
   useEffect(() => {
     if (editData && isOpen) {
@@ -57,7 +55,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     } else if (isOpen) {
       handleReset();
       setType(initialType);
-      // Auto-generate a draft invoice number for Sales
+      // Auto-generate a draft invoice number for Sales only
       if (initialType === 'Sale') {
         setInvoiceData(prev => ({ ...prev, invoiceNumber: `INV-${Date.now().toString().slice(-6)}` }));
       }
@@ -66,6 +64,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
 
   if (!isOpen) return null;
 
+  // Calculations
   const subtotal = selectedItems.reduce((sum, item) => sum + item.price * Number(item.quantity), 0);
   const taxAmount = subtotal * (Number(taxRate || 0) / 100);
   const totalAmount = (subtotal + taxAmount) - Number(invoiceData.discount || 0);
@@ -91,16 +90,15 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     setTaxRate(0);
     setSavedInvoiceId(null);
     setIsSubmitting(false);
-    setPaymentDone(false);
   };
 
   const handleClose = () => { handleReset(); onClose(); };
 
   const handleSubmit = async (e) => {
     if (e?.preventDefault) e.preventDefault();
-    if (isSubmitting || (savedInvoiceId && !editData)) return;
+    if (isSubmitting) return;
     if (!invoiceData.clientId) return toast.warning("Select a party.");
-    if (!invoiceData.invoiceNumber && type === 'Sale') return toast.warning("Invoice number is required.");
+    if (type === 'Sale' && !invoiceData.invoiceNumber) return toast.warning("Invoice number is required.");
     if (selectedItems.length === 0) return toast.warning('Add at least one product.');
 
     setIsSubmitting(true);
@@ -115,15 +113,13 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
 
       if (editData) {
         await api.put(`/invoices/${editData._id}`, payload);
-        toast.success("Updated!");
-        onRefresh();
-        handleClose();
+        toast.success("Transaction Updated!");
       } else {
-        const res = await api.post('/invoices', payload);
-        setSavedInvoiceId(res.data._id);
-        toast.success(`${type} Saved!`);
-        onRefresh();
+        await api.post('/invoices', payload);
+        toast.success(`${type} Invoice Created!`);
       }
+      onRefresh();
+      handleClose();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Save failed.');
     } finally {
@@ -139,13 +135,13 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase">{editData ? `Edit ${type}` : `New ${type}`}</h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Professional Billing Module</p>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Stock-Adjusting Billing Module</p>
           </div>
           <button onClick={handleClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><X /></button>
         </div>
 
         <div className="p-8 overflow-y-auto space-y-8 flex-1">
-          {/* TYPE TOGGLE */}
+          {/* TYPE TOGGLE (Disabled on Edit to maintain stock integrity) */}
           {!editData && (
             <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full border border-slate-200">
               <button onClick={() => setType('Sale')} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${type === 'Sale' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}><ShoppingCart size={14}/> Sales Invoice</button>
@@ -156,7 +152,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
           {/* DOCUMENT DETAILS SECTION */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="space-y-1 md:col-span-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><Hash size={10}/> {type === 'Sale' ? 'Invoice No.' : 'Bill/Ref No.'}</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><Hash size={10}/> {type === 'Sale' ? 'Inv No.' : 'Bill Ref No.'}</label>
               <input type="text" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs focus:ring-2 focus:ring-indigo-500/20" value={type === 'Sale' ? invoiceData.invoiceNumber : invoiceData.referenceNumber} onChange={(e) => setInvoiceData({ ...invoiceData, [type === 'Sale' ? 'invoiceNumber' : 'referenceNumber']: e.target.value })} />
             </div>
             <div className="space-y-1">
@@ -168,9 +164,9 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
               <input type="date" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs" value={invoiceData.dueDate} onChange={(e) => setInvoiceData({ ...invoiceData, dueDate: e.target.value })} />
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><FileText size={10}/> Payment Terms</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2 flex items-center gap-1"><FileText size={10}/> Terms</label>
               <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs" value={invoiceData.paymentTerms} onChange={(e) => setInvoiceData({ ...invoiceData, paymentTerms: e.target.value })}>
-                <option value="">Due on Receipt</option>
+                <option value="">Immediate</option>
                 <option value="Net 15">Net 15</option>
                 <option value="Net 30">Net 30</option>
                 <option value="Net 60">Net 60</option>
@@ -180,15 +176,15 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">{type === 'Sale' ? 'Customer' : 'Supplier'}</label>
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">{type === 'Sale' ? 'Customer Name' : 'Supplier Name'}</label>
               <select className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs" value={invoiceData.clientId} onChange={(e) => setInvoiceData({ ...invoiceData, clientId: e.target.value })}>
                 <option value="">Choose Party...</option>
                 {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">GST Number</label>
-              <input type="text" placeholder="Optional" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs uppercase" value={invoiceData.gstNumber} onChange={(e) => setInvoiceData({ ...invoiceData, gstNumber: e.target.value })} />
+              <label className="text-[10px] font-black text-slate-400 uppercase ml-2">GSTIN (Optional)</label>
+              <input type="text" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs uppercase" value={invoiceData.gstNumber} onChange={(e) => setInvoiceData({ ...invoiceData, gstNumber: e.target.value })} />
             </div>
           </div>
 
@@ -196,7 +192,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
           <div className={`grid grid-cols-1 ${type === 'Sale' ? 'md:grid-cols-2' : 'md:grid-cols-1'} gap-6`}>
             <div className="space-y-1">
               <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Billing Address</label>
-              <textarea placeholder="Address..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs resize-none" value={invoiceData.billingAddress} onChange={(e) => setInvoiceData({ ...invoiceData, billingAddress: e.target.value })} />
+              <textarea placeholder="Address details..." rows="2" className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none font-bold text-xs resize-none" value={invoiceData.billingAddress} onChange={(e) => setInvoiceData({ ...invoiceData, billingAddress: e.target.value })} />
             </div>
             {type === 'Sale' && (
               <div className="space-y-1">
@@ -206,18 +202,18 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
             )}
           </div>
 
-          {/* Search & Items List - Kept your original logic but styled better */}
+          {/* Search & Items List */}
           <div className="space-y-4">
             <div className="relative">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-              <input type="text" placeholder="Search products and add..." className="w-full p-4 pl-12 bg-white border-2 border-slate-100 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+              <input type="text" placeholder="Search products by title..." className="w-full p-4 pl-12 bg-white border-2 border-slate-100 rounded-2xl outline-none font-bold text-sm focus:border-indigo-500 transition-all shadow-sm" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
               {searchQuery && (
                 <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-2xl shadow-2xl max-h-60 overflow-y-auto mt-2">
                   {filteredProducts.map(p => p.variants.map(v => (
                     <div key={v._id} onClick={() => addItem(p, v)} className="p-4 hover:bg-slate-50 cursor-pointer flex justify-between items-center border-b last:border-0 transition-colors">
                       <div>
                         <p className="font-bold text-slate-800 text-sm">{p.title}</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase">{v.name} • Stock: {v.stock}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase">{v.name} • <span className={v.stock <= 5 ? 'text-rose-500' : 'text-emerald-500'}>Stock: {v.stock}</span></p>
                       </div>
                       <p className="font-black text-indigo-600 text-sm">₹{v.price}</p>
                     </div>
@@ -228,18 +224,21 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
 
             <div className="space-y-3">
               {selectedItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+                <div key={index} className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm animate-in fade-in slide-in-from-bottom-2">
                   <div className="flex-1">
                     <p className="font-bold text-slate-800 text-sm">{item.name}</p>
-                    <p className="text-[10px] text-slate-400 font-black uppercase">Rate: ₹{item.price}</p>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-tight">Rate: ₹{item.price.toLocaleString()}</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <input type="number" min={1} className="w-20 p-2 rounded-xl border-2 border-slate-50 text-center font-black text-sm" value={item.quantity} onChange={(e) => {
-                      const updated = [...selectedItems];
-                      updated[index].quantity = Number(e.target.value);
-                      setSelectedItems(updated);
-                    }} />
-                    <button onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))} className="text-rose-500 hover:bg-rose-50 p-2 rounded-xl transition-colors"><Trash2 size={18} /></button>
+                    <div className="flex items-center bg-slate-50 rounded-xl px-2">
+                        <span className="text-[10px] font-black text-slate-400 mr-2">QTY</span>
+                        <input type="number" min={1} className="w-16 p-2 bg-transparent text-center font-black text-sm outline-none" value={item.quantity} onChange={(e) => {
+                        const updated = [...selectedItems];
+                        updated[index].quantity = Math.max(1, Number(e.target.value));
+                        setSelectedItems(updated);
+                        }} />
+                    </div>
+                    <button onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))} className="text-rose-500 hover:bg-rose-50 p-2.5 rounded-xl transition-colors"><Trash2 size={18} /></button>
                   </div>
                 </div>
               ))}
@@ -247,32 +246,32 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
           </div>
 
           {/* Footer Totals */}
-          <div className="p-8 bg-slate-900 rounded-[2rem] text-white flex flex-col md:flex-row justify-between items-center gap-8">
+          <div className="p-8 bg-slate-900 rounded-4xl text-white flex flex-col md:flex-row justify-between items-center gap-8 shadow-xl">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 w-full md:w-auto">
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tax Rate</p>
-                <input type="number" className="bg-white/10 border border-white/20 rounded-xl p-2 w-20 text-white font-black text-sm outline-none" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tax Rate (%)</p>
+                <input type="number" className="bg-white/10 border border-white/20 rounded-xl p-2 w-20 text-white font-black text-sm outline-none focus:ring-1 focus:ring-white/40" value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
               </div>
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Discount</p>
-                <input type="number" className="bg-white/10 border border-white/20 rounded-xl p-2 w-24 text-white font-black text-sm outline-none" value={invoiceData.discount} onChange={(e) => setInvoiceData({...invoiceData, discount: e.target.value})} />
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Discount (₹)</p>
+                <input type="number" className="bg-white/10 border border-white/20 rounded-xl p-2 w-24 text-white font-black text-sm outline-none focus:ring-1 focus:ring-white/40" value={invoiceData.discount} onChange={(e) => setInvoiceData({...invoiceData, discount: e.target.value})} />
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tax Amt</p>
-                <p className="text-lg font-bold">₹{taxAmount.toLocaleString()}</p>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tax Total</p>
+                <p className="text-lg font-bold">₹{taxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-1">Grand Total</p>
-                <p className="text-3xl font-black">₹{totalAmount.toLocaleString()}</p>
+                <p className={`text-[10px] font-black uppercase tracking-widest mb-1 ${type === 'Sale' ? 'text-indigo-400' : 'text-rose-400'}`}>Grand Total</p>
+                <p className="text-3xl font-black">₹{totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
               </div>
             </div>
             
             <div className="flex gap-3 w-full md:w-auto">
-              <button onClick={handleSubmit} disabled={isSubmitting} className="flex-1 md:flex-none px-10 py-4 bg-white text-slate-900 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2 hover:bg-indigo-50 transition-all">
+              <button onClick={handleSubmit} disabled={isSubmitting} className={`flex-1 md:flex-none px-10 py-4 rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2 transition-all hover:scale-105 active:scale-95 ${isSubmitting ? 'bg-slate-700 text-slate-400' : 'bg-white text-slate-900 hover:bg-slate-100'}`}>
                 {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                {editData ? 'Update' : 'Save Invoice'}
+                {editData ? 'Update Record' : 'Save Invoice'}
               </button>
-              <button onClick={handleClose} className="px-6 py-4 bg-white/10 text-white rounded-2xl font-black uppercase text-xs hover:bg-white/20">Cancel</button>
+              <button onClick={handleClose} className="px-6 py-4 bg-white/10 text-white rounded-2xl font-black uppercase text-xs hover:bg-white/20 transition-colors">Cancel</button>
             </div>
           </div>
         </div>
