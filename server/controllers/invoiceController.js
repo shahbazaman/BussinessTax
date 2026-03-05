@@ -15,7 +15,7 @@ export const createInvoice = async (req, res) => {
     const invoiceType = type || 'Sale';
     const validatedItems = [];
 
-    // 1. Validate Products & Variants
+    // 1. Validate Products & Variants and apply the taxRate
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) return res.status(404).json({ message: `Product ${item.name} not found` });
@@ -29,15 +29,15 @@ export const createInvoice = async (req, res) => {
         name: item.name || product.title,
         quantity: Number(item.quantity || 0),
         price: Number(item.price || 0),
-        taxRate: Number(item.taxRate || 0)
+        // Use item-specific taxRate if it exists, otherwise use the global taxRate from body
+        taxRate: Number(item.taxRate || taxRate || 0)
       });
     }
 
     // 2. Setup Invoice Numbering Logic
-    // If Sale: needs invoiceNumber. If Purchase: uses referenceNumber primarily.
     let finalInvoiceNumber = invoiceNumber;
     if (invoiceType === 'Sale' && !finalInvoiceNumber) {
-        finalInvoiceNumber = `INV-${Date.now()}`;
+        finalInvoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
     }
 
     const invoice = new Invoice({
@@ -47,7 +47,7 @@ export const createInvoice = async (req, res) => {
       invoiceDate: invoiceDate || new Date(),
       paymentMethod,
       paymentTerms,
-      referenceNumber, // Crucial for Purchase
+      referenceNumber, 
       poNumber,
       gstNumber,
       billingAddress,
@@ -59,7 +59,7 @@ export const createInvoice = async (req, res) => {
       status: status || 'Pending',
       type: invoiceType,
       notes,
-      totalAmount: 0 // Handled by pre-save hook in model
+      totalAmount: 0 // Will be calculated by pre-save hook in model
     });
 
     const savedInvoice = await invoice.save();
@@ -81,12 +81,12 @@ export const createInvoice = async (req, res) => {
 
 export const getInvoices = async (req, res) => {
   try {
-    const invoices = await Invoice.find({ user: req.user.id })
+    const invoices = await Invoice.find({ user: req.user._id })
       .populate('client', 'name email')
       .sort({ createdAt: -1 });
     res.json(invoices);
   } catch (error) {
-    res.status(500).json({ message: "Error fetching invoices" });
+    res.status(500).json({ message: "Error fetching invoices", error: error.message });
   }
 };
 
@@ -104,19 +104,28 @@ export const updateInvoice = async (req, res) => {
       );
     }
 
-    const { _id, user, ...updateData } = req.body;
+    // 2. Handle update data and map clientId
+    const { _id, user, items, taxRate, ...updateData } = req.body;
     
-    // Map clientId to client field for the model
     if (updateData.clientId) {
-        updateData.client = updateData.clientId;
-        delete updateData.clientId;
+        oldInvoice.client = updateData.clientId;
     }
 
-    // 2. Apply updates and trigger pre-save hook for re-calculation
+    // If items are being updated, ensure taxRate is applied to each new item
+    if (items) {
+      oldInvoice.items = items.map(item => ({
+        ...item,
+        taxRate: Number(item.taxRate || taxRate || 0)
+      }));
+    }
+
+    // Apply remaining updates
     Object.assign(oldInvoice, updateData);
+    
+    // Save triggers the calculation hook in Invoice.js
     const updatedInvoice = await oldInvoice.save();
 
-    // 3. Apply new stock levels based on updated quantities/type
+    // 3. Apply new stock levels
     for (const item of updatedInvoice.items) {
       const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
       await Product.updateOne(
@@ -155,7 +164,7 @@ export const deleteInvoice = async (req, res) => {
 export const updateInvoiceStatus = async (req, res) => {
   try {
     const invoice = await Invoice.findOneAndUpdate(
-      { _id: req.params.id, user: req.user.id }, 
+      { _id: req.params.id, user: req.user._id }, 
       { status: req.body.status }, 
       { new: true }
     ).populate('client', 'name email');

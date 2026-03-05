@@ -10,7 +10,7 @@ import {
 } from '../controllers/invoiceController.js';
 
 router.route('/')
-  .get(protect, getInvoices)
+  .get(protect, getInvoices) 
   .post(protect, createInvoice);
 
 router.route('/:id')

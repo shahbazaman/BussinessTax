@@ -33,8 +33,6 @@ const Invoices = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
-  const themeColor = activeTab === 'Sale' ? 'indigo' : 'rose';
-
   useEffect(() => {
     const handleClickOutside = () => setActiveStatusDropdown(null);
     window.addEventListener('click', handleClickOutside);
@@ -59,7 +57,12 @@ const Invoices = () => {
         api.get('/accounts'),
         api.get('/products')
       ]);
-      const sortedInvoices = invRes.data.sort((a, b) => new Date(b.invoiceDate || b.createdAt) - new Date(a.invoiceDate || a.createdAt));
+      
+      // Sort by date descending
+      const sortedInvoices = invRes.data.sort((a, b) => 
+        new Date(b.invoiceDate || b.createdAt) - new Date(a.invoiceDate || a.createdAt)
+      );
+      
       setInvoices(sortedInvoices);
       setClients(clientRes.data);
       setCurrencySymbol(profileRes.data.currency === 'USD' ? '$' : '₹');
@@ -95,7 +98,10 @@ const Invoices = () => {
       const invDate = new Date(inv.invoiceDate || inv.createdAt).getTime();
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
       const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
-      const clientName = inv.client?.name || "";
+      
+      // Defensive check for missing client data
+      const clientName = inv.client?.name || "Unknown Party";
+      
       return inv.type === activeTab && 
              clientName.toLowerCase().includes(searchTerm.toLowerCase()) && 
              (filterStatus === 'All' || inv.status === filterStatus) &&
@@ -105,8 +111,8 @@ const Invoices = () => {
 
   const stats = useMemo(() => {
     return filteredInvoices.reduce((acc, inv) => {
-      acc.total += inv.totalAmount;
-      acc.tax += inv.taxAmount;
+      acc.total += (inv.totalAmount || 0);
+      acc.tax += (inv.taxAmount || 0);
       return acc;
     }, { total: 0, tax: 0 });
   }, [filteredInvoices]);
@@ -115,54 +121,81 @@ const Invoices = () => {
     const razorpayKey = import.meta.env.VITE_RAZORPAY_KEY_ID;
     if (!razorpayKey) return toast.error("Razorpay Key missing");
     if (accounts.length === 0) return toast.error("Link a bank account first");
+    
     setPaymentLoading(true);
     try {
-      const { data: order } = await api.post('/payments/create-order', { amount: invoice.totalAmount, currency: 'INR' });
+      const { data: order } = await api.post('/payments/create-order', { 
+        amount: invoice.totalAmount, 
+        currency: 'INR' 
+      });
+
       const options = {
-        key: razorpayKey, amount: order.amount, currency: order.currency, name: 'Business Ledger',
+        key: razorpayKey, 
+        amount: order.amount, 
+        currency: order.currency, 
+        name: 'Business Ledger',
         order_id: order.id,
         handler: async (res) => {
           try {
+            // Updated to use the correct account route if needed
             await api.post('/payments/verify', { ...res, invoiceId: invoice._id, accountId: accounts[0]._id });
-            toast.success("Paid!"); fetchData();
-          } catch { toast.error("Verification failed"); } finally { setPaymentLoading(false); }
+            toast.success("Payment successful!"); 
+            fetchData();
+          } catch { 
+            toast.error("Verification failed"); 
+          } finally { 
+            setPaymentLoading(false); 
+          }
         },
         modal: { ondismiss: () => setPaymentLoading(false) },
         theme: { color: activeTab === 'Sale' ? "#4f46e5" : "#e11d48" },
       };
       new window.Razorpay(options).open();
-    } catch { toast.error("Razorpay failed"); setPaymentLoading(false); }
+    } catch { 
+      toast.error("Razorpay initiation failed"); 
+      setPaymentLoading(false); 
+    }
   };
 
   const handleDelete = async (id) => {
     if (window.confirm("Delete record? This will revert stock levels.")) {
-      try { await api.delete(`/invoices/${id}`); fetchData(); toast.success("Deleted & Stock Reverted"); }
-      catch { toast.error("Failed"); }
+      try { 
+        await api.delete(`/invoices/${id}`); 
+        fetchData(); 
+        toast.success("Deleted & Stock Reverted"); 
+      } catch { 
+        toast.error("Deletion failed"); 
+      }
     }
   };
 
   const downloadPDF = (invoice) => {
     const doc = new jsPDF();
+    const isSale = invoice.type === 'Sale';
+    
+    // Header
     doc.setFontSize(22); 
-    doc.setTextColor(activeTab === 'Sale' ? 79 : 225, activeTab === 'Sale' ? 70 : 29, activeTab === 'Sale' ? 229 : 72);
-    doc.text(`${activeTab.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
+    doc.setTextColor(isSale ? 79 : 225, isSale ? 70 : 29, isSale ? 229 : 72);
+    doc.text(`${invoice.type.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
     
     doc.setFontSize(10);
     doc.setTextColor(40);
-    const identifier = activeTab === 'Sale' ? `Invoice No: ${invoice.invoiceNumber}` : `Ref No: ${invoice.referenceNumber || 'N/A'}`;
+    const identifier = isSale ? `Invoice No: ${invoice.invoiceNumber}` : `Ref No: ${invoice.referenceNumber || 'N/A'}`;
     doc.text(identifier, 14, 30);
     doc.text(`Date: ${new Date(invoice.invoiceDate || invoice.createdAt).toLocaleDateString()}`, 14, 35);
     doc.text(`GSTIN: ${invoice.gstNumber || 'N/A'}`, 14, 40);
     
-    doc.text(`Billing Address:`, 14, 50);
+    // Addresses
+    doc.text(`Party Details:`, 14, 50);
     doc.setFontSize(9);
-    doc.text(`${invoice.billingAddress || 'N/A'}`, 14, 55, { maxWidth: 80 });
+    doc.text(`${invoice.client?.name || 'N/A'}`, 14, 55);
+    doc.text(`${invoice.billingAddress || 'N/A'}`, 14, 60, { maxWidth: 80 });
     
-    if(activeTab === 'Sale') {
+    if(isSale && invoice.shippingAddress) {
         doc.setFontSize(10);
         doc.text(`Shipping Address:`, 110, 50);
         doc.setFontSize(9);
-        doc.text(`${invoice.shippingAddress || 'N/A'}`, 110, 55, { maxWidth: 80 });
+        doc.text(`${invoice.shippingAddress}`, 110, 55, { maxWidth: 80 });
     }
 
     autoTable(doc, {
@@ -181,7 +214,7 @@ const Invoices = () => {
         ['', '', '', 'Discount', `- ${formatValue(invoice.discount)}`],
         ['', '', '', 'Grand Total', formatValue(invoice.totalAmount)]
       ],
-      headStyles: { fillColor: activeTab === 'Sale' ? [79, 70, 229] : [225, 29, 72] },
+      headStyles: { fillColor: isSale ? [79, 70, 229] : [225, 29, 72] },
       footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold' }
     });
     
@@ -193,7 +226,7 @@ const Invoices = () => {
         doc.text(invoice.notes, 14, finalY + 5, { maxWidth: 180 });
     }
 
-    doc.save(`${activeTab}_${invoice.invoiceNumber || invoice.referenceNumber}.pdf`);
+    doc.save(`${invoice.type}_${invoice.invoiceNumber || invoice.referenceNumber}.pdf`);
   };
 
   return (
@@ -226,7 +259,7 @@ const Invoices = () => {
           </button>
         </div>
 
-        {/* Stats Section */}
+        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
             <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex items-center justify-between">
                 <div>
@@ -353,16 +386,6 @@ const Invoices = () => {
                       </td>
                     </tr>
                   ))}
-                  {filteredInvoices.length === 0 && (
-                    <tr>
-                        <td colSpan="5" className="px-8 py-20 text-center">
-                            <div className="flex flex-col items-center opacity-20">
-                                <FileText size={64} />
-                                <p className="font-black uppercase text-xs tracking-widest mt-4">No records found for this period</p>
-                            </div>
-                        </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -372,7 +395,7 @@ const Invoices = () => {
 
       <InvoiceModal 
         isOpen={showModal} 
-        onClose={() => { setShowModal(false); setSelectedInvoice(null); fetchData(); }} 
+        onClose={() => { setShowModal(false); setSelectedInvoice(null); }} 
         onRefresh={fetchData} 
         clients={clients} 
         products={products} 

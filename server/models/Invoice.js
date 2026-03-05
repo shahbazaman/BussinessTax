@@ -51,7 +51,6 @@ const invoiceSchema = new mongoose.Schema({
   }],
   subtotal: { 
     type: Number, 
-    required: true,
     default: 0
   },
   taxAmount: { 
@@ -67,8 +66,8 @@ const invoiceSchema = new mongoose.Schema({
     default: 0 
   },
   totalAmount: { 
-    type: Number, 
-    required: true 
+    type: Number,
+    default: 0
   },
   status: { 
     type: String, 
@@ -98,8 +97,6 @@ const invoiceSchema = new mongoose.Schema({
 
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, referenceNumber: 1 });
-
-// Calculation Hook
 invoiceSchema.pre('save', async function(next) {
   const items = this.items || [];
   
@@ -116,7 +113,6 @@ invoiceSchema.pre('save', async function(next) {
   this.taxAmount = calculatedTax;
   this.shipping = Number(this.shipping || 0);
   this.discount = Number(this.discount || 0);
-
   this.totalAmount = (this.subtotal + this.taxAmount + this.shipping) - this.discount;
   
   next();

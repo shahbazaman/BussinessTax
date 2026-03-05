@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Trash2, Save, Loader2, Plus, ShoppingCart, ShoppingBag, Hash, Calendar, FileText } from 'lucide-react';
+import { X, Search, Trash2, Save, Loader2, ShoppingCart, ShoppingBag, Hash, Calendar, FileText } from 'lucide-react';
 import api from '../utils/api.js';
 import { toast } from 'react-toastify';
 
@@ -14,18 +14,17 @@ const INITIAL_INVOICE = {
   shippingAddress: '',
   paymentTerms: '',
   paymentMethod: 'Cash',
-  referenceNumber: '', // For Purchase bills
+  referenceNumber: '', 
   discount: 0
 };
 
-const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts = [], editData, initialType = 'Sale' }) => {
+const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, editData, initialType = 'Sale' }) => {
   const [type, setType] = useState('Sale');
   const [invoiceData, setInvoiceData] = useState(INITIAL_INVOICE);
   const [selectedItems, setSelectedItems] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [taxRate, setTaxRate] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [savedInvoiceId, setSavedInvoiceId] = useState(null);
 
   useEffect(() => {
     if (editData && isOpen) {
@@ -55,7 +54,6 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     } else if (isOpen) {
       handleReset();
       setType(initialType);
-      // Auto-generate a draft invoice number for Sales only
       if (initialType === 'Sale') {
         setInvoiceData(prev => ({ ...prev, invoiceNumber: `INV-${Date.now().toString().slice(-6)}` }));
       }
@@ -64,8 +62,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
 
   if (!isOpen) return null;
 
-  // Calculations
-  const subtotal = selectedItems.reduce((sum, item) => sum + item.price * Number(item.quantity), 0);
+  // Real-time Calculations for UI feedback
+  const subtotal = selectedItems.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
   const taxAmount = subtotal * (Number(taxRate || 0) / 100);
   const totalAmount = (subtotal + taxAmount) - Number(invoiceData.discount || 0);
 
@@ -88,7 +86,6 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
     setSelectedItems([]);
     setSearchQuery('');
     setTaxRate(0);
-    setSavedInvoiceId(null);
     setIsSubmitting(false);
   };
 
@@ -103,12 +100,22 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
 
     setIsSubmitting(true);
     try {
+      // CLEANING DATA: Ensure IDs are strings and rates are numbers
+      const cleanedItems = selectedItems.map(item => ({
+        productId: item.productId?._id || item.productId,
+        variantId: item.variantId,
+        name: item.name,
+        price: Number(item.price),
+        quantity: Number(item.quantity),
+        taxRate: Number(taxRate) // Apply the modal's global tax rate to each item
+      }));
+
       const payload = { 
         ...invoiceData, 
         type, 
-        items: selectedItems, 
+        items: cleanedItems, 
         taxRate: Number(taxRate),
-        totalAmount: Number(totalAmount)
+        totalAmount: Number(totalAmount) 
       };
 
       if (editData) {
@@ -141,7 +148,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts 
         </div>
 
         <div className="p-8 overflow-y-auto space-y-8 flex-1">
-          {/* TYPE TOGGLE (Disabled on Edit to maintain stock integrity) */}
+          {/* TYPE TOGGLE */}
           {!editData && (
             <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full border border-slate-200">
               <button onClick={() => setType('Sale')} className={`flex-1 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${type === 'Sale' ? 'bg-white shadow-md text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}><ShoppingCart size={14}/> Sales Invoice</button>
