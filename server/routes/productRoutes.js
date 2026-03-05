@@ -5,17 +5,19 @@ import {
   getProducts, 
   addProduct, 
   updateProduct,
-  deleteProduct 
+  deleteProduct,
+  updateProductStock 
 } from '../controllers/productController.js';
 
-// Base route: /api/products
 router.route('/')
   .get(protect, getProducts)
   .post(protect, addProduct);
 
-// Specific product route: /api/products/:id
 router.route('/:id')
   .put(protect, updateProduct)
   .delete(protect, deleteProduct);
+
+router.route('/:id/stock')
+  .patch(protect, updateProductStock);
 
 export default router;

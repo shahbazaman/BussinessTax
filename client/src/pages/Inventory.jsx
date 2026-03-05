@@ -1,11 +1,11 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Search, AlertTriangle, Plus, Loader2, Trash2, Package, Edit2, ChevronDown, ChevronRight, Download } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
+import { Search, AlertTriangle, Plus, Loader2, Trash2, Package, Edit2, ChevronDown, ChevronRight, Download, Barcode } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
 import AddProductModal from '../components/AddProductModal';
 import { exportToCSV } from '../utils/exportCSV';
-import { useContext } from 'react';
 import { CurrencyContext } from '../context/CurrencyContext';
+
 const Inventory = () => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,6 +16,7 @@ const Inventory = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [expandedRows, setExpandedRows] = useState({}); 
   const { symbol } = useContext(CurrencyContext);
+
   const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
@@ -69,8 +70,8 @@ const Inventory = () => {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">Inventory</h1>
-          <p className="text-slate-500 text-sm font-medium">Manage products and variant stock levels</p>
+          <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase">Inventory</h1>
+          <p className="text-slate-500 text-sm font-medium">Manage stock, units, and tax rates</p>
         </div>
         <div className="flex items-center gap-3 w-full md:w-auto">
           <button onClick={() => setIsModalOpen(true)} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black text-sm uppercase flex items-center justify-center gap-2 shadow-lg transition-all active:scale-95">
@@ -87,7 +88,7 @@ const Inventory = () => {
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input 
-            type="text" placeholder="Search product name..." 
+            type="text" placeholder="Search by name..." 
             className="w-full pl-12 pr-4 py-3 rounded-xl bg-slate-50 border-none outline-none font-bold text-slate-700"
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -117,7 +118,7 @@ const Inventory = () => {
             <thead>
               <tr className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-50">
                 <th className="px-6 py-4 w-10"></th>
-                <th className="px-6 py-4">Product</th>
+                <th className="px-6 py-4">Product Name</th>
                 <th className="px-6 py-4">Category</th>
                 <th className="px-6 py-4">Total Stock</th>
                 <th className="px-6 py-4 text-right">Actions</th>
@@ -131,7 +132,6 @@ const Inventory = () => {
 
                 return (
                   <React.Fragment key={product._id}>
-                    {/* Main Row */}
                     <tr 
                       onClick={() => toggleRow(product._id)}
                       className={`group cursor-pointer hover:bg-slate-50 transition-colors ${isExpanded ? 'bg-blue-50/20' : ''}`}
@@ -169,14 +169,20 @@ const Inventory = () => {
                     {isExpanded && (
                       <tr className="bg-slate-50/30">
                         <td colSpan="5" className="px-12 py-4">
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {product.variants.map((v, idx) => {
                               const isVariantLow = v.stock <= (product.lowStockAlert || 10);
                               return (
                                 <div key={idx} className={`p-4 rounded-2xl border ${isVariantLow ? 'bg-white border-rose-200' : 'bg-white border-slate-100'} shadow-sm flex justify-between items-center`}>
                                   <div>
-                                    <p className="text-xs font-black text-slate-800">{v.weight} {v.unit}</p>
-                                    <p className="text-[10px] font-bold text-slate-400 mt-1">{ symbol }{Number(v.price).toFixed(2)}</p>
+                                    <p className="text-xs font-black text-slate-800 uppercase flex items-center gap-2">
+                                        {v.name} ({v.weight}{v.unit})
+                                        {v.barcode && <Barcode size={14} className="text-slate-400" />}
+                                    </p>
+                                    <div className="flex gap-3 mt-1">
+                                        <p className="text-[9px] font-bold text-slate-400">PRICE: {symbol}{Number(v.price).toFixed(2)}</p>
+                                        <p className="text-[9px] font-bold text-indigo-500">GST: {v.taxRate || 0}%</p>
+                                    </div>
                                   </div>
                                   <div className="text-right">
                                     <p className={`text-sm font-black ${isVariantLow ? 'text-rose-600' : 'text-emerald-600'}`}>

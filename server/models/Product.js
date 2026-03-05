@@ -10,7 +10,7 @@ const variantSchema = new mongoose.Schema({
   },
   unit: { 
     type: String, 
-    enum: ['g', 'kg', 'ml', 'L', 'pcs'], 
+    enum: ['g', 'kg', 'ml', 'L', 'pcs', 'box', 'mtr', 'set'],
     default: 'pcs' 
   },
   costPrice: { 
@@ -22,6 +22,10 @@ const variantSchema = new mongoose.Schema({
     type: Number, 
     required: true 
   },
+  taxRate: { // New Field for GST
+    type: Number,
+    default: 0 
+  },
   stock: { 
     type: Number, 
     default: 0 
@@ -30,8 +34,10 @@ const variantSchema = new mongoose.Schema({
     type: String, 
     unique: true, 
     sparse: true 
-  },barcode: { 
-    type: String 
+  },
+  barcode: { // Barcode for scanning support
+    type: String,
+    sparse: true
   }
 });
 
@@ -78,7 +84,8 @@ productSchema.virtual('margins').get(function() {
     return {
       variant: v.name,
       profit: profit.toFixed(2),
-      marginPercentage: percentage.toFixed(2) + '%'
+      marginPercentage: percentage.toFixed(2) + '%',
+      taxRate: v.taxRate + '%'
     };
   });
 });
