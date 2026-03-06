@@ -7,20 +7,23 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const Reports = () => {
+  // 1. Move all States to the very top
   const [stats, setStats] = useState({ totalIncome: 0, totalExpenses: 0, netProfit: 0 });
   const [taxRate, setTaxRate] = useState(15);
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState('USD');
 
-  // DERIVED VALUES: Use the stats state with Number() conversion to ensure calculations work
+  // 2. Define constants and derived values AFTER state
+  const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
+  const currencySymbol = CURRENCY_MAP[currency] || '$';
+
   const income = Number(stats.totalIncome || 0);
   const expenses = Number(stats.totalExpenses || 0);
   const profit = Number(stats.netProfit || 0);
   const currentTaxRate = Number(taxRate || 0);
-  const estimatedTax = profit > 0 ? (profit * (currentTaxRate / 100)) : 0;
 
-  const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
-  const currencySymbol = CURRENCY_MAP[currency] || '$';
+  // The formula for your estimated tax
+  const estimatedTax = profit > 0 ? (profit * (currentTaxRate / 100)) : 0;
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -31,12 +34,20 @@ const Reports = () => {
           api.get('/auth/profile')
         ]);
 
-        // Validate data structure before setting state
         if (statsRes.data) {
+          // Robust mapping to catch backend variations
+          const rawData = statsRes.data.summary || statsRes.data;
+          
+          const incomeVal = Number(rawData.totalIncome || rawData.totalRevenue || 0);
+          const expenseVal = Number(rawData.totalExpenses || 0);
+          const profitVal = rawData.netProfit !== undefined 
+            ? Number(rawData.netProfit) 
+            : (incomeVal - expenseVal);
+
           setStats({
-            totalIncome: statsRes.data.totalIncome ?? 0,
-            totalExpenses: statsRes.data.totalExpenses ?? 0,
-            netProfit: statsRes.data.netProfit ?? 0
+            totalIncome: incomeVal,
+            totalExpenses: expenseVal,
+            netProfit: profitVal
           });
         }
 
@@ -45,7 +56,7 @@ const Reports = () => {
         }
       } catch (err) {
         console.error("Report Fetch Error:", err);
-        toast.error("Failed to fetch fiscal data from server");
+        toast.error("Failed to sync fiscal data");
       } finally {
         setLoading(false);
       }
@@ -120,6 +131,7 @@ const Reports = () => {
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
+      <ToastContainer position="top-right" theme="dark" />
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
@@ -168,87 +180,55 @@ const Reports = () => {
           </div>
         </div>
 
-        {/* Detailed Breakdown */}
+        {/* Breakdown Section */}
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
-          <div className="p-8 border-b border-slate-50 flex justify-between items-center">
-            <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Financial Breakdown</h3>
-            <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">Live Audit</span>
-          </div>
-          <div className="p-8 space-y-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl"><ArrowUpRight size={24} /></div>
-                <div>
-                  <p className="text-sm font-black text-slate-800">Total Revenue</p>
-                  <p className="text-xs text-slate-400 font-medium">All settled invoices</p>
-                </div>
-              </div>
-              <span className="text-2xl font-black text-slate-800">{formatValue(income)}</span>
-            </div>
+           <div className="p-8 border-b border-slate-50 flex justify-between items-center">
+             <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Financial Breakdown</h3>
+             <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full uppercase">Live Audit</span>
+           </div>
+           <div className="p-8 space-y-8">
+             <div className="flex items-center justify-between">
+               <div className="flex items-center gap-4">
+                 <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl"><ArrowUpRight size={24} /></div>
+                 <div>
+                   <p className="text-sm font-black text-slate-800">Total Revenue</p>
+                   <p className="text-xs text-slate-400 font-medium">All settled invoices</p>
+                 </div>
+               </div>
+               <span className="text-2xl font-black text-slate-800">{formatValue(income)}</span>
+             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl"><ArrowDownRight size={24} /></div>
-                <div>
-                  <p className="text-sm font-black text-slate-800">Total Expenses</p>
-                  <p className="text-xs text-slate-400 font-medium">Operating deductions</p>
-                </div>
-              </div>
-              <span className="text-2xl font-black text-rose-500">-{formatValue(expenses)}</span>
-            </div>
+             <div className="flex items-center justify-between">
+               <div className="flex items-center gap-4">
+                 <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl"><ArrowDownRight size={24} /></div>
+                 <div>
+                   <p className="text-sm font-black text-slate-800">Total Expenses</p>
+                   <p className="text-xs text-slate-400 font-medium">Operating deductions</p>
+                 </div>
+               </div>
+               <span className="text-2xl font-black text-rose-500">-{formatValue(expenses)}</span>
+             </div>
 
-            <div className="pt-8 border-t border-dashed border-slate-200 flex items-center justify-between">
-              <p className="font-black text-slate-800 uppercase text-sm">Net Taxable Profit</p>
-              <span className="text-3xl font-black text-slate-900 tracking-tighter">{formatValue(profit)}</span>
-            </div>
-          </div>
+             <div className="pt-8 border-t border-dashed border-slate-200 flex items-center justify-between">
+               <p className="font-black text-slate-800 uppercase text-sm">Net Taxable Profit</p>
+               <span className="text-3xl font-black text-slate-900 tracking-tighter">{formatValue(profit)}</span>
+             </div>
+           </div>
         </div>
       </div>
 
       {/* Hidden Print Template */}
       <div style={{ position: 'absolute', left: '-9999px', top: '0' }}>
-        <div id="report-print-area-standalone" style={{ 
-          width: '800px', 
-          padding: '60px', 
-          backgroundColor: '#ffffff', 
-          color: '#0f172a', 
-          fontFamily: 'Helvetica, Arial, sans-serif' 
-        }}>
+        <div id="report-print-area-standalone" style={{ width: '800px', padding: '60px', backgroundColor: '#ffffff', color: '#0f172a', fontFamily: 'Helvetica, Arial, sans-serif' }}>
           <div style={{ borderBottom: '8px solid #10b981', paddingBottom: '30px', marginBottom: '40px' }}>
             <h1 style={{ fontSize: '42px', fontWeight: '900', margin: '0', color: '#0f172a', letterSpacing: '-1px' }}>Tax Liability Report</h1>
-            <p style={{ color: '#64748b', fontSize: '16px', fontWeight: '600', marginTop: '10px' }}>
-              Report Generated: {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
-            </p>
+            <p style={{ color: '#64748b', fontSize: '16px', fontWeight: '600', marginTop: '10px' }}>Report Generated: {new Date().toLocaleDateString()}</p>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px', marginBottom: '50px' }}>
-            <div style={{ padding: '30px', backgroundColor: '#f8fafc', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-              <p style={{ fontSize: '14px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '10px' }}>Gross Revenue</p>
-              <h2 style={{ fontSize: '32px', fontWeight: '900', margin: '0' }}>{formatValue(income, true)}</h2>
-            </div>
-            <div style={{ padding: '30px', backgroundColor: '#f8fafc', borderRadius: '24px', border: '1px solid #e2e8f0' }}>
-              <p style={{ fontSize: '14px', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', marginBottom: '10px' }}>Total Expenses</p>
-              <h2 style={{ fontSize: '32px', fontWeight: '900', color: '#ef4444', margin: '0' }}>-{formatValue(expenses, true)}</h2>
-            </div>
-          </div>
+          {/* Internal Print UI content... */}
           <div style={{ padding: '40px', backgroundColor: '#0f172a', borderRadius: '32px', color: '#ffffff', textAlign: 'center' }}>
-            <p style={{ fontSize: '14px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '2px' }}>
-              Estimated Tax Liability ({taxRate}%)
-            </p>
-            <h1 style={{ fontSize: '72px', color: '#4ade80', margin: '20px 0', fontWeight: '900' }}>
-              {formatValue(estimatedTax, true)}
-            </h1>
-            <div style={{ height: '1px', backgroundColor: 'rgba(255,255,255,0.1)', margin: '20px auto', width: '200px' }}></div>
-            <p style={{ fontSize: '18px', color: '#94a3b8', fontWeight: '600' }}>
-              Net Taxable Profit: {formatValue(profit, true)}
-            </p>
-          </div>
-          <div style={{ marginTop: '60px', borderTop: '2px solid #f1f5f9', paddingTop: '30px' }}>
-            <h4 style={{ fontSize: '14px', fontWeight: '900', color: '#0f172a', marginBottom: '10px' }}>Disclaimer</h4>
-            <p style={{ fontSize: '12px', color: '#94a3b8', lineHeight: '1.6' }}>
-              This report is a computer-generated estimate based on the data provided in the BusinessTax Ledger. 
-              Actual tax liabilities may vary based on local laws, tax brackets, and specific exemptions. 
-              Please consult with a certified tax professional before making official filings.
-            </p>
+            <p style={{ fontSize: '14px', color: '#94a3b8', textTransform: 'uppercase', fontWeight: '900' }}>Estimated Tax Liability ({taxRate}%)</p>
+            <h1 style={{ fontSize: '72px', color: '#4ade80', margin: '20px 0', fontWeight: '900' }}>{formatValue(estimatedTax, true)}</h1>
+            <p style={{ fontSize: '18px', color: '#94a3b8' }}>Net Taxable Profit: {formatValue(profit, true)}</p>
           </div>
         </div>
       </div>

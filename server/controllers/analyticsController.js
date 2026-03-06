@@ -1,44 +1,30 @@
 import Invoice from '../models/Invoice.js';
 import Transaction from '../models/Transaction.js';
-
+// Example of what the backend should return for this frontend to work
 export const getMonthlyReport = async (req, res) => {
   try {
-    const userId = req.user._id;
-
-    // 1. Calculate Total Revenue from Invoices
-    const revenueData = await Invoice.aggregate([
-      { $match: { user: userId, status: 'Paid' } },
-      { $group: { _id: null, total: { $sum: "$totalAmount" } } }
+    const report = await Invoice.aggregate([
+      { $match: { user: req.user._id } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { 
+            $sum: { $cond: [{ $eq: ["$type", "Sale"] }, "$totalAmount", 0] } 
+          },
+          totalExpenses: { 
+            $sum: { $cond: [{ $eq: ["$type", "Purchase"] }, "$totalAmount", 0] } 
+          }
+        }
+      }
     ]);
 
-    // 2. Calculate Total Expenses & Breakdown from Transactions
-    // We group by 'description' since 'category' doesn't exist in your model
-    const categoryTotals = await Transaction.aggregate([
-      { $match: { userId: userId, status: 'Completed' } },
-      { $group: { 
-          _id: "$description", 
-          total: { $sum: "$amount" } 
-        } 
-      },
-      { $sort: { total: -1 } }
-    ]);
-
-    const totalIncome = revenueData[0]?.total || 0;
-    // Sum up all transactions as expenses for now
-    const totalExpenses = categoryTotals.reduce((acc, curr) => acc + curr.total, 0);
-    const netProfit = totalIncome - totalExpenses;
-
+    const data = report[0] || { totalRevenue: 0, totalExpenses: 0 };
     res.json({
-      totalIncome: Number(totalIncome),
-      totalExpenses: Number(totalExpenses),
-      netProfit: Number(netProfit),
-      categoryTotals, // This feeds the progress bars in TaxSummary
-      month: new Date().toLocaleString('default', { month: 'long' }),
-      taxRate: 15 // Default rate
+      totalIncome: data.totalRevenue,
+      totalExpenses: data.totalExpenses,
+      netProfit: data.totalRevenue - data.totalExpenses
     });
-
   } catch (error) {
-    console.error("Analytics Error:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(500).json({ message: error.message });
   }
 };
