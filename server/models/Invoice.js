@@ -1,42 +1,19 @@
 import mongoose from 'mongoose';
 
 const invoiceSchema = new mongoose.Schema({
-  user: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User', 
-    required: true 
-  },
-  client: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Client',
-    required: true 
-  },
-  type: { 
-    type: String, 
-    enum: ['Sale', 'Purchase'], 
-    default: 'Sale' 
-  },
-  invoiceNumber: { 
-    type: String 
-  },
-  invoiceDate: { 
-    type: Date, 
-    default: Date.now 
-  },
-  paymentTerms: { 
-    type: String 
-  },
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
+  type: { type: String, enum: ['Sale', 'Purchase'], default: 'Sale' },
+  invoiceNumber: { type: String },
+  invoiceDate: { type: Date, default: Date.now },
+  paymentTerms: { type: String },
   paymentMethod: { 
     type: String, 
     enum: ['Cash', 'Bank Transfer', 'UPI', 'Card', 'Cheque'],
     default: 'Cash'
   },
-  referenceNumber: { 
-    type: String 
-  }, 
-  poNumber: { 
-    type: String 
-  },
+  referenceNumber: { type: String }, 
+  poNumber: { type: String },
   gstNumber: { type: String },
   billingAddress: { type: String },
   shippingAddress: { type: String },
@@ -48,58 +25,29 @@ const invoiceSchema = new mongoose.Schema({
     price: { type: Number, default: 0 },
     taxRate: { type: Number, default: 0 } 
   }],
-  subtotal: { 
-    type: Number, 
-    default: 0
-  },
-  taxAmount: { 
-    type: Number, 
-    default: 0 
-  },
-  discount: { 
-    type: Number, 
-    default: 0 
-  },
-  shipping: { 
-    type: Number, 
-    default: 0 
-  },
-  totalAmount: { 
-    type: Number,
-    default: 0
-  },
+  subtotal: { type: Number, default: 0 },
+  taxAmount: { type: Number, default: 0 },
+  discount: { type: Number, default: 0 },
+  shipping: { type: Number, default: 0 },
+  totalAmount: { type: Number, default: 0 },
   status: { 
     type: String, 
     enum: ['Paid', 'Pending', 'Partially Paid', 'Overdue', 'Draft', 'Cancelled'], 
     default: 'Pending' 
   },
-  dueDate: { 
-    type: Date, 
-    required: true 
-  },
-  razorpayOrderId: { 
-    type: String, 
-    unique: true, 
-    sparse: true 
-  },
-  paidIntoAccount: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Account'
-  },
-  paymentDate: { 
-    type: Date 
-  },
-  notes: {
-    type: String
-  }
+  dueDate: { type: Date, required: true },
+  razorpayOrderId: { type: String, unique: true, sparse: true },
+  paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' },
+  paymentDate: { type: Date },
+  notes: { type: String }
 }, { timestamps: true });
 
-// Indexes to speed up queries and ensure uniqueness per user
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, referenceNumber: 1 });
 
 // PRE-SAVE HOOK: Financial Calculations
-invoiceSchema.pre('save', async function(next) {
+// REMOVED 'next' parameter because the function is async
+invoiceSchema.pre('save', async function() {
   try {
     const items = this.items || [];
     
@@ -121,13 +69,12 @@ invoiceSchema.pre('save', async function(next) {
     this.discount = Number(this.discount || 0);
 
     // 4. Calculate Final Total
-    // Formula: Total = (Subtotal + Tax + Shipping) - Discount
     const finalTotal = (this.subtotal + this.taxAmount + this.shipping) - this.discount;
     this.totalAmount = Number(finalTotal.toFixed(2));
 
-    next();
+    // No next() needed here for async functions in Mongoose 5.x/6.x/7.x
   } catch (error) {
-    next(error); // Sends error to the Controller try-catch block
+    throw error; // Rethrow so the save operation fails and the controller catches it
   }
 });
 
