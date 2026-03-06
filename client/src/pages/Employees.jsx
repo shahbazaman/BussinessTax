@@ -61,9 +61,9 @@ const Employees = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  // Updated Payroll Logic: Handles Monthly vs Daily
-  const totalPayrollAmount = useMemo(() => {
+ const totalPayrollAmount = useMemo(() => {
     return employees.reduce((sum, emp) => {
+      if (Number(emp.workingDays) === 0) return sum + 0;
       const amount = emp.salaryType === 'Daily' 
         ? (Number(emp.workingDays) * Number(emp.dailyRate)) 
         : Number(emp.dailyRate);
@@ -110,18 +110,37 @@ const Employees = () => {
     }
   };
 
-  const handleCloseMonth = async () => {
+const handleCloseMonth = async () => {
     if (!selectedAccountId) {
       toast.error("Please select a payment source");
       return;
     }
+    const loadingToast = toast.loading("Processing payroll and resetting logs...");
+
     try {
       const res = await api.post('/employees/close-month', { accountId: selectedAccountId });
-      toast.success(res.data.message);
-      setShowPayrollModal(false);
-      fetchData();
+      setEmployees(prev => prev.map(emp => ({
+        ...emp,
+        workingDays: 0,
+        lastAttendanceDate: null 
+      })));
+
+      toast.update(loadingToast, { 
+        render: res.data.message || "Payroll Processed & Reset", 
+        type: "success", 
+        isLoading: false, 
+        autoClose: 3000 
+      });
+
+      setShowPayrollModal(false);    
+      await fetchData(); 
     } catch (err) {
-      toast.error(err.response?.data?.message || "Payroll reset failed");
+      toast.update(loadingToast, { 
+        render: err.response?.data?.message || "Payroll reset failed", 
+        type: "error", 
+        isLoading: false, 
+        autoClose: 3000 
+      });
     }
   };
 
@@ -267,9 +286,11 @@ const Employees = () => {
                   <td className="px-8 py-5 font-bold text-slate-700">{emp.workingDays} Days</td>
                   <td className="px-8 py-5 font-black text-slate-900">
                     {symbol}
-                    {(emp.salaryType === 'Daily' 
-                      ? (emp.workingDays * emp.dailyRate) 
-                      : emp.dailyRate
+                    {(Number(emp.workingDays) === 0 
+                      ? 0 
+                      : (emp.salaryType === 'Daily' 
+                          ? (emp.workingDays * emp.dailyRate) 
+                          : emp.dailyRate)
                     ).toLocaleString()}
                     <span className="text-[10px] ml-1 text-slate-400 font-normal">({emp.salaryType})</span>
                   </td>
