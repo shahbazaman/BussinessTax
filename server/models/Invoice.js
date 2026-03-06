@@ -17,8 +17,7 @@ const invoiceSchema = new mongoose.Schema({
     default: 'Sale' 
   },
   invoiceNumber: { 
-    type: String, 
-    required: function() { return this.type === 'Sale'; } 
+    type: String 
   },
   invoiceDate: { 
     type: Date, 
@@ -95,27 +94,41 @@ const invoiceSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Indexes to speed up queries and ensure uniqueness per user
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, referenceNumber: 1 });
+
+// PRE-SAVE HOOK: Financial Calculations
 invoiceSchema.pre('save', async function(next) {
-  const items = this.items || [];
-  
-  const calculatedSubtotal = items.reduce((acc, item) => {
-    return acc + (Number(item.price || 0) * Number(item.quantity || 0));
-  }, 0);
+  try {
+    const items = this.items || [];
+    
+    // 1. Calculate Subtotal
+    const calculatedSubtotal = items.reduce((acc, item) => {
+      return acc + (Number(item.price || 0) * Number(item.quantity || 0));
+    }, 0);
 
-  const calculatedTax = items.reduce((acc, item) => {
-    const itemTotal = Number(item.price || 0) * Number(item.quantity || 0);
-    return acc + (itemTotal * (Number(item.taxRate || 0) / 100));
-  }, 0);
+    // 2. Calculate Tax Amount
+    const calculatedTax = items.reduce((acc, item) => {
+      const itemTotal = Number(item.price || 0) * Number(item.quantity || 0);
+      return acc + (itemTotal * (Number(item.taxRate || 0) / 100));
+    }, 0);
 
-  this.subtotal = calculatedSubtotal;
-  this.taxAmount = calculatedTax;
-  this.shipping = Number(this.shipping || 0);
-  this.discount = Number(this.discount || 0);
-  this.totalAmount = (this.subtotal + this.taxAmount + this.shipping) - this.discount;
-  
-  next();
+    // 3. Update Fields
+    this.subtotal = Number(calculatedSubtotal.toFixed(2));
+    this.taxAmount = Number(calculatedTax.toFixed(2));
+    this.shipping = Number(this.shipping || 0);
+    this.discount = Number(this.discount || 0);
+
+    // 4. Calculate Final Total
+    // Formula: Total = (Subtotal + Tax + Shipping) - Discount
+    const finalTotal = (this.subtotal + this.taxAmount + this.shipping) - this.discount;
+    this.totalAmount = Number(finalTotal.toFixed(2));
+
+    next();
+  } catch (error) {
+    next(error); // Sends error to the Controller try-catch block
+  }
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);

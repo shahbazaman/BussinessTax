@@ -15,8 +15,12 @@ export const createInvoice = async (req, res) => {
     const invoiceType = type || 'Sale';
     const validatedItems = [];
 
-    // 1. Validate Products & Variants and apply the taxRate
+    // 1. Validate Products & Variants
     for (const item of items) {
+      if (!item.productId || !item.variantId) {
+        return res.status(400).json({ message: `Missing Product or Variant ID for item: ${item.name}` });
+      }
+
       const product = await Product.findById(item.productId);
       if (!product) return res.status(404).json({ message: `Product ${item.name} not found` });
       
@@ -29,7 +33,6 @@ export const createInvoice = async (req, res) => {
         name: item.name || product.title,
         quantity: Number(item.quantity || 0),
         price: Number(item.price || 0),
-        // Use item-specific taxRate if it exists, otherwise use the global taxRate from body
         taxRate: Number(item.taxRate || taxRate || 0)
       });
     }
@@ -40,11 +43,13 @@ export const createInvoice = async (req, res) => {
         finalInvoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
     }
 
+    // 3. Create Invoice Instance
     const invoice = new Invoice({
       user: req.user._id,
       client: clientId, 
       invoiceNumber: finalInvoiceNumber,
       invoiceDate: invoiceDate || new Date(),
+      dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // Default 7 days if empty
       paymentMethod,
       paymentTerms,
       referenceNumber, 
@@ -55,16 +60,15 @@ export const createInvoice = async (req, res) => {
       items: validatedItems,
       shipping: Number(shipping || 0),
       discount: Number(discount || 0),
-      dueDate,
       status: status || 'Pending',
       type: invoiceType,
-      notes,
-      totalAmount: 0 // Will be calculated by pre-save hook in model
+      notes
     });
 
+    // .save() triggers the pre-save hook in Invoice.js to calculate totals
     const savedInvoice = await invoice.save();
 
-    // 3. Adjust Stock (Purchase increases stock, Sale decreases it)
+    // 4. Adjust Stock (Purchase increases, Sale decreases)
     for (const item of validatedItems) {
       const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
       await Product.updateOne(
@@ -75,6 +79,7 @@ export const createInvoice = async (req, res) => {
     
     res.status(201).json(savedInvoice);
   } catch (error) {
+    console.error("CREATE INVOICE ERROR:", error); // Logs actual error in Render console
     res.status(500).json({ message: "Creation failed", error: error.message });
   }
 };
@@ -95,7 +100,7 @@ export const updateInvoice = async (req, res) => {
     const oldInvoice = await Invoice.findById(req.params.id);
     if (!oldInvoice) return res.status(404).json({ message: "Not found" });
 
-    // 1. Revert old stock levels before applying update
+    // 1. Revert old stock levels
     for (const item of oldInvoice.items) {
       const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
       await Product.updateOne(
@@ -104,14 +109,11 @@ export const updateInvoice = async (req, res) => {
       );
     }
 
-    // 2. Handle update data and map clientId
-    const { _id, user, items, taxRate, ...updateData } = req.body;
+    // 2. Map Update Data
+    const { _id, user, items, taxRate, clientId, ...updateData } = req.body;
     
-    if (updateData.clientId) {
-        oldInvoice.client = updateData.clientId;
-    }
+    if (clientId) oldInvoice.client = clientId;
 
-    // If items are being updated, ensure taxRate is applied to each new item
     if (items) {
       oldInvoice.items = items.map(item => ({
         ...item,
@@ -119,10 +121,9 @@ export const updateInvoice = async (req, res) => {
       }));
     }
 
-    // Apply remaining updates
     Object.assign(oldInvoice, updateData);
     
-    // Save triggers the calculation hook in Invoice.js
+    // Save triggers the calculation hook
     const updatedInvoice = await oldInvoice.save();
 
     // 3. Apply new stock levels
@@ -136,6 +137,7 @@ export const updateInvoice = async (req, res) => {
 
     res.json(updatedInvoice);
   } catch (error) {
+    console.error("UPDATE INVOICE ERROR:", error);
     res.status(500).json({ message: "Update failed", error: error.message });
   }
 };
@@ -145,7 +147,7 @@ export const deleteInvoice = async (req, res) => {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ message: "Not found" });
 
-    // Revert stock levels (Sale deletion adds back, Purchase deletion removes)
+    // Revert stock levels
     for (const item of invoice.items) {
         const revertQty = (invoice.type === 'Purchase') ? -item.quantity : item.quantity;
         await Product.updateOne(
@@ -155,9 +157,9 @@ export const deleteInvoice = async (req, res) => {
       }
 
     await invoice.deleteOne();
-    res.json({ message: "Invoice removed & stock updated accordingly" });
+    res.json({ message: "Invoice removed & stock updated" });
   } catch (error) {
-    res.status(500).json({ message: "Deletion failed" });
+    res.status(500).json({ message: "Deletion failed", error: error.message });
   }
 };
 
@@ -166,7 +168,7 @@ export const updateInvoiceStatus = async (req, res) => {
     const invoice = await Invoice.findOneAndUpdate(
       { _id: req.params.id, user: req.user._id }, 
       { status: req.body.status }, 
-      { new: true }
+      { new: true, returnDocument: 'after' } // Fixed the deprecation warning
     ).populate('client', 'name email');
     res.json(invoice);
   } catch (err) {
