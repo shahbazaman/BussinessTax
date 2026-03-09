@@ -19,12 +19,12 @@ const invoiceSchema = new mongoose.Schema({
   
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    variantId: { type: mongoose.Schema.Types.ObjectId },
-    name: { type: String, required: true },
-    sku: { type: String }, 
-    barcode: { type: String },
-    quantity: { type: Number, default: 1 },
-    price: { type: Number, default: 0 },
+    variantId: { type: mongoose.Schema.Types.ObjectId, required: false }, // Add this
+    name: String,
+    quantity: Number,
+    price: Number,
+    sku: String,
+    barcode: String,
   }],
 
   subtotal: { type: Number, default: 0 },
