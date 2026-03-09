@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../utils/api';
-import Select from 'react-select'; // Added for product search
+import Select from 'react-select';
 
 const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts, invoices, editData, initialType }) => {
   const [formData, setFormData] = useState({
@@ -24,7 +24,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
 
   const [loading, setLoading] = useState(false);
 
-  // Auto-generate sequential numbers for new invoices
+  // Initialize and Reset Logic
   useEffect(() => {
     if (isOpen) {
       if (editData) {
@@ -58,7 +58,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
     }
   }, [isOpen, editData, initialType, invoices, accounts]);
 
-  // Product Search Dropdown Options
+  // Product Search Configuration
   const productOptions = products.map(p => ({
     value: p._id,
     label: `${p.name} | SKU: ${p.sku || 'N/A'} | Barcode: ${p.barcode || 'N/A'} - ₹${p.price}`,
@@ -69,7 +69,6 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
     if (!selectedOption) return;
     const p = selectedOption.data;
     
-    // Check if item already exists in the list
     if (formData.items.find(item => item.productId === p._id)) {
       toast.info("Product already added, update quantity instead.");
       return;
@@ -84,8 +83,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           name: p.name,
           sku: p.sku,
           barcode: p.barcode,
-          quantity: 1, // Quality
-          price: p.price, // Rate
+          quantity: 1,
+          price: p.price,
           taxRate: 0
         }
       ]
@@ -139,7 +138,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex justify-center items-center p-4">
       <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
-        {/* Header */}
+        {/* Header Section */}
         <div className="px-8 py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
           <div>
             <h2 className="text-xl font-black text-slate-800 uppercase tracking-tight">
@@ -152,11 +151,11 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           </button>
         </div>
 
-        {/* Body */}
+        {/* Form Body */}
         <div className="p-8 overflow-y-auto custom-scrollbar">
           <form id="invoice-form" onSubmit={handleSubmit} className="space-y-8">
             
-            {/* Type Toggle (Only on New) */}
+            {/* Toggle Switch */}
             {!editData && (
               <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
                 {['Sale', 'Purchase'].map(t => (
@@ -171,7 +170,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
               </div>
             )}
 
-            {/* Top Info Grid */}
+            {/* Top Grid Fields */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {formData.type === 'Sale' ? (
                 <div>
@@ -205,7 +204,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
               </div>
             </div>
 
-            {/* Address & GST Grid */}
+            {/* Address Logic */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">
               <div className="md:col-span-2">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">GSTIN (Optional)</label>
@@ -223,41 +222,15 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
               )}
             </div>
 
-            {/* Items Section */}
+            {/* Item Management */}
             <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest">Line Items</h3>
-              </div>
-
-              {/* Product Search Dropdown */}
+              <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4">Line Items</h3>
               <div className="mb-6 relative z-10">
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Search & Add Product</label>
                 <Select
                   options={productOptions}
                   onChange={handleProductSelect}
-                  placeholder="Search by Name, SKU, or Barcode..."
+                  placeholder="Search and add product..."
                   className="text-sm font-bold"
-                  styles={{
-                    control: (base) => ({
-                      ...base,
-                      backgroundColor: '#f8fafc',
-                      borderColor: '#e2e8f0',
-                      borderRadius: '0.75rem',
-                      padding: '2px',
-                      boxShadow: 'none',
-                      '&:hover': { borderColor: '#cbd5e1' }
-                    })
-                  }}
-                  filterOption={(option, inputValue) => {
-                    const searchStr = inputValue.toLowerCase();
-                    const p = option.data;
-                    return (
-                      p.name?.toLowerCase().includes(searchStr) ||
-                      p.sku?.toLowerCase().includes(searchStr) ||
-                      p.barcode?.toLowerCase().includes(searchStr)
-                    );
-                  }}
-                  value={null} // Reset after selection
                 />
               </div>
 
@@ -265,83 +238,42 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
                 <table className="w-full text-left">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item Details</th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item</th>
                       <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest w-24">Qty</th>
-                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">Rate (₹)</th>
-                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest w-12"></th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest w-32">Rate</th>
+                      <th className="px-4 py-3 w-12"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {formData.items.length === 0 ? (
-                      <tr><td colSpan="4" className="p-8 text-center text-sm font-bold text-slate-400">Search and add products above</td></tr>
-                    ) : (
-                      formData.items.map((item, idx) => (
-                        <tr key={idx} className="bg-white">
-                          <td className="px-4 py-3">
-                            <div className="text-sm font-bold text-slate-800">{item.name}</div>
-                            <div className="text-[10px] text-slate-400 font-bold uppercase mt-1">SKU: {item.sku || 'N/A'}</div>
-                          </td>
-                          <td className="px-4 py-3">
-                            <input 
-                              type="number" 
-                              min="1" 
-                              className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold outline-none text-center" 
-                              value={item.quantity} 
-                              onChange={e => handleItemChange(idx, 'quantity', e.target.value)} 
-                              required 
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <input 
-                              type="number" 
-                              min="0" 
-                              step="0.01"
-                              className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-lg text-sm font-bold outline-none" 
-                              value={item.price} 
-                              onChange={e => handleItemChange(idx, 'price', e.target.value)} 
-                              required 
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <button type="button" onClick={() => removeItem(idx)} className="p-2 text-rose-400 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                    {formData.items.map((item, idx) => (
+                      <tr key={idx} className="bg-white">
+                        <td className="px-4 py-3"><div className="text-sm font-bold">{item.name}</div></td>
+                        <td className="px-4 py-3"><input type="number" min="1" className="w-full p-2 border rounded-lg text-center" value={item.quantity} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} /></td>
+                        <td className="px-4 py-3"><input type="number" step="0.01" className="w-full p-2 border rounded-lg" value={item.price} onChange={e => handleItemChange(idx, 'price', e.target.value)} /></td>
+                        <td className="px-4 py-3"><button type="button" onClick={() => removeItem(idx)} className="text-rose-400"><Trash2 size={16} /></button></td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            {/* Totals Calculation */}
+            {/* Final Totals */}
             <div className="flex justify-end pt-6 border-t border-slate-100">
               <div className="w-full md:w-1/2 space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Rate (%)</span>
-                  <input type="number" className="w-32 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold outline-none text-right" value={formData.globalTaxRate} onChange={e => setFormData({...formData, globalTaxRate: Number(e.target.value)})} />
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Discount (₹)</span>
-                  <input type="number" className="w-32 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold outline-none text-right" value={formData.discount} onChange={e => setFormData({...formData, discount: Number(e.target.value)})} />
-                </div>
-                <div className="flex justify-between items-center py-2 border-t border-slate-100">
-                  <span className="text-sm font-bold text-slate-500">Tax Total</span>
-                  <span className="text-sm font-bold text-slate-800">₹{totals.tax.toFixed(2)}</span>
-                </div>
                 <div className="flex justify-between items-center py-4 border-t border-slate-200">
                   <span className="text-lg font-black text-slate-900 uppercase tracking-widest">Grand Total</span>
                   <span className="text-2xl font-black text-indigo-600">₹{totals.total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
-
           </form>
         </div>
 
-        {/* Footer */}
+        {/* Footer Actions */}
         <div className="px-8 py-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-3">
-          <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-500 hover:bg-slate-200 transition-colors">Cancel</button>
-          <button type="submit" form="invoice-form" disabled={loading} className="px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-200 transition-all disabled:opacity-50">
+          <button type="button" onClick={onClose} className="px-6 py-3 rounded-xl font-black text-[10px] uppercase">Cancel</button>
+          <button type="submit" form="invoice-form" disabled={loading} className="px-8 py-3 rounded-xl font-black text-[10px] uppercase text-white bg-indigo-600">
             {loading ? 'Saving...' : 'Save Invoice'}
           </button>
         </div>

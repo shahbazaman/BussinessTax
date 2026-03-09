@@ -19,6 +19,7 @@ const invoiceSchema = new mongoose.Schema({
   
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+    variantId: { type: mongoose.Schema.Types.ObjectId, required: true }, // Added for variant tracking
     name: { type: String, required: true },
     sku: { type: String }, 
     barcode: { type: String },
@@ -42,12 +43,12 @@ const invoiceSchema = new mongoose.Schema({
   paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }
 }, { timestamps: true });
 
-// Sparse indexes to handle unique numbering for both Sales and Purchases
+// Sparse indexes to handle unique numbering
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, purchaseNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, referenceNumber: 1 }, { unique: true, sparse: true });
 
-// PRE-SAVE HOOK: Ensures data integrity for every transaction
+// PRE-SAVE HOOK: Ensures data integrity
 invoiceSchema.pre('save', function(next) {
   const items = this.items || [];
   

@@ -14,17 +14,21 @@ export const createInvoice = async (req, res) => {
 
     const invoiceType = type || 'Sale';
 
-    // 1. Validate Items & Fetch SKU/Barcode from DB to ensure accuracy
+    // 1. Validate Items & Fetch Variant Data
     const validatedItems = [];
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) return res.status(404).json({ message: `Product not found: ${item.name}` });
       
+      const variant = product.variants.id(item.variantId);
+      if (!variant) return res.status(404).json({ message: "Selected product variant not found" });
+
       validatedItems.push({
         productId: item.productId,
-        name: item.name || product.name,
-        sku: product.sku || '',             // Taking from DB
-        barcode: product.barcode || '',     // Taking from DB
+        variantId: item.variantId,
+        name: item.name,
+        sku: variant.sku || '',
+        barcode: variant.barcode || '',
         quantity: Number(item.quantity || 0),
         price: Number(item.price || 0)
       });
@@ -33,15 +37,12 @@ export const createInvoice = async (req, res) => {
     // 2. Create Invoice Instance
     const invoice = new Invoice({
       user: req.user._id,
-      client: client, 
-      // Using frontend generated numbers, fallback to undefined if empty strings
+      client,
       invoiceNumber: invoiceType === 'Sale' ? (invoiceNumber || undefined) : undefined,
       purchaseNumber: invoiceType === 'Purchase' ? (purchaseNumber || undefined) : undefined,
       referenceNumber: invoiceType === 'Purchase' ? (referenceNumber || undefined) : undefined,
       invoiceDate: invoiceDate || new Date(),
-      gstNumber,
-      billingAddress,
-      shippingAddress,
+      gstNumber, billingAddress, shippingAddress,
       items: validatedItems,
       discount: Number(discount || 0),
       globalTaxRate: Number(globalTaxRate || 0),
@@ -52,22 +53,18 @@ export const createInvoice = async (req, res) => {
 
     const savedInvoice = await invoice.save();
 
-    // 3. Adjust Stock directly on the Product document
+    // 3. Adjust Stock on specific variant
     for (const item of validatedItems) {
       const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
-      await Product.findByIdAndUpdate(
-        item.productId,
-        { $inc: { stock: adjustment } }
+      await Product.updateOne(
+        { _id: item.productId, "variants._id": item.variantId },
+        { $inc: { "variants.$.stock": adjustment } }
       );
     }
     
     res.status(201).json(savedInvoice);
   } catch (error) {
-    console.error("CREATE INVOICE ERROR:", error); 
-    // Handle duplicate key error from MongoDB elegantly
-    if (error.code === 11000) {
-      return res.status(400).json({ message: "An invoice with this number already exists. Please refresh and try again." });
-    }
+    if (error.code === 11000) return res.status(400).json({ message: "Invoice number already exists." });
     res.status(500).json({ message: "Creation failed", error: error.message });
   }
 };
@@ -91,27 +88,15 @@ export const updateInvoice = async (req, res) => {
     // 1. Revert old stock
     for (const item of oldInvoice.items) {
       const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
-      await Product.findByIdAndUpdate(
-        item.productId,
-        { $inc: { stock: revertQty } }
+      await Product.updateOne(
+        { _id: item.productId, "variants._id": item.variantId },
+        { $inc: { "variants.$.stock": revertQty } }
       );
     }
 
     const { items, client, ...updateData } = req.body;
-    
     if (client) oldInvoice.client = client;
-    
-    // Ensure updated items have current SKU/Barcode if changed
-    if (items) {
-      oldInvoice.items = await Promise.all(items.map(async (item) => {
-        const product = await Product.findById(item.productId);
-        return {
-          ...item,
-          sku: product?.sku || item.sku,
-          barcode: product?.barcode || item.barcode
-        };
-      }));
-    }
+    if (items) oldInvoice.items = items;
     
     Object.assign(oldInvoice, updateData);
     const updatedInvoice = await oldInvoice.save();
@@ -119,15 +104,14 @@ export const updateInvoice = async (req, res) => {
     // 2. Apply new stock
     for (const item of updatedInvoice.items) {
       const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
-      await Product.findByIdAndUpdate(
-        item.productId,
-        { $inc: { stock: newAdjustment } }
+      await Product.updateOne(
+        { _id: item.productId, "variants._id": item.variantId },
+        { $inc: { "variants.$.stock": newAdjustment } }
       );
     }
 
     res.json(updatedInvoice);
   } catch (error) {
-    console.error("UPDATE INVOICE ERROR:", error);
     res.status(500).json({ message: "Update failed", error: error.message });
   }
 };
@@ -137,12 +121,11 @@ export const deleteInvoice = async (req, res) => {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ message: "Not found" });
 
-    // Revert stock upon deletion
     for (const item of invoice.items) {
         const revertQty = (invoice.type === 'Purchase') ? -item.quantity : item.quantity;
-        await Product.findByIdAndUpdate(
-          item.productId,
-          { $inc: { stock: revertQty } }
+        await Product.updateOne(
+          { _id: item.productId, "variants._id": item.variantId },
+          { $inc: { "variants.$.stock": revertQty } }
         );
     }
 
@@ -159,7 +142,7 @@ export const updateInvoiceStatus = async (req, res) => {
       { _id: req.params.id, user: req.user._id }, 
       { status: req.body.status }, 
       { new: true }
-    ).populate('client', 'name email');
+    );
     res.json(invoice);
   } catch (err) {
     res.status(500).json({ message: "Status update failed" });
