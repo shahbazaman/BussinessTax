@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { X, Plus, Trash2, Save, Package, AlertCircle, Edit3, TrendingUp, Warehouse, Barcode } from 'lucide-react';
+import { X, Plus, Trash2, Save, Package, AlertCircle, Edit3, Warehouse, Barcode, Hash } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
 import { CurrencyContext } from '../context/CurrencyContext';
@@ -130,7 +130,7 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
               <h2 className="text-2xl font-black text-slate-800 tracking-tight">
                 {isEditing ? 'Update Inventory' : 'Product Warehouse'}
               </h2>
-              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">Units, Tax & Barcode Management</p>
+              <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">SKU, Name & Barcode Management</p>
             </div>
           </div>
           <button onClick={onClose} className="p-3 hover:bg-slate-100 text-slate-400 rounded-2xl transition-all">
@@ -190,31 +190,48 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
             <div className="space-y-4">
               {productData.variants.map((variant, index) => (
                 <div key={index} className="p-6 bg-white rounded-4xl border border-slate-100 shadow-sm space-y-4">
+                  
+                  {/* Row 1: Key Identifiers (Name, SKU, Barcode) */}
+                  <div className="grid grid-cols-12 gap-3 items-center">
+                    <div className="col-span-12 md:col-span-4">
+                      <input name="name" value={variant.name} placeholder="Variant Name (e.g. Red, XL)" className="w-full p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} required />
+                    </div>
+                    <div className="col-span-6 md:col-span-4 relative">
+                      <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                      <input name="sku" value={variant.sku} placeholder="SKU (Optional)" className="w-full pl-9 p-3 rounded-xl bg-blue-50/30 text-sm font-bold text-blue-600 outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} />
+                    </div>
+                    <div className="col-span-6 md:col-span-4 relative">
+                      <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                      <input name="barcode" value={variant.barcode} placeholder="Barcode" className="w-full pl-9 p-3 rounded-xl bg-slate-100 text-sm font-bold outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} />
+                    </div>
+                  </div>
+
+                  {/* Row 2: Physical Specs & Tax */}
                   <div className="grid grid-cols-12 gap-3">
-                    <input name="name" value={variant.name} placeholder="Variant (e.g. Small)" className="col-span-12 md:col-span-4 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)} required />
-                    <input name="weight" type="number" value={variant.weight} placeholder="Qty/Weight" className="col-span-4 md:col-span-2 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)} />
+                    <input name="weight" type="number" value={variant.weight} placeholder="Weight" className="col-span-4 md:col-span-3 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)} />
                     <select name="unit" value={variant.unit} className="col-span-4 md:col-span-3 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)}>
                       <option value="pcs">pcs</option><option value="kg">kg</option><option value="g">g</option><option value="ml">ml</option><option value="L">L</option><option value="box">box</option>
                     </select>
-                    <input name="taxRate" type="number" value={variant.taxRate} placeholder="GST %" className="col-span-4 md:col-span-3 p-3 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-black outline-none border border-indigo-100" onChange={(e) => handleVariantChange(index, e)} />
+                    <div className="col-span-4 md:col-span-6 flex items-center gap-2">
+                       <input name="taxRate" type="number" value={variant.taxRate} placeholder="Tax %" className="flex-1 p-3 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-black outline-none border border-indigo-100" onChange={(e) => handleVariantChange(index, e)} />
+                    </div>
                   </div>
 
+                  {/* Row 3: Financials & Stock */}
                   <div className="grid grid-cols-12 gap-3 items-center">
-                    <div className="col-span-6 md:col-span-3 relative">
+                    <div className="col-span-4 md:col-span-3 relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{symbol}</span>
                       <input name="costPrice" type="number" value={variant.costPrice} placeholder="Cost" className="w-full pl-7 p-3 rounded-xl bg-rose-50/50 text-sm font-black text-rose-600 outline-none border border-rose-100" onChange={(e) => handleVariantChange(index, e)} required />
                     </div>
-                    <div className="col-span-6 md:col-span-3 relative">
+                    <div className="col-span-4 md:col-span-3 relative">
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{symbol}</span>
                       <input name="salePrice" type="number" value={variant.salePrice} placeholder="Price" className="w-full pl-7 p-3 rounded-xl bg-emerald-50/50 text-sm font-black text-emerald-600 outline-none border border-emerald-100" onChange={(e) => handleVariantChange(index, e)} required />
                     </div>
-                    <input name="stock" type="number" value={variant.stock} placeholder="Stock" className="col-span-6 md:col-span-2 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)} required />
-                    <div className="col-span-6 md:col-span-4 flex items-center gap-2">
-                        <div className="relative flex-1">
-                            <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                            <input name="barcode" value={variant.barcode} placeholder="Barcode" className="w-full pl-9 p-3 rounded-xl bg-slate-100 text-sm font-bold outline-none border-none" onChange={(e) => handleVariantChange(index, e)} />
-                        </div>
-                        <button type="button" onClick={() => removeVariantField(index)} className="p-3 text-rose-400 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={18} /></button>
+                    <input name="stock" type="number" value={variant.stock} placeholder="Stock" className="col-span-2 md:col-span-4 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)} required />
+                    <div className="col-span-2 md:col-span-2 flex justify-end">
+                      <button type="button" onClick={() => removeVariantField(index)} className="p-3 text-rose-400 hover:bg-rose-50 rounded-xl transition-all">
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </div>
                 </div>

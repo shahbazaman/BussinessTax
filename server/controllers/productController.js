@@ -12,25 +12,35 @@ export const getProducts = async (req, res) => {
 export const addProduct = async (req, res) => {
   try {
     const { title, category, variants, lowStockAlert, supplier, reorderQuantity } = req.body;
+    
+    const formattedVariants = variants.map(v => ({
+      name: v.name,
+      sku: v.sku || `SKU-${Date.now()}`, 
+      barcode: v.barcode,
+      price: v.salePrice, 
+      costPrice: v.costPrice,
+      stock: v.stock,
+      taxRate: v.taxRate,
+      weight: v.weight,
+      unit: v.unit
+    }));
+
     const product = new Product({
       user: req.user.id,
       title,
       category,
       supplier,
-      variants, 
+      variants: formattedVariants, 
       lowStockAlert,
       reorderQuantity
     });
-
     const savedProduct = await product.save();
     res.status(201).json(savedProduct);
   } catch (error) {
-    console.log("DETAILED ERROR:", error);
     res.status(400).json({ message: error.message });
   }
 };
 
-// @desc Update full product details and variants
 export const updateProduct = async (req, res) => {
   try {
     const { title, category, variants, lowStockAlert, supplier, reorderQuantity } = req.body;

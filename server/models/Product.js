@@ -1,44 +1,15 @@
 import mongoose from 'mongoose';
 
 const variantSchema = new mongoose.Schema({
-  name: { 
-    type: String, 
-    required: true 
-  },
-  weight: { 
-    type: Number 
-  },
-  unit: { 
-    type: String, 
-    enum: ['g', 'kg', 'ml', 'L', 'pcs', 'box', 'mtr', 'set'],
-    default: 'pcs' 
-  },
-  costPrice: { 
-    type: Number, 
-    required: true, 
-    default: 0 
-  },
-  price: { 
-    type: Number, 
-    required: true 
-  },
-  taxRate: { // New Field for GST
-    type: Number,
-    default: 0 
-  },
-  stock: { 
-    type: Number, 
-    default: 0 
-  },
-  sku: { 
-    type: String, 
-    unique: true, 
-    sparse: true 
-  },
-  barcode: { // Barcode for scanning support
-    type: String,
-    sparse: true
-  }
+  name: { type: String, required: true },
+  sku: { type: String, sparse: true }, 
+  barcode: { type: String, sparse: true },
+  price: { type: Number, required: true },
+  costPrice: { type: Number, default: 0 },
+  stock: { type: Number, default: 0 },
+  taxRate: { type: Number, default: 0 },
+  weight: Number,
+  unit: { type: String, enum: ['g', 'kg', 'ml', 'L', 'pcs', 'box', 'mtr', 'set'], default: 'pcs' }
 });
 
 const productSchema = new mongoose.Schema({

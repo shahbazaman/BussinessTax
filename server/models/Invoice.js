@@ -4,78 +4,69 @@ const invoiceSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
   type: { type: String, enum: ['Sale', 'Purchase'], default: 'Sale' },
-  // Sales specific number (INV-0001)
+  
+  // Sales specific (INV-S-001)
   invoiceNumber: { type: String },
-  // Purchase specific number (PI-0001)
+  
+  // Purchase specific (INV-P-001 and INV-REF-001)
   purchaseNumber: { type: String }, 
-  invoiceDate: { type: Date, default: Date.now },
-  paymentMethod: { 
-    type: String, 
-    enum: ['Cash', 'Bank Transfer', 'UPI', 'Card', 'Cheque'],
-    default: 'Cash'
-  },
   referenceNumber: { type: String }, 
-  poNumber: { type: String },
+
+  invoiceDate: { type: Date, default: Date.now },
   gstNumber: { type: String },
   billingAddress: { type: String },
-  // shippingAddress and paymentTerms removed as per request
+  shippingAddress: { type: String }, 
+  
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    variantId: { type: String, required: true },
     name: { type: String, required: true },
+    sku: { type: String }, 
+    barcode: { type: String },
     quantity: { type: Number, default: 1 },
     price: { type: Number, default: 0 },
-    taxRate: { type: Number, default: 0 } 
   }],
+
   subtotal: { type: Number, default: 0 },
+  globalTaxRate: { type: Number, default: 0 }, 
   taxAmount: { type: Number, default: 0 },
   discount: { type: Number, default: 0 },
-  shipping: { type: Number, default: 0 }, // Kept in schema for internal calculation safety, set to 0
   totalAmount: { type: Number, default: 0 },
-  globalTaxRate: { type: Number, default: 0 }, // Added to track the Global Tax applied
+  
   status: { 
     type: String, 
-    enum: ['Paid', 'Pending', 'Partially Paid', 'Overdue', 'Draft', 'Cancelled'], 
+    enum: ['Paid', 'Pending', 'Partially Paid', 'Cancelled'], 
     default: 'Pending' 
   },
-  // Auto-calculated in background, hidden from UI
-  dueDate: { type: Date }, 
-  razorpayOrderId: { type: String, unique: true, sparse: true },
-  paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' },
-  paymentDate: { type: Date },
-  notes: { type: String }
+  
+  notes: { type: String },
+  paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }
 }, { timestamps: true });
 
-// Updated index to handle unique Sales and Purchase numbers per user
+// Sparse indexes to handle unique numbering for both Sales and Purchases
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, purchaseNumber: 1 }, { unique: true, sparse: true });
-invoiceSchema.index({ user: 1, referenceNumber: 1 });
+invoiceSchema.index({ user: 1, referenceNumber: 1 }, { unique: true, sparse: true });
 
-// PRE-SAVE HOOK: Financial Calculations
-invoiceSchema.pre('save', async function() {
-  try {
-    const items = this.items || [];
-    const calculatedSubtotal = items.reduce((acc, item) => {
-      return acc + (Number(item.price || 0) * Number(item.quantity || 0));
-    }, 0);
-    const netBeforeTax = calculatedSubtotal - Number(this.discount || 0);
-    const calculatedTax = netBeforeTax * (Number(this.globalTaxRate || 0) / 100);
+// PRE-SAVE HOOK: Ensures data integrity for every transaction
+invoiceSchema.pre('save', function(next) {
+  const items = this.items || [];
+  
+  // 1. Calculate Subtotal
+  const calculatedSubtotal = items.reduce((acc, item) => {
+    return acc + (Number(item.price || 0) * Number(item.quantity || 0));
+  }, 0);
 
-    this.subtotal = Number(calculatedSubtotal.toFixed(2));
-    this.taxAmount = Number(calculatedTax.toFixed(2));
-    this.shipping = 0; 
-    this.discount = Number(this.discount || 0);
-    const finalTotal = netBeforeTax + this.taxAmount;
-    this.totalAmount = Number(finalTotal.toFixed(2));
-    if (this.invoiceDate && !this.dueDate) {
-      const date = new Date(this.invoiceDate);
-      date.setDate(date.getDate() + 30);
-      this.dueDate = date;
-    }
+  // 2. Calculate Global Tax
+  const calculatedTax = calculatedSubtotal * (Number(this.globalTaxRate || 0) / 100);
 
-  } catch (error) {
-    throw error;
-  }
+  this.subtotal = Number(calculatedSubtotal.toFixed(2));
+  this.taxAmount = Number(calculatedTax.toFixed(2));
+  
+  // 3. Grand Total: (Subtotal + Tax) - Discount
+  const finalTotal = (this.subtotal + this.taxAmount) - Number(this.discount || 0);
+  this.totalAmount = Number(finalTotal.toFixed(2));
+
+  next();
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);

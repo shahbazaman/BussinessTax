@@ -58,7 +58,6 @@ const Invoices = () => {
         api.get('/products')
       ]);
       
-      // Sort by date descending
       const sortedInvoices = invRes.data.sort((a, b) => 
         new Date(b.invoiceDate || b.createdAt) - new Date(a.invoiceDate || a.createdAt)
       );
@@ -98,8 +97,6 @@ const Invoices = () => {
       const invDate = new Date(inv.invoiceDate || inv.createdAt).getTime();
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
       const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
-      
-      // Defensive check for missing client data
       const clientName = inv.client?.name || "Unknown Party";
       
       return inv.type === activeTab && 
@@ -137,7 +134,6 @@ const Invoices = () => {
         order_id: order.id,
         handler: async (res) => {
           try {
-            // Updated to use the correct account route if needed
             await api.post('/payments/verify', { ...res, invoiceId: invoice._id, accountId: accounts[0]._id });
             toast.success("Payment successful!"); 
             fetchData();
@@ -173,19 +169,21 @@ const Invoices = () => {
     const doc = new jsPDF();
     const isSale = invoice.type === 'Sale';
     
-    // Header
     doc.setFontSize(22); 
     doc.setTextColor(isSale ? 79 : 225, isSale ? 70 : 29, isSale ? 229 : 72);
     doc.text(`${invoice.type.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
     
     doc.setFontSize(10);
     doc.setTextColor(40);
-    const identifier = isSale ? `Invoice No: ${invoice.invoiceNumber}` : `Ref No: ${invoice.referenceNumber || 'N/A'}`;
+    // Updated PDF labels for logic
+    const identifier = isSale 
+        ? `Invoice No: ${invoice.invoiceNumber}` 
+        : `Purchase No: ${invoice.purchaseNumber} | Ref: ${invoice.referenceNumber || 'N/A'}`;
+    
     doc.text(identifier, 14, 30);
     doc.text(`Date: ${new Date(invoice.invoiceDate || invoice.createdAt).toLocaleDateString()}`, 14, 35);
     doc.text(`GSTIN: ${invoice.gstNumber || 'N/A'}`, 14, 40);
     
-    // Addresses
     doc.text(`Party Details:`, 14, 50);
     doc.setFontSize(9);
     doc.text(`${invoice.client?.name || 'N/A'}`, 14, 55);
@@ -226,7 +224,7 @@ const Invoices = () => {
         doc.text(invoice.notes, 14, finalY + 5, { maxWidth: 180 });
     }
 
-    doc.save(`${invoice.type}_${invoice.invoiceNumber || invoice.referenceNumber}.pdf`);
+    doc.save(`${invoice.type}_${invoice.invoiceNumber || invoice.purchaseNumber}.pdf`);
   };
 
   return (
@@ -252,7 +250,7 @@ const Invoices = () => {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div>
             <h2 className="text-3xl font-black tracking-tighter uppercase text-slate-900">{activeTab} Ledger</h2>
-            <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mt-1">Transaction History & Inventory Control</p>
+            <p className="text-slate-400 font-bold text-[10px] uppercase tracking-widest mt-1">Stock-Adjusting Billing Module</p>
           </div>
           <button onClick={() => { setSelectedInvoice(null); setShowModal(true); }} className={`px-6 py-3 rounded-2xl flex items-center gap-2 shadow-lg font-black text-[10px] uppercase tracking-widest text-white hover:opacity-90 transition-opacity ${activeTab === 'Sale' ? 'bg-indigo-600' : 'bg-rose-600'}`}>
             <Plus size={16} /> Create {activeTab}
@@ -306,7 +304,7 @@ const Invoices = () => {
               <table className="w-full text-left">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-100">
-                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">{activeTab === 'Sale' ? 'Invoice No.' : 'Ref No.'}</th>
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">{activeTab === 'Sale' ? 'Inv No.' : 'Purchase & Ref'}</th>
                     <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Party / Date</th>
                     <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Grand Total</th>
                     <th className="px-8 py-5 text-[11px] font-black text-slate-400 uppercase tracking-[0.15em]">Payment Status</th>
@@ -321,7 +319,14 @@ const Invoices = () => {
                             <div className={`p-2 rounded-lg ${activeTab === 'Sale' ? 'bg-indigo-50 text-indigo-600' : 'bg-rose-50 text-rose-600'}`}>
                                 <FileText size={16} />
                             </div>
-                            <span className="font-black text-slate-800 text-sm tracking-tight">{activeTab === 'Sale' ? inv.invoiceNumber : (inv.referenceNumber || '---')}</span>
+                            <div className="flex flex-col">
+                                <span className="font-black text-slate-800 text-sm tracking-tight">
+                                    {activeTab === 'Sale' ? inv.invoiceNumber : inv.purchaseNumber}
+                                </span>
+                                {activeTab === 'Purchase' && (
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase">REF: {inv.referenceNumber || '---'}</span>
+                                )}
+                            </div>
                         </div>
                       </td>
                       <td className="px-8 py-6">
@@ -400,6 +405,7 @@ const Invoices = () => {
         clients={clients} 
         products={products} 
         accounts={accounts} 
+        invoices={invoices} // Added this to pass full list for auto-numbering
         editData={selectedInvoice} 
         initialType={activeTab} 
       />
