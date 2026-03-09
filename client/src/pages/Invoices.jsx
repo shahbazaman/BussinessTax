@@ -33,12 +33,14 @@ const Invoices = () => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [currencySymbol, setCurrencySymbol] = useState('₹');
 
+  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = () => setActiveStatusDropdown(null);
     window.addEventListener('click', handleClickOutside);
     return () => window.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // Sync tab with URL query params
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const type = params.get('type');
@@ -58,7 +60,6 @@ const Invoices = () => {
         api.get('/products')
       ]);
       
-      // Sort by date descending
       const sortedInvoices = invRes.data.sort((a, b) => 
         new Date(b.invoiceDate || b.createdAt) - new Date(a.invoiceDate || a.createdAt)
       );
@@ -99,7 +100,6 @@ const Invoices = () => {
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
       const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
       
-      // Defensive check for missing client data
       const clientName = inv.client?.name || "Unknown Party";
       
       return inv.type === activeTab && 
@@ -137,8 +137,11 @@ const Invoices = () => {
         order_id: order.id,
         handler: async (res) => {
           try {
-            // Updated to use the correct account route if needed
-            await api.post('/payments/verify', { ...res, invoiceId: invoice._id, accountId: accounts[0]._id });
+            await api.post('/payments/verify', { 
+              ...res, 
+              invoiceId: invoice._id, 
+              accountId: accounts[0]._id 
+            });
             toast.success("Payment successful!"); 
             fetchData();
           } catch { 
@@ -173,7 +176,6 @@ const Invoices = () => {
     const doc = new jsPDF();
     const isSale = invoice.type === 'Sale';
     
-    // Header
     doc.setFontSize(22); 
     doc.setTextColor(isSale ? 79 : 225, isSale ? 70 : 29, isSale ? 229 : 72);
     doc.text(`${invoice.type.toUpperCase()} INVOICE`, 105, 20, { align: "center" });
@@ -185,7 +187,6 @@ const Invoices = () => {
     doc.text(`Date: ${new Date(invoice.invoiceDate || invoice.createdAt).toLocaleDateString()}`, 14, 35);
     doc.text(`GSTIN: ${invoice.gstNumber || 'N/A'}`, 14, 40);
     
-    // Addresses
     doc.text(`Party Details:`, 14, 50);
     doc.setFontSize(9);
     doc.text(`${invoice.client?.name || 'N/A'}`, 14, 55);
@@ -386,6 +387,13 @@ const Invoices = () => {
                       </td>
                     </tr>
                   ))}
+                  {filteredInvoices.length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="px-8 py-20 text-center">
+                        <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">No transactions found</p>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

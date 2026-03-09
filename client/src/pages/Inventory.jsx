@@ -49,14 +49,21 @@ const Inventory = () => {
     } catch (err) { toast.error("Delete failed"); }
   };
 
-  const filteredProducts = useMemo(() => {
-    return products.filter(p => {
-      const matchesSearch = p.title.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-      const isLowStock = p.variants.some(v => v.stock <= (p.lowStockAlert || 10));
-      return matchesSearch && matchesCategory && (showLowStockOnly ? isLowStock : true);
-    });
-  }, [products, searchTerm, selectedCategory, showLowStockOnly]);
+// ... inside Inventory component ...
+
+const filteredProducts = useMemo(() => {
+  return products.filter(p => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesTitle = p.title.toLowerCase().includes(searchLower);
+    const matchesCode = p.variants.some(v => 
+      (v.barcode && v.barcode.toLowerCase().includes(searchLower)) ||
+      (v.sku && v.sku.toLowerCase().includes(searchLower))
+    );
+    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    const isLowStock = p.variants.some(v => v.stock <= (p.lowStockAlert || 10));
+    return (matchesTitle || matchesCode) && matchesCategory && (showLowStockOnly ? isLowStock : true);
+  });
+}, [products, searchTerm, selectedCategory, showLowStockOnly]);
 
   if (loading) return (
     <div className="flex flex-col justify-center items-center h-screen gap-4">

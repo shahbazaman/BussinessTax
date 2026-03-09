@@ -85,7 +85,7 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
         price: Number(v.salePrice) || 0,
         taxRate: Number(v.taxRate) || 0,
         stock: Number(v.stock) || 0,
-        barcode: v.barcode?.trim() || "",
+        barcode: v.barcode?.trim() || null,
         sku: v.sku?.trim() === "" ? `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}` : v.sku
       }));
 

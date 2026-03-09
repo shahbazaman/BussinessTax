@@ -4,69 +4,67 @@ import Product from '../models/Product.js';
 export const createInvoice = async (req, res) => {
   try {
     const { 
-      clientId, items, shipping, discount, type, 
-      invoiceNumber, invoiceDate, dueDate, status, notes, 
-      paymentMethod, paymentTerms, referenceNumber,
-      poNumber, taxRate, gstNumber, billingAddress, shippingAddress 
+      clientId, items, discount, type, 
+      invoiceDate, status, notes, 
+      globalTaxRate, gstNumber, billingAddress 
     } = req.body; 
 
     if (!req.user?._id) return res.status(401).json({ message: "Auth failed" });
 
     const invoiceType = type || 'Sale';
+
+    // 1. AUTO-INCREMENT NUMBERING LOGIC
+    const lastInvoice = await Invoice.findOne({ type: invoiceType, user: req.user._id })
+      .sort({ createdAt: -1 });
+
+    let nextNumber;
+    const prefix = invoiceType === 'Sale' ? 'INV' : 'PI';
+    
+    if (lastInvoice) {
+      const lastNumStr = invoiceType === 'Sale' ? lastInvoice.invoiceNumber : lastInvoice.purchaseNumber;
+      const lastNum = parseInt(lastNumStr?.split('-')[1]) || 0;
+      nextNumber = `${prefix}-${(lastNum + 1).toString().padStart(4, '0')}`;
+    } else {
+      nextNumber = `${prefix}-0001`;
+    }
+
+    // 2. Validate Items & Prices
     const validatedItems = [];
     for (const item of items) {
-      if (!item.productId || !item.variantId) {
-        return res.status(400).json({ message: `Missing ID for item: ${item.name}` });
-      }
-
       const product = await Product.findById(item.productId);
-      if (!product) return res.status(404).json({ message: `Product ${item.name} not found` });
+      if (!product) return res.status(404).json({ message: `Product not found` });
       
       const variant = product.variants.id(item.variantId);
-      if (!variant) return res.status(404).json({ message: `Variant for ${product.title} not found` });
-
       validatedItems.push({
         productId: item.productId,
         variantId: item.variantId,
         name: item.name || product.title,
         quantity: Number(item.quantity || 0),
-        price: Number(item.price || 0),
-        taxRate: Number(item.taxRate || taxRate || 0)
+        price: Number(item.price || 0)
       });
-    }
-
-    // 2. Setup Invoice Numbering Logic
-    let finalInvoiceNumber = invoiceNumber;
-    if (invoiceType === 'Sale' && !finalInvoiceNumber) {
-        finalInvoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
     }
 
     // 3. Create Invoice Instance
     const invoice = new Invoice({
       user: req.user._id,
       client: clientId, 
-      invoiceNumber: finalInvoiceNumber,
+      invoiceNumber: invoiceType === 'Sale' ? nextNumber : undefined,
+      purchaseNumber: invoiceType === 'Purchase' ? nextNumber : undefined,
       invoiceDate: invoiceDate || new Date(),
-      dueDate: dueDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), 
-      paymentMethod,
-      paymentTerms,
-      referenceNumber, 
-      poNumber,
+      // dueDate is handled automatically in Invoice.js pre-save hook
       gstNumber,
       billingAddress,
-      shippingAddress,
       items: validatedItems,
-      shipping: Number(shipping || 0),
       discount: Number(discount || 0),
+      globalTaxRate: Number(globalTaxRate || 0),
       status: status || 'Pending',
       type: invoiceType,
       notes
     });
 
-    // Save triggers the logic in Invoice.js (Calculation + Stock)
     const savedInvoice = await invoice.save();
 
-    // 4. Adjust Stock (Purchase increases, Sale decreases)
+    // 4. Adjust Stock
     for (const item of validatedItems) {
       const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
       await Product.updateOne(
@@ -81,7 +79,6 @@ export const createInvoice = async (req, res) => {
     res.status(500).json({ message: "Creation failed", error: error.message });
   }
 };
-
 
 export const getInvoices = async (req, res) => {
   try {
@@ -99,62 +96,36 @@ export const updateInvoice = async (req, res) => {
     const oldInvoice = await Invoice.findById(req.params.id);
     if (!oldInvoice) return res.status(404).json({ message: "Invoice not found" });
 
-    // 1. Revert old stock levels before applying update
-    // We use the oldInvoice's original data to undo its previous impact on stock
+    // 1. Revert old stock
     for (const item of oldInvoice.items) {
-      if (item.productId && item.variantId) {
-        const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
-        await Product.updateOne(
-          { _id: item.productId, "variants._id": item.variantId },
-          { $inc: { "variants.$.stock": revertQty } }
-        );
-      }
+      const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
+      await Product.updateOne(
+        { _id: item.productId, "variants._id": item.variantId },
+        { $inc: { "variants.$.stock": revertQty } }
+      );
     }
 
-    // 2. Destructure and prepare update data
-    // We remove _id and user to prevent them from being overwritten accidentally
-    const { _id, user, items, taxRate, clientId, ...updateData } = req.body;
+    const { items, clientId, ...updateData } = req.body;
     
-    if (clientId) {
-      oldInvoice.client = clientId;
-    }
-
-    if (items) {
-      oldInvoice.items = items.map(item => ({
-        ...item,
-        // Ensure every item has a taxRate, defaulting to the invoice-level taxRate or 0
-        taxRate: Number(item.taxRate || taxRate || 0),
-        quantity: Number(item.quantity || 0),
-        price: Number(item.price || 0)
-      }));
-    }
-
-    // Apply remaining updates (notes, status, dueDate, etc.)
+    if (clientId) oldInvoice.client = clientId;
+    if (items) oldInvoice.items = items;
+    
     Object.assign(oldInvoice, updateData);
-    
-    // 3. Save triggers the FIXED calculation hook in your Invoice.js model
-    // This is where the 500 error used to happen; it is now safe.
     const updatedInvoice = await oldInvoice.save();
 
-    // 4. Apply new stock levels based on the updated items and type
+    // 2. Apply new stock
     for (const item of updatedInvoice.items) {
-      if (item.productId && item.variantId) {
-        const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
-        await Product.updateOne(
-          { _id: item.productId, "variants._id": item.variantId },
-          { $inc: { "variants.$.stock": newAdjustment } }
-        );
-      }
+      const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
+      await Product.updateOne(
+        { _id: item.productId, "variants._id": item.variantId },
+        { $inc: { "variants.$.stock": newAdjustment } }
+      );
     }
 
     res.json(updatedInvoice);
   } catch (error) {
-    // Explicit logging for Render's log viewer
     console.error("UPDATE INVOICE ERROR:", error);
-    res.status(500).json({ 
-      message: "Update failed", 
-      error: error.message 
-    });
+    res.status(500).json({ message: "Update failed", error: error.message });
   }
 };
 
@@ -163,14 +134,13 @@ export const deleteInvoice = async (req, res) => {
     const invoice = await Invoice.findById(req.params.id);
     if (!invoice) return res.status(404).json({ message: "Not found" });
 
-    // Revert stock levels
     for (const item of invoice.items) {
         const revertQty = (invoice.type === 'Purchase') ? -item.quantity : item.quantity;
         await Product.updateOne(
           { _id: item.productId, "variants._id": item.variantId },
           { $inc: { "variants.$.stock": revertQty } }
         );
-      }
+    }
 
     await invoice.deleteOne();
     res.json({ message: "Invoice removed & stock updated" });
@@ -184,7 +154,7 @@ export const updateInvoiceStatus = async (req, res) => {
     const invoice = await Invoice.findOneAndUpdate(
       { _id: req.params.id, user: req.user._id }, 
       { status: req.body.status }, 
-      { new: true, returnDocument: 'after' } // Fixed the deprecation warning
+      { new: true }
     ).populate('client', 'name email');
     res.json(invoice);
   } catch (err) {
