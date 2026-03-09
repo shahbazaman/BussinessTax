@@ -23,10 +23,10 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
   });
 
   const [loading, setLoading] = useState(false);
-// Add this inside the InvoiceModal component before productOptions
-useEffect(() => {
-  console.log("Products prop received:", products);
-}, [products]);
+// // Add this inside the InvoiceModal component before productOptions
+// useEffect(() => {
+//   console.log("Products prop received:", products);
+// }, [products]);
   // Initialize and Reset Logic
   useEffect(() => {
     if (isOpen) {
@@ -62,37 +62,50 @@ useEffect(() => {
   }, [isOpen, editData, initialType, invoices, accounts]);
 
   // Product Search Configuration
-  const productOptions = products.map(p => ({
-    value: p._id,
-    label: `${p.name} | SKU: ${p.sku || 'N/A'} | Barcode: ${p.barcode || 'N/A'} - ₹${p.price}`,
-    data: p
-  }));
-
-  const handleProductSelect = (selectedOption) => {
-    if (!selectedOption) return;
-    const p = selectedOption.data;
-    
-    if (formData.items.find(item => item.productId === p._id)) {
-      toast.info("Product already added, update quantity instead.");
-      return;
+  // Flatten products into variant-specific options
+  if (!products || products.length === 0) {
+  return (
+    <div className="p-8 text-center text-slate-400">
+      <p>Loading products...</p>
+    </div>
+  );
+}
+const productOptions = products.flatMap(p => 
+  (p.variants || []).map(v => ({
+    value: `${p._id}-${v._id}`, // Unique ID combining product and variant
+    label: `${p.title || 'Unknown Product'} (${v.name || 'Default'}) | SKU: ${v.sku || 'N/A'} | Price: ₹${v.price || '0'}`,
+    data: { 
+      _id: p._id, 
+      name: p.title, // Map 'title' from your object to 'name'
+      variant: v 
     }
+  }))
+);
 
-    setFormData({
-      ...formData,
-      items: [
-        ...formData.items,
-        {
-          productId: p._id,
-          name: p.name,
-          sku: p.sku,
-          barcode: p.barcode,
-          quantity: 1,
-          price: p.price,
-          taxRate: 0
-        }
-      ]
-    });
-  };
+const handleProductSelect = (selectedOption) => {
+  if (!selectedOption) return;
+  const { _id, name, variant } = selectedOption.data;
+  if (formData.items.find(item => item.variantId === variant._id)) {
+    toast.info("This specific variant is already added.");
+    return;
+  }
+
+  setFormData({
+    ...formData,
+    items: [
+      ...formData.items,
+      {
+        productId: _id,
+        variantId: variant._id, // Add this to your schema
+        name: `${name} (${variant.name})`,
+        sku: variant.sku,
+        barcode: variant.barcode,
+        quantity: 1,
+        price: variant.price
+      }
+    ]
+  });
+};
 
   const handleItemChange = (index, field, value) => {
     const newItems = [...formData.items];
@@ -249,7 +262,7 @@ useEffect(() => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {formData.items.map((item, idx) => (
-                      <tr key={idx} className="bg-white">
+                      <tr key={item.variantId} className="bg-white">
                         <td className="px-4 py-3"><div className="text-sm font-bold">{item.name}</div></td>
                         <td className="px-4 py-3"><input type="number" min="1" className="w-full p-2 border rounded-lg text-center" value={item.quantity} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} /></td>
                         <td className="px-4 py-3"><input type="number" step="0.01" className="w-full p-2 border rounded-lg" value={item.price} onChange={e => handleItemChange(idx, 'price', e.target.value)} /></td>
