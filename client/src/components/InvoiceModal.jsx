@@ -23,7 +23,10 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
   });
 
   const [loading, setLoading] = useState(false);
-
+// Add this inside the InvoiceModal component before productOptions
+useEffect(() => {
+  console.log("Products prop received:", products);
+}, [products]);
   // Initialize and Reset Logic
   useEffect(() => {
     if (isOpen) {
