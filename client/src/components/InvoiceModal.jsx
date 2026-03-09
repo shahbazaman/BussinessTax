@@ -273,16 +273,41 @@ const handleProductSelect = (selectedOption) => {
                 </table>
               </div>
             </div>
-
-            {/* Final Totals */}
-            <div className="flex justify-end pt-6 border-t border-slate-100">
-              <div className="w-full md:w-1/2 space-y-4">
-                <div className="flex justify-between items-center py-4 border-t border-slate-200">
-                  <span className="text-lg font-black text-slate-900 uppercase tracking-widest">Grand Total</span>
-                  <span className="text-2xl font-black text-indigo-600">₹{totals.total.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
+            {/* Totals Calculation Section */}
+<div className="flex justify-end pt-6 border-t border-slate-100">
+  <div className="w-full md:w-1/2 space-y-4">
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tax Rate (%)</span>
+      <input 
+        type="number" 
+        className="w-32 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold outline-none text-right" 
+        value={formData.globalTaxRate} 
+        onChange={e => setFormData({...formData, globalTaxRate: Number(e.target.value)})} 
+      />
+    </div>
+    <div className="flex items-center justify-between gap-4">
+      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Discount (₹)</span>
+      <input 
+        type="number" 
+        className="w-32 bg-slate-50 border border-slate-200 px-4 py-2 rounded-xl text-sm font-bold outline-none text-right" 
+        value={formData.discount} 
+        onChange={e => setFormData({...formData, discount: Number(e.target.value)})} 
+      />
+    </div>
+    <div className="flex justify-between items-center py-2 border-t border-slate-100">
+      <span className="text-xs font-bold text-slate-400">Subtotal</span>
+      <span className="text-sm font-bold text-slate-800">₹{totals.subtotal.toFixed(2)}</span>
+    </div>    
+    <div className="flex justify-between items-center py-2">
+      <span className="text-xs font-bold text-slate-400">Tax Amount</span>
+      <span className="text-sm font-bold text-slate-800">₹{totals.tax.toFixed(2)}</span>
+    </div>
+    <div className="flex justify-between items-center py-4 border-t border-slate-200">
+      <span className="text-lg font-black text-slate-900 uppercase tracking-widest">Grand Total</span>
+      <span className="text-2xl font-black text-indigo-600">₹{totals.total.toFixed(2)}</span>
+    </div>
+  </div>
+</div>
           </form>
         </div>
 
