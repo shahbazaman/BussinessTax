@@ -49,7 +49,7 @@ invoiceSchema.index({ user: 1, purchaseNumber: 1 }, { unique: true, sparse: true
 invoiceSchema.index({ user: 1, referenceNumber: 1 }, { unique: true, sparse: true });
 
 // PRE-SAVE HOOK: Ensures data integrity
-invoiceSchema.pre('save', function(next) {
+invoiceSchema.pre('save', function() {
   const items = this.items || [];
   
   // 1. Calculate Subtotal
@@ -66,8 +66,6 @@ invoiceSchema.pre('save', function(next) {
   // 3. Grand Total: (Subtotal + Tax) - Discount
   const finalTotal = (this.subtotal + this.taxAmount) - Number(this.discount || 0);
   this.totalAmount = Number(finalTotal.toFixed(2));
-
-  next();
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
