@@ -129,7 +129,7 @@ const handleProductSelect = (selectedOption) => {
     e.preventDefault();
     if (!formData.client) return toast.error("Please select a party");
     if (formData.items.length === 0) return toast.error("Add at least one item");
-
+console.log("Sending Payload to Server:", JSON.stringify(formData, null, 2));
     setLoading(true);
     try {
       if (editData) {

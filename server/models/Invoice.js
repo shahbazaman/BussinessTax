@@ -19,7 +19,7 @@ const invoiceSchema = new mongoose.Schema({
   
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    variantId: { type: mongoose.Schema.Types.ObjectId, required: true }, // Added for variant tracking
+    variantId: { type: mongoose.Schema.Types.ObjectId },
     name: { type: String, required: true },
     sku: { type: String }, 
     barcode: { type: String },
