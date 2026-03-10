@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../utils/api';
 import { 
-  Plus, Receipt, Trash2, Tag, X, Calendar, Edit2, 
+  Plus, Receipt, Trash2, Tag, X, Calendar, Edit2, Eye,
   ChevronDown, CreditCard, FileText, Link as LinkIcon 
 } from 'lucide-react';
 import { exportToCSV } from '../utils/exportCSV';
@@ -15,7 +15,7 @@ const Expenses = () => {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null); 
   const { symbol } = useContext(CurrencyContext);
-
+  const [viewingExpense, setViewingExpense] = useState(null);
   const categories = ['Software', 'Rent', 'Marketing', 'Travel', 'Salaries', 'Utilities', 'Other'];
   const paymentMethods = ['Bank Transfer', 'Cash', 'Card', 'UPI',  'Check', 'Other'];
 
@@ -55,7 +55,9 @@ const Expenses = () => {
   useEffect(() => {
     fetchData();
   }, []);
-
+  const handleViewClick = (exp) => {
+    setViewingExpense(exp);
+  };
   const handleEditClick = (exp) => {
     setEditingId(exp._id);
     const isStandardCategory = categories.includes(exp.category);
@@ -213,6 +215,7 @@ const Expenses = () => {
                   )}
                 </div>
                 <div className="flex gap-1">
+                  <button onClick={() => handleViewClick(exp)} className="p-2 text-slate-300 hover:text-indigo-500 transition-colors"><Eye size={16}/></button>
                   <button onClick={() => handleEditClick(exp)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors"><Edit2 size={16}/></button>
                   <button onClick={() => api.delete(`/expenses/${exp._id}`).then(fetchData)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
                 </div>
@@ -221,7 +224,33 @@ const Expenses = () => {
           ))}
         </div>
       </div>
-
+{viewingExpense && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-[2.5rem] w-full max-w-lg shadow-2xl p-8 space-y-5">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-black text-slate-900">Expense Details</h3>
+              <button onClick={() => setViewingExpense(null)} className="p-2 rounded-full bg-slate-100 text-slate-600"><X size={20}/></button>
+            </div>
+            
+            <div className="space-y-4">
+              <div><label className="text-[10px] font-black text-slate-400 uppercase">Title</label><p className="font-bold text-slate-800">{viewingExpense.title}</p></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-[10px] font-black text-slate-400 uppercase">Amount</label><p className="font-bold text-slate-800">{viewingExpense.currency} {viewingExpense.amount}</p></div>
+                <div><label className="text-[10px] font-black text-slate-400 uppercase">Category</label><p className="font-bold text-slate-800">{viewingExpense.category}</p></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-[10px] font-black text-slate-400 uppercase">Payment Method</label><p className="font-bold text-slate-800">{viewingExpense.paymentMethod}</p></div>
+                <div><label className="text-[10px] font-black text-slate-400 uppercase">Date</label><p className="font-bold text-slate-800">{new Date(viewingExpense.date).toLocaleDateString()}</p></div>
+              </div>
+              <div><label className="text-[10px] font-black text-slate-400 uppercase">Notes</label><p className="font-bold text-slate-800 bg-slate-50 p-4 rounded-xl">{viewingExpense.notes || 'No notes added.'}</p></div>
+              {viewingExpense.receiptUrl && (
+                <a href={viewingExpense.receiptUrl} target="_blank" rel="noreferrer" className="block text-center bg-indigo-50 text-indigo-600 py-3 rounded-xl font-bold text-sm">View Original Receipt</a>
+              )}
+            </div>
+            <button onClick={() => setViewingExpense(null)} className="w-full bg-slate-100 py-3 rounded-xl font-bold text-sm">Close</button>
+          </div>
+        </div>
+      )}
       {/* CREATE/EDIT MODAL */}
       {showModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 overflow-y-auto">

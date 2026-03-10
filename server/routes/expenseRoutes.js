@@ -6,8 +6,6 @@ import { deleteExpense } from '../controllers/expenseController.js';
 
 const router = express.Router();
 
-// @desc    Create new expense with Payment Details & Currency Conversion
-// @route   POST /api/expenses
 router.post('/', protect, async (req, res) => {
   try {
     const { 
