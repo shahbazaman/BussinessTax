@@ -83,20 +83,20 @@ const productOptions = products.flatMap(p =>
 );
 
 const handleProductSelect = (selectedOption) => {
-  if (!selectedOption) return;
+  if (!selectedOption) return;  
   const { _id, name, variant } = selectedOption.data;
   if (formData.items.find(item => item.variantId === variant._id)) {
     toast.info("This specific variant is already added.");
     return;
   }
-
   setFormData({
     ...formData,
+    globalTaxRate: variant.taxRate || 0, 
     items: [
       ...formData.items,
       {
         productId: _id,
-        variantId: variant._id, // Add this to your schema
+        variantId: variant._id,
         name: `${name} (${variant.name})`,
         sku: variant.sku,
         barcode: variant.barcode,
@@ -105,6 +105,7 @@ const handleProductSelect = (selectedOption) => {
       }
     ]
   });
+  toast.success(`Added ${name} - Tax set to ${variant.taxRate || 0}%`);
 };
 
   const handleItemChange = (index, field, value) => {
@@ -230,12 +231,12 @@ console.log("Sending Payload to Server:", JSON.stringify(formData, null, 2));
                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Billing Address</label>
                 <textarea rows="2" className="w-full bg-white border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none resize-none" value={formData.billingAddress} onChange={e => setFormData({...formData, billingAddress: e.target.value})} />
               </div>
-              {formData.type === 'Sale' && (
+              {/* {formData.type === 'Sale' && (
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Shipping Address</label>
                   <textarea rows="2" className="w-full bg-white border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none resize-none" value={formData.shippingAddress} onChange={e => setFormData({...formData, shippingAddress: e.target.value})} />
                 </div>
-              )}
+              )} */}
             </div>
 
             {/* Item Management */}

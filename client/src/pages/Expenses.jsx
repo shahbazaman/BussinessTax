@@ -17,7 +17,7 @@ const Expenses = () => {
   const { symbol } = useContext(CurrencyContext);
 
   const categories = ['Software', 'Rent', 'Marketing', 'Travel', 'Salaries', 'Utilities', 'Other'];
-  const paymentMethods = ['Bank Transfer', 'Cash', 'Credit Card', 'Debit Card', 'Check', 'Other'];
+  const paymentMethods = ['Bank Transfer', 'Cash', 'Card', 'UPI',  'Check', 'Other'];
 
   const [formData, setFormData] = useState({ 
     title: '', 

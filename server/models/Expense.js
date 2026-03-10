@@ -30,7 +30,7 @@ const expenseSchema = new mongoose.Schema({
   // --- New Expense Tracking Fields ---
   paymentMethod: {
     type: String,
-    enum: ['Bank Transfer', 'Cash', 'Credit Card', 'Debit Card', 'Check', 'Other'],
+    enum: ['Bank Transfer', 'Cash', 'Card', 'UPI', 'Check', 'Other'],
     default: 'Bank Transfer'
   },
   paidFromAccount: { 

@@ -212,8 +212,16 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
                     <select name="unit" value={variant.unit} className="col-span-4 md:col-span-3 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)}>
                       <option value="pcs">pcs</option><option value="kg">kg</option><option value="g">g</option><option value="ml">ml</option><option value="L">L</option><option value="box">box</option>
                     </select>
-                    <div className="col-span-4 md:col-span-6 flex items-center gap-2">
-                       <input name="taxRate" type="number" value={variant.taxRate} placeholder="Tax %" className="flex-1 p-3 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-black outline-none border border-indigo-100" onChange={(e) => handleVariantChange(index, e)} />
+                    <div className="col-span-4 md:col-span-6 flex flex-col gap-1">
+                      <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Default Tax %</label>
+                      <input 
+                        name="taxRate" 
+                        type="number" 
+                        value={variant.taxRate} 
+                        placeholder="Tax %" 
+                        className="w-full p-3 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-black outline-none border border-indigo-100" 
+                        onChange={(e) => handleVariantChange(index, e)} 
+                      />
                     </div>
                   </div>
 
