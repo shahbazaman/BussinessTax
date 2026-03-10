@@ -240,18 +240,16 @@ const handleVariantChange = (index, e) => {
                         className="w-full pl-9 p-3 rounded-xl bg-blue-50/30 text-sm font-bold text-blue-600 outline-none border border-transparent focus:border-blue-200" 
                         onChange={(e) => handleVariantChange(index, e)} 
                       />
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          const newVariants = [...productData.variants];
-                          newVariants[index].sku = generateUniqueSKU(productData.title, newVariants[index], index);
-                          setProductData({...productData, variants: newVariants});
-                        }}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600"
-                        title="Regenerate SKU"
+                      <button type="button"  onClick={() => {
+                        const updatedVariants = [...productData.variants];                  
+                        updatedVariants[index].sku = generateUniqueSKU(productData.title, updatedVariants[index], index);                
+                        setProductData({ ...productData, variants: updatedVariants });
+                      }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600 transition-colors"
+                      title="Regenerate SKU"
                       >
-                        <Barcode size={14} />
-                      </button>
+                      <Barcode size={14} />
+                    </button>
                     </div>
                     <div className="col-span-6 md:col-span-4 relative">
                       <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
