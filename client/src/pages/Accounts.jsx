@@ -120,44 +120,43 @@ const getIcon = (type) => {
         {accounts.map((acc) => (
           <div key={acc._id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all relative group">
             <div className="flex items-start justify-between mb-8">
-              <div className={`p-4 rounded-2xl ${acc.accountType === 'Cash' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+              <div className="p-4 rounded-2xl bg-slate-50 text-slate-600">
                 {getIcon(acc.accountType)}
-              </div>
-              <div className={`p-4 rounded-2xl ${acc.accountType === 'Wallet' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                {acc.accountType === 'Wallet' ? <Wallet size={24} /> : <Landmark size={24} />}
-              </div>
+              </div>              
               <button 
                 onClick={() => handleDelete(acc._id)} 
                 className="p-2 text-slate-200 hover:text-rose-500 rounded-xl lg:opacity-0 group-hover:opacity-100 transition-all"
               >
                 <Trash2 size={18} />
               </button>
-            </div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{acc.accountType || 'Bank Account'}</p>
+            </div>            
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{acc.accountType}</p>
             <h3 className="text-xl font-black text-slate-800 mb-1">{acc.bankName}</h3>
             <h4 className="text-3xl font-black text-slate-900 tracking-tighter">
               {symbol}{Number(acc.balance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-            </h4>
-            <div className="mt-6 flex items-center gap-2 text-slate-300">
-              <CreditCard size={14} />
-              <span className="text-xs font-bold font-mono tracking-wider">
-                **** {acc.accountNumber?.slice(-4) || '8821'}
-              </span>
-            </div>
+            </h4>            
+            {acc.accountNumber && (
+              <div className="mt-6 flex items-center gap-2 text-slate-300">
+                <CreditCard size={14} />
+                <span className="text-xs font-bold font-mono tracking-wider">
+                  **** {acc.accountNumber.slice(-4)}
+                </span>
+              </div>
+            )}
           </div>
         ))}
-
+        
         {accounts.length === 0 && (
-          <button 
-            onClick={() => setIsAddModalOpen(true)}
-            className="border-2 border-dashed border-slate-200 p-8 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all group"
-          >
-            <div className="p-4 bg-slate-50 rounded-full group-hover:bg-blue-50">
-               <Plus size={30} />
-            </div>
-            <span className="font-bold text-sm">Link your first account</span>
-          </button>
-        )}
+                <button 
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="border-2 border-dashed border-slate-200 p-8 rounded-[2.5rem] flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-blue-400 hover:text-blue-500 transition-all group"
+                >
+                  <div className="p-4 bg-slate-50 rounded-full group-hover:bg-blue-50">
+                    <Plus size={30} />
+                  </div>
+                  <span className="font-bold text-sm">Link your first account</span>
+                </button>
+              )}
       </div>
 
       {/* --- Unified Activity Feed --- */}

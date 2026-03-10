@@ -70,21 +70,22 @@ const AddAccountModal = ({ isOpen, onClose, onRefresh }) => {
           {/* Account Type Selection */}
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Asset Type</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {types.map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setFormData({...formData, accountType: type})}
-                  className={`py-3 px-2 rounded-xl text-[10px] font-black uppercase transition-all border ${
-                    formData.accountType === type 
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-lg' 
-                    : 'bg-white text-slate-400 border-slate-100 hover:border-blue-200'
-                  }`}
-                >
-                  {type}
-                </button>
-              ))}
+            <div className="relative">
+              <select 
+                className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-blue-500/20 font-bold text-sm text-slate-700 appearance-none cursor-pointer"
+                value={formData.accountType}
+                onChange={(e) => setFormData({...formData, accountType: e.target.value})}
+              >
+                <option value="Checking Account">Checking Account</option>
+                <option value="Savings Account">Savings Account</option>
+                <option value="Cash">Cash</option>
+                <option value="Wallet/UPI">Wallet/UPI</option>
+                <option value="Payment Gateway">Payment Gateway</option>
+              </select>
+              {/* Custom Dropdown Arrow */}
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                <ChevronDown size={16} />
+              </div>
             </div>
           </div>
 

@@ -13,11 +13,11 @@ export const addProduct = async (req, res) => {
   try {
     const { title, category, variants, lowStockAlert, supplier, reorderQuantity } = req.body;
     
-    const formattedVariants = variants.map(v => ({
+    const formattedVariants = variants.map((v, index) => ({
       name: v.name,
-      sku: v.sku || `SKU-${Date.now()}`, 
+      sku: v.sku || `${category.substring(0,3).toUpperCase()}-${title.substring(0,3).toUpperCase()}-${Date.now()}-${index}`,
       barcode: v.barcode,
-      price: v.salePrice, 
+      price: v.price, 
       costPrice: v.costPrice,
       stock: v.stock,
       taxRate: v.taxRate,
@@ -34,8 +34,8 @@ export const addProduct = async (req, res) => {
       lowStockAlert,
       reorderQuantity
     });
-    const savedProduct = await product.save();
-    res.status(201).json(savedProduct);
+    await product.save();
+    res.status(201).json(product);
   } catch (error) {
     res.status(400).json({ message: error.message });
   }

@@ -22,6 +22,13 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   const [productData, setProductData] = useState(initialState);
   const [isOtherCategory, setIsOtherCategory] = useState(false);
   const isEditing = !!editingProduct;
+  const generateSKU = (productName, variant, index) => {
+    const catPrefix = productData.category.substring(0, 3).toUpperCase();
+    const namePrefix = productName.substring(0, 6).toUpperCase().replace(/\s/g, '');
+    const weight = variant.weight ? `${variant.weight}${variant.unit.toUpperCase()}` : 'GEN';
+    const id = String(index + 1).padStart(2, '0');
+    return `${catPrefix}-${namePrefix}-${weight}-${id}`;
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -78,7 +85,7 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
 
     const validVariants = productData.variants
       .filter(v => v.name.trim() !== '') 
-      .map(v => ({
+      .map((v, index) => ({
         ...v,
         weight: Number(v.weight) || 0,
         costPrice: Number(v.costPrice) || 0,
@@ -86,11 +93,28 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
         taxRate: Number(v.taxRate) || 0,
         stock: Number(v.stock) || 0,
         barcode: v.barcode?.trim() || null,
-        sku: v.sku?.trim() === "" ? `SKU-${Date.now()}-${Math.floor(Math.random() * 1000)}` : v.sku
+        sku: v.sku?.trim() || generateSKU(productData.title, v, index)
       }));
 
     if (validVariants.length === 0) return toast.error("Please add at least one variant");
+// Add this helper function at the top level
+const generateUniqueSKU = (title, variant, index) => {
+  const catPrefix = "PROD"; // Or use productData.category
+  const namePrefix = title.substring(0, 3).toUpperCase();
+  const weight = variant.weight ? `${variant.weight}${variant.unit.toUpperCase()}` : '00';
+  return `${catPrefix}-${namePrefix}-${weight}-${index + 1}`;
+};
 
+const handleVariantChange = (index, e) => {
+  const { name, value } = e.target;
+  const newVariants = [...productData.variants];  
+  newVariants[index][name] = value;
+  if (name === "weight" || name === "unit") {
+    newVariants[index].sku = generateUniqueSKU(productData.title, newVariants[index], index);
+  }
+  
+  setProductData({ ...productData, variants: newVariants });
+};
     const sanitizedData = {
       ...productData,
       category: finalCategory,
@@ -198,7 +222,25 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
                     </div>
                     <div className="col-span-6 md:col-span-4 relative">
                       <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                      <input name="sku" value={variant.sku} placeholder="SKU (Optional)" className="w-full pl-9 p-3 rounded-xl bg-blue-50/30 text-sm font-bold text-blue-600 outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} />
+                      <input 
+                        name="sku" 
+                        value={variant.sku} 
+                        placeholder="SKU (e.g. CAR-500G-01)" 
+                        className="w-full pl-9 p-3 rounded-xl bg-blue-50/30 text-sm font-bold text-blue-600 outline-none border border-transparent focus:border-blue-200" 
+                        onChange={(e) => handleVariantChange(index, e)} 
+                      />
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const newVariants = [...productData.variants];
+                          newVariants[index].sku = generateUniqueSKU(productData.title, newVariants[index], index);
+                          setProductData({...productData, variants: newVariants});
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600"
+                        title="Regenerate SKU"
+                      >
+                        <Barcode size={14} />
+                      </button>
                     </div>
                     <div className="col-span-6 md:col-span-4 relative">
                       <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
