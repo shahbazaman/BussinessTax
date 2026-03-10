@@ -22,13 +22,12 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   const [productData, setProductData] = useState(initialState);
   const [isOtherCategory, setIsOtherCategory] = useState(false);
   const isEditing = !!editingProduct;
-  const generateSKU = (productName, variant, index) => {
-    const catPrefix = productData.category.substring(0, 3).toUpperCase();
-    const namePrefix = productName.substring(0, 6).toUpperCase().replace(/\s/g, '');
-    const weight = variant.weight ? `${variant.weight}${variant.unit.toUpperCase()}` : 'GEN';
-    const id = String(index + 1).padStart(2, '0');
-    return `${catPrefix}-${namePrefix}-${weight}-${id}`;
-  };
+  const generateSKU = (title, variant, index) => {
+  const catPrefix = "SKU"; // or your logic
+  const namePrefix = title.substring(0, 3).toUpperCase() || "PRO";
+  const weight = variant.weight ? `${variant.weight}${variant.unit.toUpperCase()}` : '00';
+  return `${catPrefix}-${namePrefix}-${weight}-${String(index + 1).padStart(2, '0')}`;
+};
 
   useEffect(() => {
     if (isOpen) {
@@ -51,16 +50,28 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   }, [isOpen, editingProduct]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    if (name === "category") setIsOtherCategory(value === "Other");
-    setProductData({ ...productData, [name]: value });
-  };
+  const { name, value } = e.target;
+  
+  let updatedProductData = { ...productData, [name]: value };
+  if (name === "title") {
+    updatedProductData.variants = updatedProductData.variants.map((v, idx) => ({
+      ...v,
+      sku: v.sku || generateSKU(value, v, idx)
+    }));
+  }
+
+  setProductData(updatedProductData);
+};
 
   const handleVariantChange = (index, e) => {
-    const newVariants = [...productData.variants];
-    newVariants[index][e.target.name] = e.target.value;
-    setProductData({ ...productData, variants: newVariants });
-  };
+  const { name, value } = e.target;
+  const newVariants = [...productData.variants];
+  newVariants[index][name] = value;
+  if (!newVariants[index].sku) {
+    newVariants[index].sku = generateSKU(productData.title, newVariants[index], index);
+  }
+  setProductData({ ...productData, variants: newVariants });
+};
 
   const addVariantField = () => {
     setProductData({
