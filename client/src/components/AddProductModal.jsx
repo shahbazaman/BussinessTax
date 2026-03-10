@@ -67,8 +67,8 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   const { name, value } = e.target;
   const newVariants = [...productData.variants];
   newVariants[index][name] = value;
-  if (!newVariants[index].sku) {
-    newVariants[index].sku = generateSKU(productData.title, newVariants[index], index);
+  if (name === 'weight' || name === 'unit') {
+      newVariants[index].sku = generateUniqueSKU(productData.title, newVariants[index], index);
   }
   setProductData({ ...productData, variants: newVariants });
 };
