@@ -65,12 +65,11 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
 
   const handleVariantChange = (index, e) => {
   const { name, value } = e.target;
-  const newVariants = [...productData.variants];
-  newVariants[index][name] = value;
-  if (name === 'weight' || name === 'unit') {
-      newVariants[index].sku = generateUniqueSKU(productData.title, newVariants[index], index);
-  }
-  setProductData({ ...productData, variants: newVariants });
+  setProductData(prev => {
+    const newVariants = [...prev.variants];
+    newVariants[index][name] = value;
+    return { ...prev, variants: newVariants };
+  });
 };
 
   const addVariantField = () => {
@@ -235,21 +234,23 @@ const handleVariantChange = (index, e) => {
                       <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                       <input 
                         name="sku" 
-                        value={variant.sku} 
-                        placeholder="SKU (e.g. CAR-500G-01)" 
+                        value={variant.sku || ''} // Ensure it's never undefined
+                        placeholder="SKU"
                         className="w-full pl-9 p-3 rounded-xl bg-blue-50/30 text-sm font-bold text-blue-600 outline-none border border-transparent focus:border-blue-200" 
                         onChange={(e) => handleVariantChange(index, e)} 
                       />
-                      <button type="button"  onClick={() => {
-                        const updatedVariants = [...productData.variants];                  
-                        updatedVariants[index].sku = generateUniqueSKU(productData.title, updatedVariants[index], index);                
-                        setProductData({ ...productData, variants: updatedVariants });
-                      }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600 transition-colors"
-                      title="Regenerate SKU"
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          const newSku = generateUniqueSKU(productData.title, variant, index);
+                          const newVariants = [...productData.variants];
+                          newVariants[index].sku = newSku;
+                          setProductData({ ...productData, variants: newVariants });
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600"
                       >
-                      <Barcode size={14} />
-                    </button>
+                        <Barcode size={14} />
+                      </button>
                     </div>
                     <div className="col-span-6 md:col-span-4 relative">
                       <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
