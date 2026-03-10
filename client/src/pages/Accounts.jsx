@@ -65,7 +65,14 @@ const Accounts = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
+const getIcon = (type) => {
+  switch(type) {
+    case 'Cash': return <ArrowDownRight size={24} />;
+    case 'Wallet/UPI': return <Wallet size={24} />;
+    case 'Payment Gateway': return <CreditCard size={24} />;
+    default: return <Landmark size={24} />;
+  }
+};
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to unlink this account? This will not delete transactions but will remove the link.")) return;
     try {
@@ -113,6 +120,9 @@ const Accounts = () => {
         {accounts.map((acc) => (
           <div key={acc._id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all relative group">
             <div className="flex items-start justify-between mb-8">
+              <div className={`p-4 rounded-2xl ${acc.accountType === 'Cash' ? 'bg-amber-50 text-amber-600' : 'bg-blue-50 text-blue-600'}`}>
+                {getIcon(acc.accountType)}
+              </div>
               <div className={`p-4 rounded-2xl ${acc.accountType === 'Wallet' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
                 {acc.accountType === 'Wallet' ? <Wallet size={24} /> : <Landmark size={24} />}
               </div>
