@@ -78,7 +78,7 @@ const handleChange = (e) => {
     if (name === "title") {
       updatedProductData.variants = updatedProductData.variants.map((v, idx) => ({
         ...v,
-        sku: v.sku || generateSKU(value, v, idx)
+        sku: v.sku || generateUniqueSKU(value, v, idx)
       }));
     }
     setProductData(updatedProductData);
@@ -118,7 +118,7 @@ const handleChange = (e) => {
         taxRate: Number(v.taxRate) || 0,
         stock: Number(v.stock) || 0,
         barcode: v.barcode?.trim() || null,
-        sku: v.sku?.trim() || generateSKU(productData.title, v, index)
+        sku: v.sku?.trim() || generateUniqueSKU(productData.title, v, index)
       }));
 
     if (validVariants.length === 0) return toast.error("Please add at least one variant");
