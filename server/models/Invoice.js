@@ -5,12 +5,9 @@ const invoiceSchema = new mongoose.Schema({
   client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client', required: true },
   type: { type: String, enum: ['Sale', 'Purchase'], default: 'Sale' },
   
-  // Sales specific (INV-S-001)
-  invoiceNumber: { type: String },
-  
-  // Purchase specific (INV-P-001 and INV-REF-001)
-  purchaseNumber: { type: String }, 
-  referenceNumber: { type: String }, 
+  invoiceNumber: { type: String, trim: true },
+  purchaseNumber: { type: String, trim: true }, 
+  referenceNumber: { type: String, trim: true }, 
 
   invoiceDate: { type: Date, default: Date.now },
   gstNumber: { type: String },
@@ -19,10 +16,10 @@ const invoiceSchema = new mongoose.Schema({
   
   items: [{
     productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    variantId: { type: mongoose.Schema.Types.ObjectId, required: false }, // Add this
+    variantId: { type: mongoose.Schema.Types.ObjectId, required: true },
     name: String,
-    quantity: Number,
-    price: Number,
+    quantity: { type: Number, default: 0 },
+    price: { type: Number, default: 0 },
     sku: String,
     barcode: String,
   }],
@@ -43,29 +40,27 @@ const invoiceSchema = new mongoose.Schema({
   paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }
 }, { timestamps: true });
 
-// Sparse indexes to handle unique numbering
+// Sparse indexes: These ONLY work if the field is missing or undefined (not "")
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, purchaseNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, referenceNumber: 1 }, { unique: true, sparse: true });
 
-// PRE-SAVE HOOK: Ensures data integrity
-invoiceSchema.pre('save', function() {
+invoiceSchema.pre('save', function(next) {
   const items = this.items || [];
   
-  // 1. Calculate Subtotal
   const calculatedSubtotal = items.reduce((acc, item) => {
     return acc + (Number(item.price || 0) * Number(item.quantity || 0));
   }, 0);
 
-  // 2. Calculate Global Tax
   const calculatedTax = calculatedSubtotal * (Number(this.globalTaxRate || 0) / 100);
 
   this.subtotal = Number(calculatedSubtotal.toFixed(2));
   this.taxAmount = Number(calculatedTax.toFixed(2));
   
-  // 3. Grand Total: (Subtotal + Tax) - Discount
   const finalTotal = (this.subtotal + this.taxAmount) - Number(this.discount || 0);
   this.totalAmount = Number(finalTotal.toFixed(2));
+  
+  next();
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);

@@ -630,7 +630,9 @@ const Dashboard = () => {
           <div style={{ marginTop: '60px', padding: '40px', borderRadius: '24px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontWeight: 'bold', color: '#64748b', fontSize: '18px' }}>Total Amount Due</span>
-              <span style={{ fontSize: '42px', fontWeight: '900', color: '#0f172a' }}>{currencySymbol}0.00</span>
+              <span style={{ fontSize: '42px', fontWeight: '900', color: '#0f172a' }}>
+                {currencySymbol}{lastInvoice?.totalAmount?.toLocaleString('en-IN', { minimumFractionDigits: 2 }) || '0.00'}
+              </span>
             </div>
           </div>
         </div>

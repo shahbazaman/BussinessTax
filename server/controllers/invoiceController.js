@@ -11,11 +11,16 @@ export const createInvoice = async (req, res) => {
 
     if (!req.user?._id) return res.status(401).json({ message: "Auth failed" });
     const invoiceType = type || 'Sale';
+    const cleanedData = {
+      invoiceNumber: invoiceType === 'Sale' ? (invoiceNumber || undefined) : undefined,
+      purchaseNumber: invoiceType === 'Purchase' ? (purchaseNumber || undefined) : undefined,
+      referenceNumber: invoiceType === 'Purchase' ? (referenceNumber || undefined) : undefined
+    };
 
     const validatedItems = [];
     for (const item of items) {
       const product = await Product.findById(item.productId);
-      if (!product) return res.status(404).json({ message: `Product not found: ${item.productId}` });
+      if (!product) return res.status(404).json({ message: `Product not found` });
       
       const variant = product.variants.id(item.variantId);
       if (!variant) return res.status(404).json({ message: "Variant not found" });
@@ -34,9 +39,7 @@ export const createInvoice = async (req, res) => {
     const invoice = new Invoice({
       user: req.user._id, 
       client, 
-      invoiceNumber, 
-      purchaseNumber, 
-      referenceNumber,
+      ...cleanedData,
       invoiceDate: invoiceDate || new Date(), 
       gstNumber, 
       billingAddress, 
@@ -50,23 +53,20 @@ export const createInvoice = async (req, res) => {
     });
 
     const savedInvoice = await invoice.save();
-
     for (const item of validatedItems) {
       const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
-      const result = await Product.updateOne(
+      await Product.updateOne(
         { _id: item.productId, "variants._id": item.variantId },
         { $inc: { "variants.$.stock": adjustment } }
       );
-      if (result.matchedCount === 0) throw new Error(`Stock update failed for variant ${item.variantId}`);
     }
     
     res.status(201).json(savedInvoice);
   } catch (error) {
-    console.error("Create Invoice Error:", error);
     if (error.code === 11000) {
-      return res.status(400).json({ message: "Invoice or Reference number already exists." });
+      return res.status(400).json({ message: "Duplicate ID: This Invoice/Ref number is already in use." });
     }
-    res.status(500).json({ message: "Creation failed", error: error.message });
+    res.status(500).json({ message: error.message });
   }
 };
 
@@ -74,8 +74,6 @@ export const updateInvoice = async (req, res) => {
   try {
     const oldInvoice = await Invoice.findById(req.params.id);
     if (!oldInvoice) return res.status(404).json({ message: "Invoice not found" });
-
-    // 1. Revert Old Stock
     for (const item of oldInvoice.items) {
       const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
       await Product.updateOne(
@@ -83,34 +81,33 @@ export const updateInvoice = async (req, res) => {
         { $inc: { "variants.$.stock": revertQty } }
       );
     }
+    const invoiceType = req.body.type || oldInvoice.type;
+    const cleanedUpdate = {
+      ...req.body,
+      invoiceNumber: invoiceType === 'Sale' ? (req.body.invoiceNumber || undefined) : undefined,
+      purchaseNumber: invoiceType === 'Purchase' ? (req.body.purchaseNumber || undefined) : undefined,
+      referenceNumber: invoiceType === 'Purchase' ? (req.body.referenceNumber || undefined) : undefined,
+      $unset: invoiceType === 'Sale' 
+        ? { purchaseNumber: 1, referenceNumber: 1 } 
+        : { invoiceNumber: 1 }
+    };
 
-    // 2. Update Invoice Data
-    const { items, client, globalTaxRate, discount, ...updateData } = req.body;
-    
-    // Explicitly update fields to ensure pre-save hook triggers correctly
-    Object.assign(oldInvoice, { 
-      ...updateData, 
-      client, 
-      items,
-      globalTaxRate: Number(globalTaxRate || 0),
-      discount: Number(discount || 0)
-    });
+    const updatedInvoice = await Invoice.findByIdAndUpdate(
+        req.params.id, 
+        cleanedUpdate, 
+        { new: true, runValidators: true }
+    );
 
-    const updatedInvoice = await oldInvoice.save();
-
-    // 3. Apply New Stock
     for (const item of updatedInvoice.items) {
       const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
-      const result = await Product.updateOne(
+      await Product.updateOne(
         { _id: item.productId, "variants._id": item.variantId }, 
         { $inc: { "variants.$.stock": newAdjustment } }
       );
-      if (result.matchedCount === 0) throw new Error(`Stock adjustment failed for ${item.variantId}`);
     }
 
     res.json(updatedInvoice);
   } catch (error) {
-    console.error("Update Invoice Error:", error);
     res.status(500).json({ message: "Update failed", error: error.message });
   }
 };
