@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { X, Landmark, ShieldCheck } from 'lucide-react';
+import { X, Landmark, ShieldCheck, ChevronDown } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
 import { CurrencyContext } from '../context/CurrencyContext';
