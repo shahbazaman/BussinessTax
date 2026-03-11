@@ -27,25 +27,31 @@ useEffect(() => {
   if (isOpen && !editData) {
     const type = initialType || 'Sale';
     
-    // SAFE FALLBACK: If invoices is undefined, treat it as an empty array
+    // 1. Ensure we are working with an array
     const safeInvoices = Array.isArray(invoices) ? invoices : [];
     const typeInvoices = safeInvoices.filter(inv => inv.type === type);
 
+    // 2. Find the highest existing number
     const maxNumber = typeInvoices.reduce((max, inv) => {
+      // Choose correct field
       const code = type === 'Sale' ? inv.invoiceNumber : inv.purchaseNumber;
       if (!code) return max;
       
+      // Extract the last part (e.g., '001' from 'INV-S-001')
       const parts = code.split('-');
       const numericPart = parseInt(parts[parts.length - 1], 10);
+      
       return !isNaN(numericPart) && numericPart > max ? numericPart : max;
     }, 0);
 
+    // 3. Generate the formatted string: Increment, pad to 3, and add prefix
     const nextSequence = String(maxNumber + 1).padStart(3, '0');
     const fullCode = type === 'Sale' ? `INV-S-${nextSequence}` : `INV-P-${nextSequence}`;
 
+    // 4. Update state
     setFormData(prev => ({
       ...prev,
-      type,
+      type: type,
       invoiceNumber: type === 'Sale' ? fullCode : '',
       purchaseNumber: type === 'Purchase' ? fullCode : '',
       referenceNumber: type === 'Purchase' ? `INV-REF-${nextSequence}` : '',
