@@ -5,10 +5,16 @@ const AccountSchema = new mongoose.Schema({
   bankName: { type: String, required: [true, 'Name is required'], trim: true },
   balance: { type: Number, default: 0, min: [0, 'Balance cannot be negative'] },
   accountType: {
-    type: String,
-    enum: ['Checking Account', 'Savings Account', 'Cash', 'Wallet/UPI', 'Payment Gateway'],
-    default: 'Checking Account'
-  },
+  type: String,
+  enum: [
+    'Checking Account', 'Checking', 
+    'Savings Account', 'Savings', 
+    'Cash', 
+    'Wallet/UPI', 
+    'Payment Gateway'
+  ],
+  default: 'Checking Account'
+},
   accountNumber: { type: String, sparse: true },
   notes: { type: String, trim: true },
   createdAt: { type: Date, default: Date.now }
