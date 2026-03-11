@@ -23,29 +23,28 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
   });
 
   const [loading, setLoading] = useState(false);
-// // Add this inside the InvoiceModal component before productOptions
-// useEffect(() => {
-//   console.log("Products prop received:", products);
-// }, [products]);
-  // Initialize and Reset Logic
-  useEffect(() => {
+useEffect(() => {
     if (isOpen) {
       if (editData) {
-        setFormData({
-          ...editData,
-          invoiceDate: new Date(editData.invoiceDate).toISOString().split('T')[0],
-          client: editData.client?._id || editData.client,
-        });
       } else {
-        const type = initialType || 'Sale';
+        const type = initialType || 'Sale';    
         const typeInvoices = invoices?.filter(inv => inv.type === type) || [];
-        const nextSequence = String(typeInvoices.length + 1).padStart(3, '0');
+        const maxNumber = typeInvoices.reduce((max, inv) => {
+          const numStr = type === 'Sale' ? inv.invoiceNumber : inv.purchaseNumber;
+          if (!numStr) return max;
+          
+          const match = numStr.match(/\d+$/); 
+          const currentNum = match ? parseInt(match[0], 10) : 0;
+          
+          return currentNum > max ? currentNum : max;
+        }, 0);
+        const nextSequence = String(maxNumber + 1).padStart(3, '0');
 
         setFormData({
           type: type,
           invoiceNumber: type === 'Sale' ? `INV-S-${nextSequence}` : '',
           purchaseNumber: type === 'Purchase' ? `INV-P-${nextSequence}` : '',
-          referenceNumber: type === 'Purchase' ? `INV-REF-${nextSequence}` : '',
+          referenceNumber: '',
           invoiceDate: new Date().toISOString().split('T')[0],
           client: '',
           gstNumber: '',
@@ -60,9 +59,6 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
       }
     }
   }, [isOpen, editData, initialType, invoices, accounts]);
-
-  // Product Search Configuration
-  // Flatten products into variant-specific options
   if (!products || products.length === 0) {
   return (
     <div className="p-8 text-center text-slate-400">
