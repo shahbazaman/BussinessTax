@@ -60,7 +60,7 @@ invoiceSchema.pre('save', function(next) {
   const finalTotal = (this.subtotal + this.taxAmount) - Number(this.discount || 0);
   this.totalAmount = Number(finalTotal.toFixed(2));
   
-  next();
+  // next();
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
