@@ -69,6 +69,7 @@ const Dashboard = () => {
         clientsRes,
         transactionsRes,
         profileRes,
+        invoicesRes,
         productsRes,
       ] = await Promise.all([
         api.get('/dashboard/stats'),
@@ -76,6 +77,7 @@ const Dashboard = () => {
         api.get('/clients'),
         api.get('/accounts/transactions'),
         api.get('/auth/profile'),
+        api.get('/invoices'),
         api.get('/products'),
       ]);
 
@@ -85,6 +87,7 @@ const Dashboard = () => {
       setAccounts(accountsRes.data);
       setClients(clientsRes.data);
       setTransactions(transactionsRes.data);
+      setInvoices(invoicesRes.data);
       setProducts(productsRes.data);
 
     } catch (err) {
@@ -233,14 +236,15 @@ const Dashboard = () => {
 
         {/* ── Invoice Modal ── */}
         <InvoiceModal
-          isOpen={showInvoiceModal}
-          onClose={() => setShowInvoiceModal(false)}
-          onRefresh={fetchDashboardData}
-          clients={clients}
-          products={products}
-          accounts={accounts}
-          currencySymbol={currencySymbol}
-        />
+  isOpen={showInvoiceModal}
+  onClose={() => setShowInvoiceModal(false)}
+  onRefresh={fetchDashboardData}
+  clients={clients}
+  products={products}
+  accounts={accounts}
+  invoices={invoices} // <--- ADD THIS PROP
+  currencySymbol={currencySymbol}
+/>
 
         {/* ── Summary Stats ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

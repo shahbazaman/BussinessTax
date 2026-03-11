@@ -24,23 +24,19 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
 
   const [loading, setLoading] = useState(false);
 useEffect(() => {
-  console.log("Current invoices prop in Modal:", invoices);
   if (isOpen && !editData) {
     const type = initialType || 'Sale';
-    const typeInvoices = invoices?.filter(inv => inv.type === type) || [];
+    
+    // SAFE FALLBACK: If invoices is undefined, treat it as an empty array
+    const safeInvoices = Array.isArray(invoices) ? invoices : [];
+    const typeInvoices = safeInvoices.filter(inv => inv.type === type);
 
-    // Find the absolute highest number currently stored
     const maxNumber = typeInvoices.reduce((max, inv) => {
       const code = type === 'Sale' ? inv.invoiceNumber : inv.purchaseNumber;
-      
-      // If no code exists, skip it
       if (!code) return max;
-
-      // Extract only the last part of the string (e.g., "007" from "INV-S-007")
+      
       const parts = code.split('-');
       const numericPart = parseInt(parts[parts.length - 1], 10);
-
-      // Compare and return the highest found
       return !isNaN(numericPart) && numericPart > max ? numericPart : max;
     }, 0);
 
@@ -52,7 +48,17 @@ useEffect(() => {
       type,
       invoiceNumber: type === 'Sale' ? fullCode : '',
       purchaseNumber: type === 'Purchase' ? fullCode : '',
-      // ... keep other defaults
+      referenceNumber: type === 'Purchase' ? `INV-REF-${nextSequence}` : '',
+      invoiceDate: new Date().toISOString().split('T')[0],
+      client: '',
+      gstNumber: '',
+      billingAddress: '',
+      shippingAddress: '',
+      items: [],
+      globalTaxRate: 0,
+      discount: 0,
+      paidIntoAccount: accounts?.[0]?._id || '',
+      status: 'Pending'
     }));
   }
 }, [isOpen, editData, initialType, invoices]);
