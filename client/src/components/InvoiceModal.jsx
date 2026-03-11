@@ -24,41 +24,79 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
 
   const [loading, setLoading] = useState(false);
 useEffect(() => {
-    if (isOpen) {
-      if (editData) {
-      } else {
-        const type = initialType || 'Sale';    
-        const typeInvoices = invoices?.filter(inv => inv.type === type) || [];
-        const maxNumber = typeInvoices.reduce((max, inv) => {
-          const numStr = type === 'Sale' ? inv.invoiceNumber : inv.purchaseNumber;
-          if (!numStr) return max;
-          
-          const match = numStr.match(/\d+$/); 
-          const currentNum = match ? parseInt(match[0], 10) : 0;
-          
-          return currentNum > max ? currentNum : max;
-        }, 0);
-        const nextSequence = String(maxNumber + 1).padStart(3, '0');
+  if (isOpen && !editData) {
+    const type = initialType || 'Sale';
+    
+    // 1. Filter existing invoices of the current type
+    const typeInvoices = invoices?.filter(inv => inv.type === type) || [];
 
-        setFormData({
-          type: type,
-          invoiceNumber: type === 'Sale' ? `INV-S-${nextSequence}` : '',
-          purchaseNumber: type === 'Purchase' ? `INV-P-${nextSequence}` : '',
-          referenceNumber: '',
-          invoiceDate: new Date().toISOString().split('T')[0],
-          client: '',
-          gstNumber: '',
-          billingAddress: '',
-          shippingAddress: '',
-          items: [],
-          globalTaxRate: 0,
-          discount: 0,
-          paidIntoAccount: accounts?.[0]?._id || '',
-          status: 'Pending'
-        });
-      }
-    }
-  }, [isOpen, editData, initialType, invoices, accounts]);
+    // 2. Find the maximum numerical suffix
+    const maxNumber = typeInvoices.reduce((max, inv) => {
+      // Get the correct field based on type
+      const code = type === 'Sale' ? inv.invoiceNumber : inv.purchaseNumber;
+      if (!code || typeof code !== 'string') return max;
+
+      // Extract only the numeric part (e.g., "005" -> 5)
+      const parts = code.split('-');
+      const numericPart = parseInt(parts[parts.length - 1], 10);
+      
+      return !isNaN(numericPart) && numericPart > max ? numericPart : max;
+    }, 0);
+
+    // 3. Format the next number: max + 1, then pad to 3 digits (e.g., 001, 002... 099)
+    const nextSequence = String(maxNumber + 1).padStart(3, '0');
+    
+    // 4. Construct the final string
+    const prefix = type === 'Sale' ? 'INV-S-' : 'INV-P-';
+    const fullCode = `${prefix}${nextSequence}`;
+
+    setFormData(prev => ({
+      ...prev,
+      type: type,
+      invoiceNumber: type === 'Sale' ? fullCode : '',
+      purchaseNumber: type === 'Purchase' ? fullCode : '',
+      referenceNumber: '',
+      invoiceDate: new Date().toISOString().split('T')[0],
+      items: [],
+      globalTaxRate: 0,
+      discount: 0,
+      status: 'Pending'
+    }));
+  }
+}, [isOpen, editData, initialType, invoices]);
+  // useEffect(() => {
+  //   if (isOpen) {
+  //     if (editData) {
+  //       setFormData({
+  //         ...editData,
+  //         invoiceDate: new Date(editData.invoiceDate).toISOString().split('T')[0],
+  //         client: editData.client?._id || editData.client,
+  //       });
+  //     } else {
+  //       const type = initialType || 'Sale';
+  //       const typeInvoices = invoices?.filter(inv => inv.type === type) || [];
+  //       const nextSequence = String(typeInvoices.length + 1).padStart(3, '0');
+
+  //       setFormData({
+  //         type: type,
+  //         invoiceNumber: type === 'Sale' ? `INV-S-${nextSequence}` : '',
+  //         purchaseNumber: type === 'Purchase' ? `INV-P-${nextSequence}` : '',
+  //         referenceNumber: type === 'Purchase' ? `INV-REF-${nextSequence}` : '',
+  //         invoiceDate: new Date().toISOString().split('T')[0],
+  //         client: '',
+  //         gstNumber: '',
+  //         billingAddress: '',
+  //         shippingAddress: '',
+  //         items: [],
+  //         globalTaxRate: 0,
+  //         discount: 0,
+  //         paidIntoAccount: accounts?.[0]?._id || '',
+  //         status: 'Pending'
+  //       });
+  //     }
+  //   }
+  // }, [isOpen, editData, initialType, invoices, accounts]);
+
   if (!products || products.length === 0) {
   return (
     <div className="p-8 text-center text-slate-400">
