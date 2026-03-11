@@ -15,11 +15,8 @@ const Clients = () => {
   const [loading, setLoading] = useState(true);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { symbol } = useContext(CurrencyContext);
-  const [editingClient, setEditingClient] = useState(null);
-  
+  const [editingClient, setEditingClient] = useState(null);  
   const navigate = useNavigate();
-
-  // Updated Form State with Shipping & Client Type
   const initialFormState = {
     name: '',
     email: '',
@@ -33,9 +30,7 @@ const Clients = () => {
     billingAddress: { street: '', city: '', state: '', zip: '', country: '' },
     shippingAddress: { street: '', city: '', state: '', zip: '', country: '' }
   };
-
   const [formData, setFormData] = useState(initialFormState);
-
   const fetchClients = async () => {
     try {
       const res = await api.get('/clients');
@@ -50,14 +45,12 @@ const Clients = () => {
   useEffect(() => {
     fetchClients();
   }, []);
-
   const handleOpenAddModal = () => {
     setEditingClient(null);
     setFormData(initialFormState);
     setShowAdvanced(false);
     setShowModal(true);
   };
-
   const handleEdit = (client) => {
     setEditingClient(client);
     setFormData({

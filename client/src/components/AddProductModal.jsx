@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { X, Plus, Trash2, Save, Package, AlertCircle, Edit3, Warehouse, Barcode, Hash } from 'lucide-react';
+import { X, Plus, Trash2, Save, Package, AlertCircle, Edit3, Warehouse, Barcode, Hash, ChevronDown } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
 import { CurrencyContext } from '../context/CurrencyContext';
@@ -18,7 +18,8 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
       name: '', weight: '', unit: 'pcs', costPrice: '', salePrice: '', stock: '', sku: '', barcode: '', taxRate: 0 
     }]
   };
-
+  const [clients, setClients] = useState([]);
+  const [supplierMode, setSupplierMode] = useState('select');
   const [productData, setProductData] = useState(initialState);
   const [isOtherCategory, setIsOtherCategory] = useState(false);
   const isEditing = !!editingProduct;
@@ -31,6 +32,7 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
 
   useEffect(() => {
     if (isOpen) {
+      api.get('/clients/names').then(res => setClients(res.data));
       if (editingProduct) {
         const standardCategories = ["Groceries", "Electronics", "Home & Kitchen", "Liquids"];
         const isCustom = editingProduct.category && !standardCategories.includes(editingProduct.category);
@@ -193,7 +195,42 @@ const handleVariantChange = (index, e) => {
                 <option value="Other">Other</option>
             </select>
 
-            <input name="supplier" value={productData.supplier} placeholder="Supplier" className="p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-700 shadow-inner" onChange={handleChange} />
+            <div className="space-y-2">
+  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier</label>
+  <div className="flex gap-2">
+    {supplierMode === 'select' ? (
+      <select 
+        name="supplier" 
+        value={productData.supplier} 
+        className="flex-1 p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-700 shadow-inner" 
+        onChange={handleChange}
+      >
+        <option value="">Select an existing client...</option>
+        {clients.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
+        <option value="custom">-- Enter Custom Supplier --</option>
+      </select>
+    ) : (
+      <input 
+        name="supplier" 
+        value={productData.supplier} 
+        placeholder="Enter Supplier Name" 
+        className="flex-1 p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-700 shadow-inner" 
+        onChange={handleChange} 
+      />
+    )}
+    
+    <button 
+      type="button"
+      onClick={() => {
+        setSupplierMode(prev => prev === 'select' ? 'custom' : 'select');
+        setProductData(prev => ({ ...prev, supplier: '' }));
+      }}
+      className="p-5 bg-slate-100 rounded-3xl text-slate-500 hover:bg-slate-200"
+    >
+      {supplierMode === 'select' ? <Plus size={20} /> : <ChevronDown size={20} />}
+    </button>
+  </div>
+</div>
             
             {isOtherCategory && (
                 <input name="customCategory" value={productData.customCategory} placeholder="Type category..." className="md:col-span-2 p-5 bg-blue-50 rounded-3xl border-2 border-blue-200 outline-none font-bold text-blue-700" onChange={handleChange} required />

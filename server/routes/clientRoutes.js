@@ -29,7 +29,15 @@ router.get('/', protect, async (req, res) => {
     res.status(500).json({ message: "Error fetching clients" });
   }
 });
-
+// Add this to routes/clientRoutes.js
+router.get('/names', protect, async (req, res) => {
+  try {
+    const clients = await Client.find({ user: req.user.id }).select('name');
+    res.json(clients);
+  } catch (err) {
+    res.status(500).json({ message: "Error fetching names" });
+  }
+});
 // @route   POST /api/clients
 // @desc    Add new client (Supports Shipping, Client Type, & Terms)
 router.post('/', protect, async (req, res) => {
