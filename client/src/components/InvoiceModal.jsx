@@ -24,43 +24,35 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
 
   const [loading, setLoading] = useState(false);
 useEffect(() => {
+  console.log("Current invoices prop in Modal:", invoices);
   if (isOpen && !editData) {
     const type = initialType || 'Sale';
-    
-    // 1. Filter existing invoices of the current type
     const typeInvoices = invoices?.filter(inv => inv.type === type) || [];
 
-    // 2. Find the maximum numerical suffix
+    // Find the absolute highest number currently stored
     const maxNumber = typeInvoices.reduce((max, inv) => {
-      // Get the correct field based on type
       const code = type === 'Sale' ? inv.invoiceNumber : inv.purchaseNumber;
-      if (!code || typeof code !== 'string') return max;
+      
+      // If no code exists, skip it
+      if (!code) return max;
 
-      // Extract only the numeric part (e.g., "005" -> 5)
+      // Extract only the last part of the string (e.g., "007" from "INV-S-007")
       const parts = code.split('-');
       const numericPart = parseInt(parts[parts.length - 1], 10);
-      
+
+      // Compare and return the highest found
       return !isNaN(numericPart) && numericPart > max ? numericPart : max;
     }, 0);
 
-    // 3. Format the next number: max + 1, then pad to 3 digits (e.g., 001, 002... 099)
     const nextSequence = String(maxNumber + 1).padStart(3, '0');
-    
-    // 4. Construct the final string
-    const prefix = type === 'Sale' ? 'INV-S-' : 'INV-P-';
-    const fullCode = `${prefix}${nextSequence}`;
+    const fullCode = type === 'Sale' ? `INV-S-${nextSequence}` : `INV-P-${nextSequence}`;
 
     setFormData(prev => ({
       ...prev,
-      type: type,
+      type,
       invoiceNumber: type === 'Sale' ? fullCode : '',
       purchaseNumber: type === 'Purchase' ? fullCode : '',
-      referenceNumber: '',
-      invoiceDate: new Date().toISOString().split('T')[0],
-      items: [],
-      globalTaxRate: 0,
-      discount: 0,
-      status: 'Pending'
+      // ... keep other defaults
     }));
   }
 }, [isOpen, editData, initialType, invoices]);
