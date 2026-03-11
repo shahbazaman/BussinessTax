@@ -23,12 +23,6 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   const [productData, setProductData] = useState(initialState);
   const [isOtherCategory, setIsOtherCategory] = useState(false);
   const isEditing = !!editingProduct;
-  const generateSKU = (title, variant, index) => {
-  const catPrefix = "SKU"; // or your logic
-  const namePrefix = title.substring(0, 3).toUpperCase() || "PRO";
-  const weight = variant.weight ? `${variant.weight}${variant.unit.toUpperCase()}` : '00';
-  return `${catPrefix}-${namePrefix}-${weight}-${String(index + 1).padStart(2, '0')}`;
-};
 
   useEffect(() => {
     if (isOpen) {
@@ -40,7 +34,6 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
         setProductData({
           ...editingProduct,
           customCategory: isCustom ? editingProduct.category : '',
-          // Ensure salePrice is mapped from price if editing
           variants: editingProduct.variants.map(v => ({ ...v, salePrice: v.price }))
         });
         setIsOtherCategory(isCustom);
@@ -50,29 +43,49 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
       }
     }
   }, [isOpen, editingProduct]);
-
-  const handleChange = (e) => {
-  const { name, value } = e.target;
-  
-  let updatedProductData = { ...productData, [name]: value };
-  if (name === "title") {
-    updatedProductData.variants = updatedProductData.variants.map((v, idx) => ({
-      ...v,
-      sku: v.sku || generateSKU(value, v, idx)
-    }));
-  }
-
-  setProductData(updatedProductData);
+const generateUniqueSKU = (title, variant, index) => {
+  const catPrefix = "PROD"; // Or use productData.category
+  const namePrefix = title.substring(0, 3).toUpperCase();
+  const weight = variant.weight ? `${variant.weight}${variant.unit.toUpperCase()}` : '00';
+  return `${catPrefix}-${namePrefix}-${weight}-${index + 1}`;
 };
 
-  const handleVariantChange = (index, e) => {
+const handleVariantChange = (index, e) => {
   const { name, value } = e.target;
   setProductData(prev => {
     const newVariants = [...prev.variants];
     newVariants[index][name] = value;
+    if (name === "weight" || name === "unit") {
+      newVariants[index].sku = generateUniqueSKU(prev.title, newVariants[index], index);
+    }
     return { ...prev, variants: newVariants };
   });
 };
+
+const handleChange = (e) => {
+  const { name, value } = e.target;
+
+  if (name === "category") {
+    const isOther = value === "Other";
+    setIsOtherCategory(isOther);
+    setProductData(prev => ({ 
+      ...prev, 
+      category: value,
+      customCategory: isOther ? prev.customCategory : '' 
+    }));
+  } else {
+    let updatedProductData = { ...productData, [name]: value };
+    if (name === "title") {
+      updatedProductData.variants = updatedProductData.variants.map((v, idx) => ({
+        ...v,
+        sku: v.sku || generateSKU(value, v, idx)
+      }));
+    }
+    setProductData(updatedProductData);
+  }
+};
+
+ 
 
   const addVariantField = () => {
     setProductData({
@@ -109,31 +122,21 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
       }));
 
     if (validVariants.length === 0) return toast.error("Please add at least one variant");
-// Add this helper function at the top level
-const generateUniqueSKU = (title, variant, index) => {
-  const catPrefix = "PROD"; // Or use productData.category
-  const namePrefix = title.substring(0, 3).toUpperCase();
-  const weight = variant.weight ? `${variant.weight}${variant.unit.toUpperCase()}` : '00';
-  return `${catPrefix}-${namePrefix}-${weight}-${index + 1}`;
-};
-
-const handleVariantChange = (index, e) => {
-  const { name, value } = e.target;
-  const newVariants = [...productData.variants];  
-  newVariants[index][name] = value;
-  if (name === "weight" || name === "unit") {
-    newVariants[index].sku = generateUniqueSKU(productData.title, newVariants[index], index);
-  }
-  
-  setProductData({ ...productData, variants: newVariants });
-};
     const sanitizedData = {
-      ...productData,
-      category: finalCategory,
-      lowStockAlert: Number(productData.lowStockAlert) || 0,
-      reorderQuantity: Number(productData.reorderQuantity) || 0,
-      variants: validVariants
-    };
+    ...productData,
+    category: finalCategory, 
+    lowStockAlert: Number(productData.lowStockAlert) || 0,
+    reorderQuantity: Number(productData.reorderQuantity) || 0,
+    variants: productData.variants.map((v, index) => ({
+      ...v,
+      weight: Number(v.weight) || 0,
+      costPrice: Number(v.costPrice) || 0,
+      price: Number(v.salePrice) || 0,
+      taxRate: Number(v.taxRate) || 0,
+      stock: Number(v.stock) || 0,
+      sku: v.sku?.trim() || generateUniqueSKU(productData.title, v, index)
+    }))
+  };
 
     try {
       if (isEditing) {
@@ -154,9 +157,7 @@ const handleVariantChange = (index, e) => {
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-100 flex items-center justify-center p-4">
-      <div className="bg-white rounded-[3rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-white/20">
-        
-        {/* Header */}
+      <div className="bg-white rounded-[3rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-white/20">        
         <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-50">
           <div className="flex items-center gap-3">
             <div className={`p-3 ${isEditing ? 'bg-amber-500' : 'bg-blue-600'} rounded-2xl text-white shadow-lg`}>
@@ -174,8 +175,7 @@ const handleVariantChange = (index, e) => {
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">
-          {/* Section 1: General Info */}
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">        
           <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="md:col-span-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">General Information</label>
@@ -184,17 +184,21 @@ const handleVariantChange = (index, e) => {
                 className="w-full p-5 bg-slate-50 rounded-3xl border-2 border-transparent focus:border-blue-500/20 focus:bg-white outline-none font-bold text-slate-700 shadow-inner"
                 onChange={handleChange} required
               />
-            </div>
-            
-            <select name="category" value={isOtherCategory ? "Other" : productData.category} className="p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-600 shadow-inner" onChange={handleChange} required>
+            </div>            
+            <select 
+                name="category" 
+                value={productData.category} 
+                className="p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-600 shadow-inner" 
+                onChange={handleChange} 
+                required
+              >
                 <option value="">Select Category</option>
                 <option value="Groceries">Groceries</option>
                 <option value="Liquids">Liquids</option>
                 <option value="Electronics">Electronics</option>
                 <option value="Home & Kitchen">Home & Kitchen</option>
                 <option value="Other">Other</option>
-            </select>
-
+              </select>
             <div className="space-y-2">
   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier</label>
   <div className="flex gap-2">
@@ -236,8 +240,6 @@ const handleVariantChange = (index, e) => {
                 <input name="customCategory" value={productData.customCategory} placeholder="Type category..." className="md:col-span-2 p-5 bg-blue-50 rounded-3xl border-2 border-blue-200 outline-none font-bold text-blue-700" onChange={handleChange} required />
             )}
           </section>
-
-          {/* Section 2: Reorder Rules */}
           <section className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1"><AlertCircle size={12} /> Low Stock Alert</label>
@@ -248,8 +250,6 @@ const handleVariantChange = (index, e) => {
               <input name="reorderQuantity" type="number" value={productData.reorderQuantity} className="w-full p-4 bg-white rounded-2xl outline-none font-bold text-slate-700" onChange={handleChange} />
             </div>
           </section>
-
-          {/* Section 3: Variants */}
           <section className="space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pricing & Variants</span>
@@ -260,9 +260,7 @@ const handleVariantChange = (index, e) => {
 
             <div className="space-y-4">
               {productData.variants.map((variant, index) => (
-                <div key={index} className="p-6 bg-white rounded-4xl border border-slate-100 shadow-sm space-y-4">
-                  
-                  {/* Row 1: Key Identifiers (Name, SKU, Barcode) */}
+                <div key={index} className="p-6 bg-white rounded-4xl border border-slate-100 shadow-sm space-y-4">                  
                   <div className="grid grid-cols-12 gap-3 items-center">
                     <div className="col-span-12 md:col-span-4">
                       <input name="name" value={variant.name} placeholder="Variant Name (e.g. Red, XL)" className="w-full p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} required />
@@ -271,7 +269,7 @@ const handleVariantChange = (index, e) => {
                       <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                       <input 
                         name="sku" 
-                        value={variant.sku || ''} // Ensure it's never undefined
+                        value={variant.sku || ''} 
                         placeholder="SKU"
                         className="w-full pl-9 p-3 rounded-xl bg-blue-50/30 text-sm font-bold text-blue-600 outline-none border border-transparent focus:border-blue-200" 
                         onChange={(e) => handleVariantChange(index, e)} 
