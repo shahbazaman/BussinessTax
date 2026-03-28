@@ -43,7 +43,6 @@ const invoiceSchema = new mongoose.Schema({
 // Sparse indexes: These ONLY work if the field is missing or undefined (not "")
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, purchaseNumber: 1 }, { unique: true, sparse: true });
-invoiceSchema.index({ user: 1, referenceNumber: 1 }, { unique: true, sparse: true });
 
 invoiceSchema.pre('save', function(next) {
   const items = this.items || [];
@@ -60,7 +59,7 @@ invoiceSchema.pre('save', function(next) {
   const finalTotal = (this.subtotal + this.taxAmount) - Number(this.discount || 0);
   this.totalAmount = Number(finalTotal.toFixed(2));
   
-  // next();
+  next();
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);

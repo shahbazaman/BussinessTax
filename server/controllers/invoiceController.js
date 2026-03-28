@@ -3,25 +3,38 @@ import Product from '../models/Product.js';
 
 export const createInvoice = async (req, res) => {
   try {
-    const { 
-      client, items, discount, type, invoiceDate, status, 
-      notes, globalTaxRate, gstNumber, billingAddress, 
-      shippingAddress, invoiceNumber, purchaseNumber, referenceNumber 
+    const {
+      client, items, discount, type, invoiceDate, status,
+      notes, globalTaxRate, gstNumber, billingAddress,
+      shippingAddress, referenceNumber
     } = req.body;
 
     if (!req.user?._id) return res.status(401).json({ message: "Auth failed" });
-    const invoiceType = type || 'Sale';
-    const cleanedData = {
-      invoiceNumber: invoiceType === 'Sale' ? (invoiceNumber || undefined) : undefined,
-      purchaseNumber: invoiceType === 'Purchase' ? (purchaseNumber || undefined) : undefined,
-      referenceNumber: invoiceType === 'Purchase' ? (referenceNumber || undefined) : undefined
-    };
 
+    const invoiceType = type || 'Sale';
+
+    // ─── Auto-generate sequential invoice numbers ───────────────────────────
+    // Count only invoices of this type for THIS user, so Sales and Purchases
+    // each have their own sequence: INV-S-001, INV-S-002 / INV-P-001, INV-P-002
+    const count = await Invoice.countDocuments({
+      user: req.user._id,
+      type: invoiceType
+    });
+    const seq = String(count + 1).padStart(3, '0');
+
+    const invoiceNumber   = invoiceType === 'Sale'     ? `INV-S-${seq}` : undefined;
+    const purchaseNumber  = invoiceType === 'Purchase' ? `INV-P-${seq}` : undefined;
+    // referenceNumber is the SUPPLIER's ref — only on Purchase, set from form or auto
+    const resolvedRefNum  = invoiceType === 'Purchase'
+      ? (referenceNumber || `INV-REF-${seq}`)
+      : undefined;
+
+    // ─── Validate items and stock ───────────────────────────────────────────
     const validatedItems = [];
     for (const item of items) {
       const product = await Product.findById(item.productId);
       if (!product) return res.status(404).json({ message: `Product not found` });
-      
+
       const variant = product.variants.id(item.variantId);
       if (!variant) return res.status(404).json({ message: "Variant not found" });
 
@@ -37,39 +50,46 @@ export const createInvoice = async (req, res) => {
     }
 
     const invoice = new Invoice({
-      user: req.user._id, 
-      client, 
-      ...cleanedData,
-      invoiceDate: invoiceDate || new Date(), 
-      gstNumber, 
-      billingAddress, 
+      user: req.user._id,
+      client,
+      invoiceDate: invoiceDate || new Date(),
+      type: invoiceType,
+      // These will be undefined (not "") for the wrong type — sparse index only
+      // triggers on actual values, so undefined fields are safely ignored
+      invoiceNumber,
+      purchaseNumber,
+      referenceNumber: resolvedRefNum,
+      gstNumber,
+      billingAddress,
       shippingAddress,
-      items: validatedItems, 
+      items: validatedItems,
       discount: Number(discount || 0),
-      globalTaxRate: Number(globalTaxRate || 0), 
+      globalTaxRate: Number(globalTaxRate || 0),
       status: status || 'Pending',
-      type: invoiceType, 
       notes
     });
 
     const savedInvoice = await invoice.save();
+
+    // ─── Adjust stock ───────────────────────────────────────────────────────
     for (const item of validatedItems) {
-      const adjustment = (invoiceType === 'Purchase') ? item.quantity : -item.quantity;
+      const adjustment = invoiceType === 'Purchase' ? item.quantity : -item.quantity;
       await Product.updateOne(
         { _id: item.productId, "variants._id": item.variantId },
         { $inc: { "variants.$.stock": adjustment } }
       );
     }
-    
+
     res.status(201).json(savedInvoice);
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({ message: "Duplicate ID: This Invoice/Ref number is already in use." });
+      return res.status(400).json({
+        message: "Duplicate number detected. Please refresh and try again."
+      });
     }
     res.status(500).json({ message: error.message });
   }
 };
-
 export const updateInvoice = async (req, res) => {
   try {
     const oldInvoice = await Invoice.findById(req.params.id);
