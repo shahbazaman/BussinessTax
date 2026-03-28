@@ -18,14 +18,28 @@ const Sidebar = () => {
   const [showAlerts, setShowAlerts] = useState(false);
     useEffect(() => {
   const fetchAlerts = async () => {
-    const [products, invoices] = await Promise.all([
-      api.get('/products'), api.get('/invoices')
-    ]);
-    const lowStock = products.data.filter(p => p.stock <= p.reorderLevel);
-    const overdue = invoices.data.filter(i => i.status !== 'Paid' && new Date(i.dueDate) < new Date());
-    setAlerts([...lowStock.map(p => `Low stock: ${p.name}`), ...overdue.map(i => `Overdue: Invoice #${i.invoiceNumber}`)]);
+    try {
+      const [products, invoices] = await Promise.all([
+        api.get('/products'), api.get('/invoices')
+      ]);
+      const lowStock = products.data.filter(p => p.stock <= (p.reorderLevel ?? p.minStock ?? 5));
+      const overdue = invoices.data.filter(i => i.status !== 'Paid' && i.dueDate && new Date(i.dueDate) < new Date());
+      setAlerts([
+        ...lowStock.map(p => `🔴 Low stock: ${p.name} (${p.stock} left)`),
+        ...overdue.map(i => `⚠️ Overdue: Invoice #${i.invoiceNumber || i._id?.slice(-5)}`)
+      ]);
+    } catch (err) {
+      console.error('Alert fetch failed:', err);
+    }
   };
   fetchAlerts();
+}, []);
+useEffect(() => {
+  const handleClickOutside = (e) => {
+    if (!e.target.closest('.bell-wrapper')) setShowAlerts(false);
+  };
+  document.addEventListener('click', handleClickOutside);
+  return () => document.removeEventListener('click', handleClickOutside);
 }, []);
   const menuItems = [
     { icon: <LayoutDashboard />, label: 'Dashboard', path: '/' },
@@ -77,9 +91,9 @@ const Sidebar = () => {
             </span>
           )}
           {!isCollapsed && (
-  <div className="relative">
+<div className="relative bell-wrapper">
     <button
-      onClick={() => setShowAlerts(!showAlerts)}
+      onClick={(e) => { e.stopPropagation(); setShowAlerts(!showAlerts); }}
       className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 relative"
     >
       <Bell size={18} />
