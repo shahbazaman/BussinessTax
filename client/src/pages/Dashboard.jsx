@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Users, UserCheck, FileCheck, Receipt,
   ArrowRightLeft, Landmark, Plus,
-  Trash2
+  Trash2,X, ChevronDown, CreditCard, ShieldCheck, MapPin, Truck, Copy
 } from 'lucide-react';
 import {
   XAxis, YAxis, CartesianGrid, Tooltip,
@@ -49,7 +49,15 @@ const Dashboard = () => {
   const [showInvoiceModal,  setShowInvoiceModal]  = useState(false);
 
   const [transferData, setTransferData] = useState({ fromId: '', toId: '', amount: 0 });
-  const [newClient,    setNewClient]    = useState({ name: '', email: '', phone: '' });
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const initialClientFormState = {
+    name: '', email: '', phone: '', clientType: 'Individual',
+    businessName: '', taxId: '', paymentTerms: 'Immediate', creditLimit: 0,
+    openingBalance: 0,
+    billingAddress: { street: '', city: '', state: '', zip: '', country: '' },
+    shippingAddress: { street: '', city: '', state: '', zip: '', country: '' }
+  };
+  const [newClient, setNewClient] = useState(initialClientFormState);
   const [newAccount,   setNewAccount]  = useState({
     bankName: '', balance: '', accountType: 'Checking', accountNumber: ''
   });
@@ -165,12 +173,13 @@ const Dashboard = () => {
     }
   };
 
-  const handleAddClient = async (e) => {
+    const handleAddClient = async (e) => {
     e.preventDefault();
     try {
       await api.post('/clients', newClient);
       setShowClientModal(false);
-      setNewClient({ name: '', email: '', phone: '' });
+      setNewClient(initialClientFormState); 
+      setShowAdvanced(false);              
       await fetchDashboardData();
     } catch (err) {
       toast.error('Error adding client: ' + (err.response?.data?.message || 'Error'));
@@ -542,34 +551,126 @@ const Dashboard = () => {
       )}
 
       {/* ── Add Client Modal ── */}
-      {showClientModal && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[2.5rem] p-8 w-full max-w-md shadow-2xl">
-            <h2 className="text-2xl font-black text-slate-800 mb-6">Add New Client</h2>
-            <form onSubmit={handleAddClient} className="space-y-4">
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Name</label>
-                <input required className="w-full bg-slate-50 border-none rounded-2xl p-4 mt-1 focus:ring-2 focus:ring-blue-500 transition-all" placeholder="Acme Corp"
-                  value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Email</label>
-                <input type="email" required className="w-full bg-slate-50 border-none rounded-2xl p-4 mt-1 focus:ring-2 focus:ring-blue-500 transition-all" placeholder="contact@acme.com"
-                  value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Phone</label>
-                <input type="tel" className="w-full bg-slate-50 border-none rounded-2xl p-4 mt-1 focus:ring-2 focus:ring-blue-500 transition-all" placeholder="+1 (555) 000-0000"
-                  value={newClient.phone} onChange={(e) => setNewClient({ ...newClient, phone: e.target.value })} />
-              </div>
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setShowClientModal(false)} className="flex-1 bg-red-600 py-4 rounded-2xl font-bold text-white transition-colors">Cancel</button>
-                <button type="submit" className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all">Save Client</button>
-              </div>
-            </form>
+     {/* ── Add Client Modal ── */}
+{showClientModal && (
+  <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
+    <div className="bg-white rounded-[3rem] w-full max-w-2xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+      <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+        <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">New Client Onboarding</h3>
+        <button onClick={() => setShowClientModal(false)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm">
+          <X size={20} />
+        </button>
+      </div>
+
+      <form onSubmit={handleAddClient} className="p-8 overflow-y-auto flex-1">
+        {/* Client Type Toggle */}
+        <div className="flex p-1 bg-slate-100 rounded-2xl w-fit mb-8">
+          {['Individual', 'Business'].map((type) => (
+            <button key={type} type="button" onClick={() => setNewClient({ ...newClient, clientType: type })}
+              className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${newClient.clientType === type ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>
+              {type}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Core Identity</h4>
+            <input required placeholder="Full Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
+              value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} />
+            <input required type="email" placeholder="Email Address" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
+              value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} />
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1">Business Specs</h4>
+            <input placeholder="Company Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
+              value={newClient.businessName} onChange={(e) => setNewClient({ ...newClient, businessName: e.target.value })}
+              disabled={newClient.clientType === 'Individual'} />
+            <input placeholder="Tax ID / GST" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
+              value={newClient.taxId} onChange={(e) => setNewClient({ ...newClient, taxId: e.target.value })} />
           </div>
         </div>
-      )}
+
+        {/* Advanced Section */}
+        <div className="mt-8 pt-6 border-t border-slate-100">
+          <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-all font-black text-[10px] uppercase tracking-widest">
+            <ChevronDown className={`transition-transform duration-300 ${showAdvanced ? 'rotate-180' : ''}`} size={16} />
+            Financials & Addresses
+          </button>
+
+          {showAdvanced && (
+            <div className="mt-6 space-y-8">
+              {/* Financials */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl">
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1">
+                    <CreditCard size={12} /> Payment Terms
+                  </label>
+                  <select className="w-full p-3 bg-white rounded-xl font-bold text-sm outline-none shadow-sm"
+                    value={newClient.paymentTerms} onChange={(e) => setNewClient({ ...newClient, paymentTerms: e.target.value })}>
+                    <option value="Immediate">Due on Receipt</option>
+                    <option value="Net 15">Net 15</option>
+                    <option value="Net 30">Net 30</option>
+                    <option value="Net 60">Net 60</option>
+                  </select>
+                </div>
+                <div className="space-y-3">
+                  <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1">
+                    <ShieldCheck size={12} /> Credit Limit
+                  </label>
+                  <input type="number" className="w-full p-3 bg-white rounded-xl font-bold text-sm outline-none"
+                    value={newClient.creditLimit} onChange={(e) => setNewClient({ ...newClient, creditLimit: e.target.value })} />
+                </div>
+              </div>
+
+              {/* Addresses */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <h5 className="text-[10px] font-black text-slate-800 flex items-center gap-2"><MapPin size={14} /> BILLING ADDRESS</h5>
+                  <input placeholder="Street" className="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
+                    value={newClient.billingAddress.street} onChange={(e) => setNewClient({ ...newClient, billingAddress: { ...newClient.billingAddress, street: e.target.value } })} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input placeholder="City" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
+                      value={newClient.billingAddress.city} onChange={(e) => setNewClient({ ...newClient, billingAddress: { ...newClient.billingAddress, city: e.target.value } })} />
+                    <input placeholder="Country" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
+                      value={newClient.billingAddress.country} onChange={(e) => setNewClient({ ...newClient, billingAddress: { ...newClient.billingAddress, country: e.target.value } })} />
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h5 className="text-[10px] font-black text-slate-800 flex items-center gap-2"><Truck size={14} /> SHIPPING ADDRESS</h5>
+                    <button type="button"
+                      onClick={() => setNewClient({ ...newClient, shippingAddress: { ...newClient.billingAddress } })}
+                      className="text-[8px] font-black text-blue-600 uppercase flex items-center gap-1 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all">
+                      <Copy size={10} /> Same as billing
+                    </button>
+                  </div>
+                  <input placeholder="Street" className="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
+                    value={newClient.shippingAddress.street} onChange={(e) => setNewClient({ ...newClient, shippingAddress: { ...newClient.shippingAddress, street: e.target.value } })} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input placeholder="City" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
+                      value={newClient.shippingAddress.city} onChange={(e) => setNewClient({ ...newClient, shippingAddress: { ...newClient.shippingAddress, city: e.target.value } })} />
+                    <input placeholder="Country" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
+                      value={newClient.shippingAddress.country} onChange={(e) => setNewClient({ ...newClient, shippingAddress: { ...newClient.shippingAddress, country: e.target.value } })} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="pt-8">
+          <button type="submit" className="w-full bg-slate-900 hover:bg-emerald-600 text-white py-5 rounded-[2rem] font-black text-sm shadow-xl transition-all">
+            Authorize & Create Profile
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+)}
 
       {/* ── Add Account Modal ── */}
       {showAccountModal && (
