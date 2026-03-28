@@ -44,9 +44,9 @@ const invoiceSchema = new mongoose.Schema({
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, purchaseNumber: 1 }, { unique: true, sparse: true });
 
-invoiceSchema.pre('save', function(next) {
+invoiceSchema.pre('save', async function() {
   const items = this.items || [];
-  
+
   const calculatedSubtotal = items.reduce((acc, item) => {
     return acc + (Number(item.price || 0) * Number(item.quantity || 0));
   }, 0);
@@ -55,11 +55,9 @@ invoiceSchema.pre('save', function(next) {
 
   this.subtotal = Number(calculatedSubtotal.toFixed(2));
   this.taxAmount = Number(calculatedTax.toFixed(2));
-  
+
   const finalTotal = (this.subtotal + this.taxAmount) - Number(this.discount || 0);
   this.totalAmount = Number(finalTotal.toFixed(2));
-  
-  next();
 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
