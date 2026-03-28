@@ -40,13 +40,19 @@ const invoiceSchema = new mongoose.Schema({
   paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }
 }, { timestamps: true });
 
-// Sparse: only indexes documents where the field actually has a value
-// Empty string "" still triggers the index — we handle this in the controller
-// by never saving empty strings for these fields
 invoiceSchema.index({ user: 1, invoiceNumber: 1 },  { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, purchaseNumber: 1 }, { unique: true, sparse: true });
+// NO index on referenceNumber — it is user-entered and non-unique
 
 invoiceSchema.pre('save', async function () {
+  // Never store empty strings — they break sparse indexes
+  if (this.referenceNumber === '' || this.referenceNumber == null) {
+    this.referenceNumber = undefined;
+    this.unmarkModified('referenceNumber');
+  }
+  if (this.invoiceNumber === '') this.invoiceNumber = undefined;
+  if (this.purchaseNumber === '') this.purchaseNumber = undefined;
+
   const items = this.items || [];
 
   const calculatedSubtotal = items.reduce((acc, item) => {

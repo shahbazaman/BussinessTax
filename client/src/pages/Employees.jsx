@@ -184,14 +184,34 @@ const handleCloseMonth = async () => {
     setFormData(initialState);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this employee permanently?")) return;
-    try {
-      await api.delete(`/employees/${id}`);
-      toast.success("Record Purged");
-      fetchData();
-    } catch (err) { toast.error("Delete failed"); }
-  };
+  const handleDelete = (id) => {
+  toast(
+    ({ closeToast }) => (
+      <div>
+        <p className="font-bold text-sm mb-2">Delete this employee?</p>
+        <p className="text-xs text-slate-500 mb-3">This will permanently remove the employee record.</p>
+        <div className="flex gap-2">
+          <button onClick={async () => {
+            closeToast();
+            try {
+              await api.delete(`/employees/${id}`);
+              toast.success("Record Purged");
+              fetchData();
+            } catch (err) {
+              toast.error("Delete failed");
+            }
+          }} className="bg-rose-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+            Yes, Delete
+          </button>
+          <button onClick={closeToast} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">
+            Cancel
+          </button>
+        </div>
+      </div>
+    ),
+    { autoClose: false, closeButton: false }
+  );
+};
 
   const isAlreadyMarked = (lastDate) => {
     if (!lastDate) return false;

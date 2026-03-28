@@ -153,17 +153,34 @@ const Invoices = () => {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm("Delete record? This will revert stock levels.")) {
-      try { 
-        await api.delete(`/invoices/${id}`); 
-        fetchData(); 
-        toast.success("Deleted & Stock Reverted"); 
-      } catch { 
-        toast.error("Deletion failed"); 
-      }
-    }
-  };
+const handleDelete = (id) => {
+  toast(
+    ({ closeToast }) => (
+      <div>
+        <p className="font-bold text-sm mb-2">Delete this invoice?</p>
+        <p className="text-xs text-slate-500 mb-3">This will permanently delete the record and revert stock levels.</p>
+        <div className="flex gap-2">
+          <button onClick={async () => {
+            closeToast();
+            try {
+              await api.delete(`/invoices/${id}`);
+              fetchData();
+              toast.success("Deleted & Stock Reverted");
+            } catch {
+              toast.error("Deletion failed");
+            }
+          }} className="bg-rose-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+            Yes, Delete
+          </button>
+          <button onClick={closeToast} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">
+            Cancel
+          </button>
+        </div>
+      </div>
+    ),
+    { autoClose: false, closeButton: false }
+  );
+};
 
   const downloadPDF = (invoice) => {
     const doc = new jsPDF();

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { X, Plus, Trash2, Percent, Globe, User } from 'lucide-react';
-
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 const CreateInvoiceModal = ({ isOpen, onClose, onRefresh }) => {
   const [clients, setClients] = useState([]); // Store fetched clients
   const [selectedClientId, setSelectedClientId] = useState('');
@@ -55,7 +56,7 @@ const CreateInvoiceModal = ({ isOpen, onClose, onRefresh }) => {
       onRefresh();
       onClose();
     } catch (err) {
-      alert("Error saving invoice");
+      toast.error("Error saving invoice");
     }
   };
 

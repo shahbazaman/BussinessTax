@@ -186,25 +186,43 @@ const Dashboard = () => {
     }
   };
 
-  const handleDeleteAccount = async (accountId) => {
-    if (!window.confirm('Permanently delete this account?')) return;
-    const deletePromise = api.delete(`/accounts/${accountId}`);
-    toast.promise(deletePromise, {
-      pending: 'Deleting account...',
-      success: 'Account removed successfully! 🗑️',
-      error: {
-        render({ data }) {
-          return data?.response?.data?.message || 'Failed to delete account';
-        },
-      },
-    });
-    try {
-      await deletePromise;
-      await fetchDashboardData();
-    } catch (err) {
-      console.error(err);
-    }
-  };
+const handleDeleteAccount = (accountId) => {
+  toast(
+    ({ closeToast }) => (
+      <div>
+        <p className="font-bold text-sm mb-2">Delete this account?</p>
+        <p className="text-xs text-slate-500 mb-3">This will permanently remove this account.</p>
+        <div className="flex gap-2">
+          <button onClick={async () => {
+            closeToast();
+            const deletePromise = api.delete(`/accounts/${accountId}`);
+            toast.promise(deletePromise, {
+              pending: 'Deleting account...',
+              success: 'Account removed successfully! 🗑️',
+              error: {
+                render({ data }) {
+                  return data?.response?.data?.message || 'Failed to delete account';
+                },
+              },
+            });
+            try {
+              await deletePromise;
+              await fetchDashboardData();
+            } catch (err) {
+              console.error(err);
+            }
+          }} className="bg-rose-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+            Yes, Delete
+          </button>
+          <button onClick={closeToast} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">
+            Cancel
+          </button>
+        </div>
+      </div>
+    ),
+    { autoClose: false, closeButton: false }
+  );
+};
 
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading)

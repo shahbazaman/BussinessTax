@@ -95,7 +95,11 @@ export const createInvoice = async (req, res) => {
       notes
     });
 
-    const savedInvoice = await invoice.save();
+      if (!invoice.referenceNumber) delete invoice.referenceNumber;
+      if (!invoice.invoiceNumber)   delete invoice.invoiceNumber;
+      if (!invoice.purchaseNumber)  delete invoice.purchaseNumber;
+
+      const savedInvoice = await invoice.save();
 
     // Adjust stock
     for (const item of validatedItems) {
