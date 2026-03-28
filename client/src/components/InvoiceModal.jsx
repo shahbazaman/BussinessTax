@@ -122,24 +122,48 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.client) return toast.error("Please select a party");
-    if (formData.items.length === 0) return toast.error("Add at least one item");
+if (!formData.client) return toast.error("Please select a party");
+if (formData.items.length === 0) return toast.error("Add at least one item");
+
+// ── Duplicate number check (client-side) ──
+if (!editData) {
+  const field = formData.type === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
+  const value = formData.type === 'Sale' ? formData.invoiceNumber : formData.purchaseNumber;
+
+  if (!value?.trim()) {
+    return toast.error(`Please enter a ${formData.type === 'Sale' ? 'invoice' : 'purchase'} number`);
+  }
+
+  if (Array.isArray(invoices) && invoices.length > 0) {
+    const duplicate = invoices.find(inv =>
+      inv.type === formData.type &&
+      inv[field]?.trim().toLowerCase() === value.trim().toLowerCase()
+    );
+    if (duplicate) {
+      return toast.error(`"${value.trim()}" already exists. Please use a different number.`);
+    }
+  }
+}
 
     setLoading(true);
     try {
       if (editData) {
-        await api.put(`/invoices/${editData._id}`, formData);
+        const editPayload = {
+          ...formData,
+          invoiceNumber:   editData.invoiceNumber,   // never change on edit
+          purchaseNumber:  editData.purchaseNumber,  // never change on edit
+          referenceNumber: formData.referenceNumber?.trim() || undefined,
+        };
+        await api.put(`/invoices/${editData._id}`, editPayload);
         toast.success("Updated successfully");
       } else {
-        // Strip invoiceNumber/purchaseNumber — backend generates these.
-        // Never send them as empty strings "" or sparse index breaks.
-        const { invoiceNumber, purchaseNumber, referenceNumber, ...rest } = formData;
         const payload = {
-          ...rest,
-          // Only attach referenceNumber if user actually typed one
-          ...(referenceNumber ? { referenceNumber } : {})
-        };
-        await api.post('/invoices', payload);
+        ...formData,
+        invoiceNumber:   formData.type === 'Sale' ? formData.invoiceNumber : undefined,
+        purchaseNumber:  formData.type === 'Purchase' ? formData.purchaseNumber : undefined,
+        referenceNumber: formData.referenceNumber?.trim() || undefined,
+      };
+      await api.post('/invoices', payload);
         toast.success("Created successfully");
       }
       onRefresh();
@@ -188,67 +212,79 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
             )}
 
             {/* Top Fields */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {formData.type === 'Sale' ? (
-                <div>
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Inv No.</label>
-                  <input
-                    type="text"
-                    className="w-full bg-slate-100 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none text-slate-400 cursor-not-allowed"
-                    value="Auto-generated"
-                    readOnly
-                  />
-                </div>
-              ) : (
-                <>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Purchase No.</label>
-                    <input
-                      type="text"
-                      className="w-full bg-slate-100 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none text-slate-400 cursor-not-allowed"
-                      value="Auto-generated"
-                      readOnly
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Bill Ref No. (Optional)</label>
-                    <input
-                      type="text"
-                      className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none"
-                      placeholder="Supplier's bill ref..."
-                      value={formData.referenceNumber}
-                      onChange={e => setFormData({ ...formData, referenceNumber: e.target.value })}
-                    />
-                  </div>
-                </>
-              )}
+{/* Top Fields */}
+<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Date</label>
-                <input
-                  type="date"
-                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none uppercase"
-                  value={formData.invoiceDate}
-                  onChange={e => setFormData({ ...formData, invoiceDate: e.target.value })}
-                  required
-                />
-              </div>
+  {/* Invoice / Purchase Number */}
+  {formData.type === 'Sale' ? (
+    <div>
+      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Invoice No.</label>
+      <input
+        type="text"
+        required
+        placeholder="e.g. INV-S-001"
+        className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
+        value={formData.invoiceNumber}
+        onChange={e => setFormData({ ...formData, invoiceNumber: e.target.value })}
+      />
+    </div>
+  ) : (
+    <div>
+      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Purchase No.</label>
+      <input
+        type="text"
+        required
+        placeholder="e.g. INV-P-001"
+        className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-rose-500/20"
+        value={formData.purchaseNumber}
+        onChange={e => setFormData({ ...formData, purchaseNumber: e.target.value })}
+      />
+    </div>
+  )}
 
-              <div>
-                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
-                  {formData.type === 'Sale' ? 'Customer Name' : 'Supplier Name'}
-                </label>
-                <select
-                  className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none"
-                  value={formData.client}
-                  onChange={e => setFormData({ ...formData, client: e.target.value })}
-                  required
-                >
-                  <option value="">Choose Party...</option>
-                  {clients.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
-                </select>
-              </div>
-            </div>
+  {/* Date — always visible */}
+  <div>
+    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Date</label>
+    <input
+      type="date"
+      required
+      className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none uppercase"
+      value={formData.invoiceDate}
+      onChange={e => setFormData({ ...formData, invoiceDate: e.target.value })}
+    />
+  </div>
+
+  {/* Client — always visible */}
+  <div>
+    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+      {formData.type === 'Sale' ? 'Customer Name' : 'Supplier Name'}
+    </label>
+    <select
+      required
+      className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none"
+      value={formData.client}
+      onChange={e => setFormData({ ...formData, client: e.target.value })}
+    >
+      <option value="">Choose Party...</option>
+      {clients.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
+    </select>
+  </div>
+
+  {/* Reference Number — Purchase only */}
+  {formData.type === 'Purchase' && (
+    <div>
+      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Bill Ref No. (Optional)</label>
+      <input
+        type="text"
+        placeholder="Supplier's bill ref..."
+        className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none"
+        value={formData.referenceNumber}
+        onChange={e => setFormData({ ...formData, referenceNumber: e.target.value })}
+      />
+    </div>
+  )}
+
+</div>
 
             {/* Address Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50/50 p-6 rounded-2xl border border-slate-100">

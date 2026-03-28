@@ -40,10 +40,6 @@ const invoiceSchema = new mongoose.Schema({
   paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }
 }, { timestamps: true });
 
-invoiceSchema.index({ user: 1, invoiceNumber: 1 },  { unique: true, sparse: true });
-invoiceSchema.index({ user: 1, purchaseNumber: 1 }, { unique: true, sparse: true });
-// NO index on referenceNumber — it is user-entered and non-unique
-
 invoiceSchema.pre('save', async function () {
   // Never store empty strings — they break sparse indexes
   if (this.referenceNumber === '' || this.referenceNumber == null) {
