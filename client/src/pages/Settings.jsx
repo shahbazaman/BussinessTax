@@ -10,7 +10,7 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [isGoogleUser, setIsGoogleUser] = useState(false);
-  
+  const [darkMode, setDarkMode] = useState(localStorage.getItem('theme') === 'dark');
   // Settings Form State
   const [formData, setFormData] = useState({
     businessName: '',
@@ -48,7 +48,11 @@ const Settings = () => {
     };
     fetchSettings();
   }, []);
-
+useEffect(() => {
+  if (darkMode) document.documentElement.classList.add('dark');
+  else document.documentElement.classList.remove('dark');
+  localStorage.setItem('theme', darkMode ? 'dark' : 'light');
+}, [darkMode]);
   // Update General Settings
   const handleSettingsSubmit = async (e) => {
     e.preventDefault();
@@ -179,7 +183,21 @@ const Settings = () => {
             </button>
           </div>
         </form>
-
+      {/* Dark Mode Toggle */}
+<div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+  <div className="flex items-center justify-between">
+    <div>
+      <h3 className="font-bold text-slate-800">Appearance</h3>
+      <p className="text-xs text-slate-400 mt-1">Toggle dark mode for the interface</p>
+    </div>
+    <button
+      onClick={() => setDarkMode(!darkMode)}
+      className={`relative w-14 h-7 rounded-full transition-colors duration-300 ${darkMode ? 'bg-slate-900' : 'bg-slate-200'}`}
+    >
+      <span className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow transition-transform duration-300 ${darkMode ? 'translate-x-7' : 'translate-x-0'}`} />
+    </button>
+  </div>
+</div>
         <hr className="my-10 border-slate-200" />
 
         {/* 2. SECURITY SECTION (Conditional based on Login Method) */}

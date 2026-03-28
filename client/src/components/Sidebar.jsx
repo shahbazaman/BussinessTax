@@ -1,4 +1,5 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
+import api from '../utils/api';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { 
@@ -6,14 +7,26 @@ import {
   Settings, Landmark, ChevronLeft, ChevronRight, LogOut, Menu, X,
   Package, PieChart 
 } from 'lucide-react';
-
+import { Bell } from 'lucide-react';
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { user, logout } = useContext(AuthContext);
   const location = useLocation();
   const navigate = useNavigate();
-
+  const [alerts, setAlerts] = useState([]);
+  const [showAlerts, setShowAlerts] = useState(false);
+    useEffect(() => {
+  const fetchAlerts = async () => {
+    const [products, invoices] = await Promise.all([
+      api.get('/products'), api.get('/invoices')
+    ]);
+    const lowStock = products.data.filter(p => p.stock <= p.reorderLevel);
+    const overdue = invoices.data.filter(i => i.status !== 'Paid' && new Date(i.dueDate) < new Date());
+    setAlerts([...lowStock.map(p => `Low stock: ${p.name}`), ...overdue.map(i => `Overdue: Invoice #${i.invoiceNumber}`)]);
+  };
+  fetchAlerts();
+}, []);
   const menuItems = [
     { icon: <LayoutDashboard />, label: 'Dashboard', path: '/' },
     { icon: <FileText />, label: 'Invoices', path: '/invoices' },
@@ -63,7 +76,29 @@ const Sidebar = () => {
               BUSSINESS<span className="text-green-500">TAX</span>
             </span>
           )}
-          
+          {!isCollapsed && (
+  <div className="relative">
+    <button
+      onClick={() => setShowAlerts(!showAlerts)}
+      className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 relative"
+    >
+      <Bell size={18} />
+      {alerts.length > 0 && (
+        <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full" />
+      )}
+    </button>
+    {showAlerts && alerts.length > 0 && (
+      <div className="absolute left-0 top-10 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-4 pt-4 pb-2">Alerts</p>
+        {alerts.map((alert, i) => (
+          <div key={i} className="px-4 py-2.5 text-xs font-medium text-slate-700 border-t border-slate-50 hover:bg-slate-50">
+            {alert}
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
           <button 
             onClick={() => setIsCollapsed(!isCollapsed)} 
             className="hidden lg:block p-1.5 rounded-md hover:bg-slate-100 text-slate-400 shrink-0"

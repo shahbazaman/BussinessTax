@@ -11,7 +11,7 @@ import {
     Landmark     
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-
+import { Receipt } from 'lucide-react';
 const Sidebar = () => {
     const location = useLocation();
     const { logout } = useAuth();
@@ -21,6 +21,7 @@ const Sidebar = () => {
         { icon: Users, label: 'Clients', path: '/clients' },
         { icon: Users, label: 'Employees', path: '/employees' },
         { icon: Package, label: 'Inventory', path: '/inventory' },
+        { icon: Receipt, label: 'Expenses', path: '/expenses' },
         { icon: Landmark, label: 'Accounts', path: '/accounts' },
         { icon: PieChart, label: 'Reports', path: '/reports' },
         { icon: Settings, label: 'Settings', path: '/settings' },

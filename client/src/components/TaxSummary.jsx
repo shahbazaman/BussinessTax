@@ -73,7 +73,7 @@ const estimatedTax = taxableIncome > 0 ? (taxableIncome * (taxRateValue / 100)) 
           <div className="relative z-10">
             <div className="flex items-center gap-2 mb-4 opacity-80">
               <TrendingUp size={20} />
-              <span className="text-xs font-bold uppercase tracking-widest">Est. Tax Liability ({taxPercentage}%)</span>
+             <span className="text-xs font-bold uppercase tracking-widest">Est. Tax Liability ({taxRateValue}%)</span>
             </div>
             <h3 className="text-5xl font-black mb-2">${estimatedTax.toLocaleString(undefined, { minimumFractionDigits: 2 })}</h3>
             <p className="text-indigo-100 text-sm max-w-md">

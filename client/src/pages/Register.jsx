@@ -1,7 +1,7 @@
 import { useState, useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-
+import { toast } from 'react-toastify';
 const Register = () => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const { register } = useContext(AuthContext);
@@ -17,7 +17,7 @@ const handleSubmit = async (e) => {
     window.dispatchEvent(new Event('authChange')); 
     navigate('/');
   } catch (err) {
-    alert(err.response?.data?.message || "Registration failed");
+    toast.error(err.response?.data?.message || "Registration failed");
   } finally {
     setLoading(false);
   }

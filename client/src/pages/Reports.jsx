@@ -12,7 +12,7 @@ const Reports = () => {
   const [taxRate, setTaxRate] = useState(15);
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState('USD');
-
+  const [invoices, setInvoices] = useState([]);
   // 2. Define constants and derived values AFTER state
   const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
@@ -29,10 +29,11 @@ const Reports = () => {
     const fetchStats = async () => {
       try {
         setLoading(true);
-        const [statsRes, profileRes] = await Promise.all([
-          api.get('/analytics/monthly-report'), 
-          api.get('/auth/profile')
-        ]);
+       const [statsRes, profileRes, invoicesRes] = await Promise.all([
+        api.get('/analytics/monthly-report'), 
+        api.get('/auth/profile'),
+        api.get('/invoices')
+      ]);
 
         if (statsRes.data) {
           // Robust mapping to catch backend variations
@@ -54,6 +55,8 @@ const Reports = () => {
         if (profileRes.data?.currency) {
           setCurrency(profileRes.data.currency);
         }
+        setInvoices(invoicesRes.data || []);
+        
       } catch (err) {
         console.error("Report Fetch Error:", err);
         toast.error("Failed to sync fiscal data");
@@ -215,6 +218,34 @@ const Reports = () => {
              </div>
            </div>
         </div>
+        {/* Invoice Aging Report */}
+<div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden mt-6">
+  <div className="p-8 border-b border-slate-50 flex justify-between items-center">
+    <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Invoice Aging</h3>
+    <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full uppercase">Overdue Tracker</span>
+  </div>
+  <div className="p-8 grid grid-cols-2 md:grid-cols-4 gap-4">
+    {(() => {
+      const today = new Date();
+      const aging = { '0–30 days': 0, '31–60 days': 0, '61–90 days': 0, '90+ days': 0 };
+      invoices.filter(i => i.status !== 'Paid').forEach(inv => {
+        const days = Math.floor((today - new Date(inv.dueDate)) / 86400000);
+        if (days <= 30) aging['0–30 days'] += inv.total || 0;
+        else if (days <= 60) aging['31–60 days'] += inv.total || 0;
+        else if (days <= 90) aging['61–90 days'] += inv.total || 0;
+        else aging['90+ days'] += inv.total || 0;
+      });
+      const colors = ['text-emerald-600', 'text-yellow-600', 'text-orange-500', 'text-rose-600'];
+      const bg = ['bg-emerald-50', 'bg-yellow-50', 'bg-orange-50', 'bg-rose-50'];
+      return Object.entries(aging).map(([label, val], i) => (
+        <div key={label} className={`${bg[i]} p-5 rounded-2xl`}>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</p>
+          <p className={`text-xl font-black ${colors[i]}`}>{formatValue(val)}</p>
+        </div>
+      ));
+    })()}
+  </div>
+</div>
       </div>
 
       {/* Hidden Print Template */}

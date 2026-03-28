@@ -217,8 +217,18 @@ const Expenses = () => {
                 <div className="flex gap-1">
                   <button onClick={() => handleViewClick(exp)} className="p-2 text-slate-300 hover:text-indigo-500 transition-colors"><Eye size={16}/></button>
                   <button onClick={() => handleEditClick(exp)} className="p-2 text-slate-300 hover:text-blue-500 transition-colors"><Edit2 size={16}/></button>
-                  <button onClick={() => api.delete(`/expenses/${exp._id}`).then(fetchData)} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button>
-                </div>
+                  <button onClick={() => {
+  toast(({ closeToast }) => (
+    <div>
+      <p className="font-bold text-sm mb-2">Delete this expense?</p>
+      <p className="text-xs text-slate-500 mb-3">This action cannot be undone.</p>
+      <div className="flex gap-2">
+        <button onClick={async () => { closeToast(); await api.delete(`/expenses/${exp._id}`); fetchData(); }} className="bg-rose-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">Yes, Delete</button>
+        <button onClick={closeToast} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">Cancel</button>
+      </div>
+    </div>
+  ), { autoClose: false, closeButton: false });
+}} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button></div>
               </div>
             </div>
           ))}
