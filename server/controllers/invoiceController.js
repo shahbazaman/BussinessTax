@@ -1,13 +1,13 @@
 import Invoice from '../models/Invoice.js';
 import Product from '../models/Product.js';
 
-// ─── Helper: find true highest sequence and return next number ──────────────
-const getNextNumber = async (userId, type) => {
-  const field = type === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
-  const prefix = type === 'Sale' ? 'INV-S-' : 'INV-P-';
+// Finds the highest existing sequence for this user+type and returns next number
+const getNextNumber = async (userId, invoiceType) => {
+  const field  = invoiceType === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
+  const prefix = invoiceType === 'Sale' ? 'INV-S-' : 'INV-P-';
 
   const allInvoices = await Invoice.find(
-    { user: userId, type: type, [field]: { $exists: true, $ne: null } },
+    { user: userId, type: invoiceType, [field]: { $exists: true, $ne: null, $ne: '' } },
     { [field]: 1 }
   );
 
@@ -20,7 +20,18 @@ const getNextNumber = async (userId, type) => {
     if (!isNaN(num) && num > maxSeq) maxSeq = num;
   }
 
-  return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`;
+  // Keep incrementing until we find a number that doesn't exist
+  let seq = maxSeq + 1;
+  let candidate = `${prefix}${String(seq).padStart(3, '0')}`;
+
+  while (true) {
+    const exists = await Invoice.findOne({ user: userId, [field]: candidate });
+    if (!exists) break;
+    seq++;
+    candidate = `${prefix}${String(seq).padStart(3, '0')}`;
+  }
+
+  return candidate;
 };
 
 export const createInvoice = async (req, res) => {
@@ -35,27 +46,18 @@ export const createInvoice = async (req, res) => {
 
     const invoiceType = type || 'Sale';
 
-    // ─── Generate next unique number ────────────────────────────────────────
-    const field = invoiceType === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
-    let nextNumber;
-    let attempts = 0;
-
-    while (attempts < 10) {
-      nextNumber = await getNextNumber(req.user._id, invoiceType);
-      const exists = await Invoice.findOne({ user: req.user._id, [field]: nextNumber });
-      if (!exists) break;
-      attempts++;
-    }
+    // Generate unique number — guaranteed not to exist in DB
+    const nextNumber = await getNextNumber(req.user._id, invoiceType);
 
     const invoiceNumber  = invoiceType === 'Sale'     ? nextNumber : undefined;
     const purchaseNumber = invoiceType === 'Purchase' ? nextNumber : undefined;
 
-    // Only store referenceNumber if user actually typed something
+    // Only store referenceNumber if user typed something — never store ""
     const resolvedRefNum = (invoiceType === 'Purchase' && referenceNumber?.trim())
       ? referenceNumber.trim()
       : undefined;
 
-    // ─── Validate items ─────────────────────────────────────────────────────
+    // Validate items
     const validatedItems = [];
     for (const item of items) {
       const product = await Product.findById(item.productId);
@@ -67,36 +69,35 @@ export const createInvoice = async (req, res) => {
       validatedItems.push({
         productId: item.productId,
         variantId: item.variantId,
-        name: item.name,
-        sku: variant.sku || '',
-        barcode: variant.barcode || '',
-        quantity: Number(item.quantity || 0),
-        price: Number(item.price || 0)
+        name:      item.name,
+        sku:       variant.sku   || '',
+        barcode:   variant.barcode || '',
+        quantity:  Number(item.quantity || 0),
+        price:     Number(item.price    || 0)
       });
     }
 
-    // ─── Create and save ────────────────────────────────────────────────────
     const invoice = new Invoice({
-      user: req.user._id,
+      user:            req.user._id,
       client,
-      invoiceDate: invoiceDate || new Date(),
-      type: invoiceType,
-      invoiceNumber,
-      purchaseNumber,
+      invoiceDate:     invoiceDate || new Date(),
+      type:            invoiceType,
+      invoiceNumber,   // undefined for Purchase — sparse index ignores it
+      purchaseNumber,  // undefined for Sale    — sparse index ignores it
       referenceNumber: resolvedRefNum,
       gstNumber,
       billingAddress,
       shippingAddress,
-      items: validatedItems,
-      discount: Number(discount || 0),
-      globalTaxRate: Number(globalTaxRate || 0),
-      status: status || 'Pending',
+      items:           validatedItems,
+      discount:        Number(discount     || 0),
+      globalTaxRate:   Number(globalTaxRate || 0),
+      status:          status || 'Pending',
       notes
     });
 
     const savedInvoice = await invoice.save();
 
-    // ─── Adjust stock ───────────────────────────────────────────────────────
+    // Adjust stock
     for (const item of validatedItems) {
       const adjustment = invoiceType === 'Purchase' ? item.quantity : -item.quantity;
       await Product.updateOne(
@@ -123,8 +124,9 @@ export const updateInvoice = async (req, res) => {
     const oldInvoice = await Invoice.findById(req.params.id);
     if (!oldInvoice) return res.status(404).json({ message: "Invoice not found" });
 
+    // Revert stock from old items
     for (const item of oldInvoice.items) {
-      const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
+      const revertQty = oldInvoice.type === 'Purchase' ? -item.quantity : item.quantity;
       await Product.updateOne(
         { _id: item.productId, "variants._id": item.variantId },
         { $inc: { "variants.$.stock": revertQty } }
@@ -132,16 +134,15 @@ export const updateInvoice = async (req, res) => {
     }
 
     const invoiceType = req.body.type || oldInvoice.type;
+
+    // Never overwrite the invoice/purchase number on edit
     const cleanedUpdate = {
       ...req.body,
-      invoiceNumber: invoiceType === 'Sale' ? (req.body.invoiceNumber || undefined) : undefined,
-      purchaseNumber: invoiceType === 'Purchase' ? (req.body.purchaseNumber || undefined) : undefined,
+      invoiceNumber:   oldInvoice.invoiceNumber,
+      purchaseNumber:  oldInvoice.purchaseNumber,
       referenceNumber: (invoiceType === 'Purchase' && req.body.referenceNumber?.trim())
         ? req.body.referenceNumber.trim()
         : undefined,
-      $unset: invoiceType === 'Sale'
-        ? { purchaseNumber: 1, referenceNumber: 1 }
-        : { invoiceNumber: 1 }
     };
 
     const updatedInvoice = await Invoice.findByIdAndUpdate(
@@ -150,11 +151,12 @@ export const updateInvoice = async (req, res) => {
       { new: true, runValidators: true }
     );
 
+    // Apply new stock from updated items
     for (const item of updatedInvoice.items) {
-      const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
+      const adjustment = updatedInvoice.type === 'Purchase' ? item.quantity : -item.quantity;
       await Product.updateOne(
         { _id: item.productId, "variants._id": item.variantId },
-        { $inc: { "variants.$.stock": newAdjustment } }
+        { $inc: { "variants.$.stock": adjustment } }
       );
     }
 
@@ -181,7 +183,7 @@ export const deleteInvoice = async (req, res) => {
     if (!invoice) return res.status(404).json({ message: "Not found" });
 
     for (const item of invoice.items) {
-      const revertQty = (invoice.type === 'Purchase') ? -item.quantity : item.quantity;
+      const revertQty = invoice.type === 'Purchase' ? -item.quantity : item.quantity;
       await Product.updateOne(
         { _id: item.productId, "variants._id": item.variantId },
         { $inc: { "variants.$.stock": revertQty } }
