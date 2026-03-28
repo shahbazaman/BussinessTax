@@ -1,6 +1,28 @@
 import Invoice from '../models/Invoice.js';
 import Product from '../models/Product.js';
 
+// ─── Helper: find true highest sequence and return next number ──────────────
+const getNextNumber = async (userId, type) => {
+  const field = type === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
+  const prefix = type === 'Sale' ? 'INV-S-' : 'INV-P-';
+
+  const allInvoices = await Invoice.find(
+    { user: userId, type: type, [field]: { $exists: true, $ne: null } },
+    { [field]: 1 }
+  );
+
+  let maxSeq = 0;
+  for (const inv of allInvoices) {
+    const code = inv[field];
+    if (!code) continue;
+    const parts = code.split('-');
+    const num = parseInt(parts[parts.length - 1], 10);
+    if (!isNaN(num) && num > maxSeq) maxSeq = num;
+  }
+
+  return `${prefix}${String(maxSeq + 1).padStart(3, '0')}`;
+};
+
 export const createInvoice = async (req, res) => {
   try {
     const {
@@ -13,44 +35,22 @@ export const createInvoice = async (req, res) => {
 
     const invoiceType = type || 'Sale';
 
-    // ─── Generate next number by finding the highest existing one ──────────
+    // ─── Generate next unique number ────────────────────────────────────────
+    const field = invoiceType === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
     let nextNumber;
-    if (invoiceType === 'Sale') {
-      // Find all sale invoices for this user and get the highest invoiceNumber
-      const lastInvoice = await Invoice.findOne({ 
-        user: req.user._id, 
-        type: 'Sale',
-        invoiceNumber: { $exists: true, $ne: null }
-      }).sort({ createdAt: -1 });
+    let attempts = 0;
 
-      let maxSeq = 0;
-      if (lastInvoice?.invoiceNumber) {
-        const parts = lastInvoice.invoiceNumber.split('-');
-        const num = parseInt(parts[parts.length - 1], 10);
-        if (!isNaN(num)) maxSeq = num;
-      }
-      nextNumber = `INV-S-${String(maxSeq + 1).padStart(3, '0')}`;
-    } else {
-      // Find all purchase invoices for this user and get the highest purchaseNumber
-      const lastInvoice = await Invoice.findOne({ 
-        user: req.user._id, 
-        type: 'Purchase',
-        purchaseNumber: { $exists: true, $ne: null }
-      }).sort({ createdAt: -1 });
-
-      let maxSeq = 0;
-      if (lastInvoice?.purchaseNumber) {
-        const parts = lastInvoice.purchaseNumber.split('-');
-        const num = parseInt(parts[parts.length - 1], 10);
-        if (!isNaN(num)) maxSeq = num;
-      }
-      nextNumber = `INV-P-${String(maxSeq + 1).padStart(3, '0')}`;
+    while (attempts < 10) {
+      nextNumber = await getNextNumber(req.user._id, invoiceType);
+      const exists = await Invoice.findOne({ user: req.user._id, [field]: nextNumber });
+      if (!exists) break;
+      attempts++;
     }
 
     const invoiceNumber  = invoiceType === 'Sale'     ? nextNumber : undefined;
     const purchaseNumber = invoiceType === 'Purchase' ? nextNumber : undefined;
 
-    // Only save referenceNumber if user actually typed something
+    // Only store referenceNumber if user actually typed something
     const resolvedRefNum = (invoiceType === 'Purchase' && referenceNumber?.trim())
       ? referenceNumber.trim()
       : undefined;
@@ -75,6 +75,7 @@ export const createInvoice = async (req, res) => {
       });
     }
 
+    // ─── Create and save ────────────────────────────────────────────────────
     const invoice = new Invoice({
       user: req.user._id,
       client,
@@ -109,45 +110,50 @@ export const createInvoice = async (req, res) => {
   } catch (error) {
     if (error.code === 11000) {
       const field = Object.keys(error.keyPattern || {})[0];
-      return res.status(400).json({ 
-        message: `Duplicate number on ${field}. Please refresh and try again.` 
+      return res.status(400).json({
+        message: `Duplicate number on ${field}. Please refresh and try again.`
       });
     }
     res.status(500).json({ message: error.message });
   }
 };
+
 export const updateInvoice = async (req, res) => {
   try {
     const oldInvoice = await Invoice.findById(req.params.id);
     if (!oldInvoice) return res.status(404).json({ message: "Invoice not found" });
+
     for (const item of oldInvoice.items) {
       const revertQty = (oldInvoice.type === 'Purchase') ? -item.quantity : item.quantity;
       await Product.updateOne(
-        { _id: item.productId, "variants._id": item.variantId }, 
+        { _id: item.productId, "variants._id": item.variantId },
         { $inc: { "variants.$.stock": revertQty } }
       );
     }
+
     const invoiceType = req.body.type || oldInvoice.type;
     const cleanedUpdate = {
       ...req.body,
       invoiceNumber: invoiceType === 'Sale' ? (req.body.invoiceNumber || undefined) : undefined,
       purchaseNumber: invoiceType === 'Purchase' ? (req.body.purchaseNumber || undefined) : undefined,
-      referenceNumber: invoiceType === 'Purchase' ? (req.body.referenceNumber || undefined) : undefined,
-      $unset: invoiceType === 'Sale' 
-        ? { purchaseNumber: 1, referenceNumber: 1 } 
+      referenceNumber: (invoiceType === 'Purchase' && req.body.referenceNumber?.trim())
+        ? req.body.referenceNumber.trim()
+        : undefined,
+      $unset: invoiceType === 'Sale'
+        ? { purchaseNumber: 1, referenceNumber: 1 }
         : { invoiceNumber: 1 }
     };
 
     const updatedInvoice = await Invoice.findByIdAndUpdate(
-        req.params.id, 
-        cleanedUpdate, 
-        { new: true, runValidators: true }
+      req.params.id,
+      cleanedUpdate,
+      { new: true, runValidators: true }
     );
 
     for (const item of updatedInvoice.items) {
       const newAdjustment = (updatedInvoice.type === 'Purchase') ? item.quantity : -item.quantity;
       await Product.updateOne(
-        { _id: item.productId, "variants._id": item.variantId }, 
+        { _id: item.productId, "variants._id": item.variantId },
         { $inc: { "variants.$.stock": newAdjustment } }
       );
     }
@@ -192,8 +198,8 @@ export const deleteInvoice = async (req, res) => {
 export const updateInvoiceStatus = async (req, res) => {
   try {
     const invoice = await Invoice.findOneAndUpdate(
-      { _id: req.params.id, user: req.user._id }, 
-      { status: req.body.status }, 
+      { _id: req.params.id, user: req.user._id },
+      { status: req.body.status },
       { new: true }
     );
     res.json(invoice);
