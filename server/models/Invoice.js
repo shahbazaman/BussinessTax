@@ -50,8 +50,14 @@ invoiceSchema.pre('save', async function () {
     this.referenceNumber = undefined;
     this.unmarkModified('referenceNumber');
   }
-  if (this.invoiceNumber === '') this.invoiceNumber = undefined;
-  if (this.purchaseNumber === '') this.purchaseNumber = undefined;
+  if (this.invoiceNumber === '' || this.invoiceNumber == null) {
+    this.invoiceNumber = undefined;
+    this.unmarkModified('invoiceNumber');
+  }
+  if (this.purchaseNumber === '' || this.purchaseNumber == null) {
+    this.purchaseNumber = undefined;
+    this.unmarkModified('purchaseNumber');
+  }
 
   const items = this.items || [];
 

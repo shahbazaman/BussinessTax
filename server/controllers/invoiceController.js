@@ -95,11 +95,16 @@ export const createInvoice = async (req, res) => {
       notes
     });
 
-      if (!invoice.referenceNumber) delete invoice.referenceNumber;
-      if (!invoice.invoiceNumber)   delete invoice.invoiceNumber;
-      if (!invoice.purchaseNumber)  delete invoice.purchaseNumber;
+// Use $unset-safe approach for Mongoose documents
+    if (!invoice.invoiceNumber)  invoice.set('invoiceNumber',  undefined);
+    if (!invoice.purchaseNumber) invoice.set('purchaseNumber', undefined);
+    if (!invoice.referenceNumber) invoice.set('referenceNumber', undefined);
 
-      const savedInvoice = await invoice.save();
+    invoice.unmarkModified('invoiceNumber');
+    invoice.unmarkModified('purchaseNumber');
+    invoice.unmarkModified('referenceNumber');
+
+    const savedInvoice = await invoice.save();
 
     // Adjust stock
     for (const item of validatedItems) {
