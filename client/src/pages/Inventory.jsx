@@ -41,12 +41,32 @@ const Inventory = () => {
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Delete this product and all its variants?")) return;
-    try {
-      await api.delete(`/products/${id}`);
-      toast.success("Product removed");
-      fetchProducts();
-    } catch (err) { toast.error("Delete failed"); }
+    toast(
+  ({ closeToast }) => (
+    <div>
+      <p className="font-bold text-sm mb-2">Delete this product?</p>
+      <p className="text-xs text-slate-500 mb-3">This will remove the product and all its variants permanently.</p>
+      <div className="flex gap-2">
+        <button onClick={async () => {
+          closeToast();
+          try {
+            await api.delete(`/products/${id}`);
+            toast.success("Product removed");
+            fetchProducts();
+          } catch (err) {
+            toast.error("Delete failed");
+          }
+        }} className="bg-rose-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+          Yes, Delete
+        </button>
+        <button onClick={closeToast} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">
+          Cancel
+        </button>
+      </div>
+    </div>
+  ),
+  { autoClose: false, closeButton: false }
+);
   };
 
 // ... inside Inventory component ...

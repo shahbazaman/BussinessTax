@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { CurrencyContext } from '../context/CurrencyContext';
-
+import { toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 const Clients = () => {
   const [clients, setClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -73,19 +74,37 @@ const Clients = () => {
       setShowModal(false);
       fetchClients();
     } catch (err) {
-      alert(`Failed to save client data`);
+      toast.error('Failed to save client data');
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure? This will remove the client from the directory.")) {
-      try {
-        await api.delete(`/clients/${id}`);
-        fetchClients();
-      } catch (err) {
-        alert("Delete failed");
-      }
-    }
+    toast(
+  ({ closeToast }) => (
+    <div>
+      <p className="font-bold text-sm mb-2">Remove this client?</p>
+      <p className="text-xs text-slate-500 mb-3">This will remove the client from the directory.</p>
+      <div className="flex gap-2">
+        <button onClick={async () => {
+          closeToast();
+          try {
+            await api.delete(`/clients/${id}`);
+            toast.success("Client removed successfully");
+            fetchClients();
+          } catch (err) {
+            toast.error("Delete failed");
+          }
+        }} className="bg-rose-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+          Yes, Remove
+        </button>
+        <button onClick={closeToast} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">
+          Cancel
+        </button>
+      </div>
+    </div>
+  ),
+  { autoClose: false, closeButton: false }
+);
   };
 
   const copyBillingToShipping = () => {

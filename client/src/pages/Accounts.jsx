@@ -74,14 +74,32 @@ const getIcon = (type) => {
   }
 };
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to unlink this account? This will not delete transactions but will remove the link.")) return;
-    try {
-      await api.delete(`/accounts/${id}`);
-      toast.success("Account unlinked successfully");
-      fetchData();
-    } catch (err) {
-      toast.error("Delete failed: " + (err.response?.data?.message || "Server error"));
-    }
+    toast(
+  ({ closeToast }) => (
+    <div>
+      <p className="font-bold text-sm mb-2">Unlink this account?</p>
+      <p className="text-xs text-slate-500 mb-3">This will not delete transactions but will remove the link.</p>
+      <div className="flex gap-2">
+        <button onClick={async () => {
+          closeToast();
+          try {
+            await api.delete(`/accounts/${id}`);
+            toast.success("Account unlinked successfully");
+            fetchData();
+          } catch (err) {
+            toast.error("Delete failed: " + (err.response?.data?.message || "Server error"));
+          }
+        }} className="bg-rose-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+          Yes, Unlink
+        </button>
+        <button onClick={closeToast} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">
+          Cancel
+        </button>
+      </div>
+    </div>
+  ),
+  { autoClose: false, closeButton: false }
+);
   };
 
   if (loading) return (
