@@ -40,7 +40,6 @@ const invoiceSchema = new mongoose.Schema({
   paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }
 }, { timestamps: true });
 
-// Sparse indexes: These ONLY work if the field is missing or undefined (not "")
 invoiceSchema.index({ user: 1, invoiceNumber: 1 }, { unique: true, sparse: true });
 invoiceSchema.index({ user: 1, purchaseNumber: 1 }, { unique: true, sparse: true });
 

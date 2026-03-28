@@ -13,23 +13,49 @@ export const createInvoice = async (req, res) => {
 
     const invoiceType = type || 'Sale';
 
-    // ─── Auto-generate sequential invoice numbers ───────────────────────────
-    // Count only invoices of this type for THIS user, so Sales and Purchases
-    // each have their own sequence: INV-S-001, INV-S-002 / INV-P-001, INV-P-002
-    const count = await Invoice.countDocuments({
-      user: req.user._id,
-      type: invoiceType
-    });
-    const seq = String(count + 1).padStart(3, '0');
+    // ─── Generate next number by finding the highest existing one ──────────
+    let nextNumber;
+    if (invoiceType === 'Sale') {
+      // Find all sale invoices for this user and get the highest invoiceNumber
+      const lastInvoice = await Invoice.findOne({ 
+        user: req.user._id, 
+        type: 'Sale',
+        invoiceNumber: { $exists: true, $ne: null }
+      }).sort({ createdAt: -1 });
 
-    const invoiceNumber   = invoiceType === 'Sale'     ? `INV-S-${seq}` : undefined;
-    const purchaseNumber  = invoiceType === 'Purchase' ? `INV-P-${seq}` : undefined;
-    // referenceNumber is the SUPPLIER's ref — only on Purchase, set from form or auto
-    const resolvedRefNum = (invoiceType === 'Purchase' && referenceNumber && referenceNumber.trim() !== '')
+      let maxSeq = 0;
+      if (lastInvoice?.invoiceNumber) {
+        const parts = lastInvoice.invoiceNumber.split('-');
+        const num = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(num)) maxSeq = num;
+      }
+      nextNumber = `INV-S-${String(maxSeq + 1).padStart(3, '0')}`;
+    } else {
+      // Find all purchase invoices for this user and get the highest purchaseNumber
+      const lastInvoice = await Invoice.findOne({ 
+        user: req.user._id, 
+        type: 'Purchase',
+        purchaseNumber: { $exists: true, $ne: null }
+      }).sort({ createdAt: -1 });
+
+      let maxSeq = 0;
+      if (lastInvoice?.purchaseNumber) {
+        const parts = lastInvoice.purchaseNumber.split('-');
+        const num = parseInt(parts[parts.length - 1], 10);
+        if (!isNaN(num)) maxSeq = num;
+      }
+      nextNumber = `INV-P-${String(maxSeq + 1).padStart(3, '0')}`;
+    }
+
+    const invoiceNumber  = invoiceType === 'Sale'     ? nextNumber : undefined;
+    const purchaseNumber = invoiceType === 'Purchase' ? nextNumber : undefined;
+
+    // Only save referenceNumber if user actually typed something
+    const resolvedRefNum = (invoiceType === 'Purchase' && referenceNumber?.trim())
       ? referenceNumber.trim()
       : undefined;
 
-    // ─── Validate items and stock ───────────────────────────────────────────
+    // ─── Validate items ─────────────────────────────────────────────────────
     const validatedItems = [];
     for (const item of items) {
       const product = await Product.findById(item.productId);
@@ -54,8 +80,6 @@ export const createInvoice = async (req, res) => {
       client,
       invoiceDate: invoiceDate || new Date(),
       type: invoiceType,
-      // These will be undefined (not "") for the wrong type — sparse index only
-      // triggers on actual values, so undefined fields are safely ignored
       invoiceNumber,
       purchaseNumber,
       referenceNumber: resolvedRefNum,
@@ -81,10 +105,12 @@ export const createInvoice = async (req, res) => {
     }
 
     res.status(201).json(savedInvoice);
+
   } catch (error) {
     if (error.code === 11000) {
-      return res.status(400).json({
-        message: "Duplicate number detected. Please refresh and try again."
+      const field = Object.keys(error.keyPattern || {})[0];
+      return res.status(400).json({ 
+        message: `Duplicate number on ${field}. Please refresh and try again.` 
       });
     }
     res.status(500).json({ message: error.message });
