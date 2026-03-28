@@ -49,23 +49,17 @@ const Settings = () => {
     fetchSettings();
   }, []);
 useEffect(() => {
-  if (darkMode) document.documentElement.classList.add('dark');
-  else document.documentElement.classList.remove('dark');
+  if (darkMode) {
+    document.documentElement.classList.add('dark');
+    document.body.style.backgroundColor = '#0f172a';
+    document.body.style.color = '#f1f5f9';
+  } else {
+    document.documentElement.classList.remove('dark');
+    document.body.style.backgroundColor = '';
+    document.body.style.color = '';
+  }
   localStorage.setItem('theme', darkMode ? 'dark' : 'light');
 }, [darkMode]);
-  // Update General Settings
-  const handleSettingsSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await api.put('/auth/update-settings', formData);
-      toast.success("General settings updated!");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Update failed");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Update Password Logic
   const handlePasswordSubmit = async (e) => {
@@ -184,7 +178,7 @@ useEffect(() => {
           </div>
         </form>
       {/* Dark Mode Toggle */}
-<div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+<div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm mt-6">
   <div className="flex items-center justify-between">
     <div>
       <h3 className="font-bold text-slate-800">Appearance</h3>
