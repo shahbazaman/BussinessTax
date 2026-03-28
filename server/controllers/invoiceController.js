@@ -25,9 +25,9 @@ export const createInvoice = async (req, res) => {
     const invoiceNumber   = invoiceType === 'Sale'     ? `INV-S-${seq}` : undefined;
     const purchaseNumber  = invoiceType === 'Purchase' ? `INV-P-${seq}` : undefined;
     // referenceNumber is the SUPPLIER's ref — only on Purchase, set from form or auto
-    const resolvedRefNum = invoiceType === 'Purchase'
-  ? (referenceNumber || undefined)
-  : undefined;
+    const resolvedRefNum = (invoiceType === 'Purchase' && referenceNumber && referenceNumber.trim() !== '')
+      ? referenceNumber.trim()
+      : undefined;
 
     // ─── Validate items and stock ───────────────────────────────────────────
     const validatedItems = [];

@@ -7,7 +7,7 @@ const invoiceSchema = new mongoose.Schema({
   
   invoiceNumber: { type: String, trim: true },
   purchaseNumber: { type: String, trim: true }, 
-  referenceNumber: { type: String, trim: true }, 
+  referenceNumber: { type: String, trim: true, index: false },
 
   invoiceDate: { type: Date, default: Date.now },
   gstNumber: { type: String },
