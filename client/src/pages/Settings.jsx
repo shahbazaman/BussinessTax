@@ -48,19 +48,34 @@ const Settings = () => {
     };
     fetchSettings();
   }, []);
+const [isFirstRender, setIsFirstRender] = useState(true);
+
 useEffect(() => {
+  if (isFirstRender) {
+    setIsFirstRender(false);
+    return;
+  }
   if (darkMode) {
-    document.documentElement.classList.add('dark');
     document.body.style.backgroundColor = '#0f172a';
     document.body.style.color = '#f1f5f9';
   } else {
-    document.documentElement.classList.remove('dark');
     document.body.style.backgroundColor = '';
     document.body.style.color = '';
   }
   localStorage.setItem('theme', darkMode ? 'dark' : 'light');
 }, [darkMode]);
-
+const handleSettingsSubmit = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  try {
+    await api.put('/auth/update-settings', formData);
+    toast.success("General settings updated!");
+  } catch (err) {
+    toast.error(err.response?.data?.message || "Update failed");
+  } finally {
+    setLoading(false);
+  }
+};
   // Update Password Logic
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
