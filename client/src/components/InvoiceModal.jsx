@@ -130,19 +130,36 @@ if (!editData) {
   const field = formData.type === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
   const value = formData.type === 'Sale' ? formData.invoiceNumber : formData.purchaseNumber;
 
-  if (!value?.trim()) {
-    return toast.error(`Please enter a ${formData.type === 'Sale' ? 'invoice' : 'purchase'} number`);
-  }
+  if (!value?.trim() || value === 'INV-S-' || value === 'INV-P-') {
+  return toast.error(`Please enter the last 3 digits of your ${formData.type === 'Sale' ? 'invoice' : 'purchase'} number`);
+}
 
   if (Array.isArray(invoices) && invoices.length > 0) {
-    const duplicate = invoices.find(inv =>
-      inv.type === formData.type &&
-      inv[field]?.trim().toLowerCase() === value.trim().toLowerCase()
+  const duplicate = invoices.find(inv =>
+    inv.type === formData.type &&
+    inv[field]?.trim().toLowerCase() === value.trim().toLowerCase()
+  );
+  if (duplicate) {
+    toast(
+      ({ closeToast }) => (
+        <div className="p-1">
+          <p className="font-black text-slate-800 text-sm mb-1">⚠️ Duplicate Number Detected</p>
+          <p className="text-xs text-slate-500 mb-3">
+            <span className="font-black text-rose-600">{value.trim()}</span> is already used by another {formData.type} invoice. Please enter a different number.
+          </p>
+          <button
+            onClick={closeToast}
+            className="w-full bg-rose-600 hover:bg-rose-700 text-white text-xs font-black px-4 py-2 rounded-xl transition-all"
+          >
+            OK, I'll Change It
+          </button>
+        </div>
+      ),
+      { autoClose: false, closeButton: false }
     );
-    if (duplicate) {
-      return toast.error(`"${value.trim()}" already exists. Please use a different number.`);
-    }
+    return;
   }
+}
 }
 
     setLoading(true);
@@ -211,7 +228,6 @@ if (!editData) {
               </div>
             )}
 
-            {/* Top Fields */}
 {/* Top Fields */}
 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
@@ -219,26 +235,40 @@ if (!editData) {
   {formData.type === 'Sale' ? (
     <div>
       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Invoice No.</label>
-      <input
-        type="text"
-        required
-        placeholder="e.g. INV-S-001"
-        className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-indigo-500/20"
-        value={formData.invoiceNumber}
-        onChange={e => setFormData({ ...formData, invoiceNumber: e.target.value })}
-      />
+      <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500/30">
+        <span className="px-3 py-3 text-sm font-black text-indigo-600 bg-indigo-50 border-r border-slate-200 whitespace-nowrap">INV-S-</span>
+        <input
+          type="text"
+          required
+          maxLength={3}
+          placeholder="001"
+          className="flex-1 px-3 py-3 bg-transparent text-sm font-black outline-none text-slate-800 w-16"
+          value={formData.invoiceNumber.replace('INV-S-', '')}
+          onChange={e => {
+            const val = e.target.value.replace(/\D/g, '').slice(0, 3);
+            setFormData({ ...formData, invoiceNumber: `INV-S-${val}` });
+          }}
+        />
+      </div>
     </div>
   ) : (
     <div>
       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Purchase No.</label>
-      <input
-        type="text"
-        required
-        placeholder="e.g. INV-P-001"
-        className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-rose-500/20"
-        value={formData.purchaseNumber}
-        onChange={e => setFormData({ ...formData, purchaseNumber: e.target.value })}
-      />
+      <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-rose-500/30">
+        <span className="px-3 py-3 text-sm font-black text-rose-600 bg-rose-50 border-r border-slate-200 whitespace-nowrap">INV-P-</span>
+        <input
+          type="text"
+          required
+          maxLength={3}
+          placeholder="001"
+          className="flex-1 px-3 py-3 bg-transparent text-sm font-black outline-none text-slate-800 w-16"
+          value={formData.purchaseNumber.replace('INV-P-', '')}
+          onChange={e => {
+            const val = e.target.value.replace(/\D/g, '').slice(0, 3);
+            setFormData({ ...formData, purchaseNumber: `INV-P-${val}` });
+          }}
+        />
+      </div>
     </div>
   )}
 
@@ -274,13 +304,20 @@ if (!editData) {
   {formData.type === 'Purchase' && (
     <div>
       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Bill Ref No. (Optional)</label>
-      <input
-        type="text"
-        placeholder="Supplier's bill ref..."
-        className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none"
-        value={formData.referenceNumber}
-        onChange={e => setFormData({ ...formData, referenceNumber: e.target.value })}
-      />
+      <div className="flex items-center bg-slate-50 border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-slate-400/30">
+        <span className="px-3 py-3 text-sm font-black text-slate-500 bg-slate-100 border-r border-slate-200 whitespace-nowrap">REF-</span>
+        <input
+          type="text"
+          maxLength={3}
+          placeholder="001"
+          className="flex-1 px-3 py-3 bg-transparent text-sm font-black outline-none text-slate-800 w-16"
+          value={formData.referenceNumber.replace('REF-', '')}
+          onChange={e => {
+            const val = e.target.value.replace(/\D/g, '').slice(0, 3);
+            setFormData({ ...formData, referenceNumber: val ? `REF-${val}` : '' });
+          }}
+        />
+      </div>
     </div>
   )}
 
