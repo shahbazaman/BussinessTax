@@ -681,7 +681,7 @@ const handleDeleteAccount = (accountId) => {
         </div>
 
         <div className="pt-8">
-          <button type="submit" className="w-full bg-slate-900 hover:bg-emerald-600 text-white py-5 rounded-[2rem] font-black text-sm shadow-xl transition-all">
+          <button type="submit" className="w-full bg-slate-900 hover:bg-emerald-600 text-white py-5 rounded-4xl font-black text-sm shadow-xl transition-all">
             Authorize & Create Profile
           </button>
         </div>
