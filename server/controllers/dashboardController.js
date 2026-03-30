@@ -42,7 +42,7 @@ export const getDashboardStats = async (req, res) => {
     const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const chartData = [];
 
-    for (let i = 5; i >= 0; i--) {
+    for (let i = 11; i >= 0; i--) {
       const d = new Date();
       d.setMonth(d.getMonth() - i);
       const targetMonth = d.getMonth();
@@ -50,7 +50,7 @@ export const getDashboardStats = async (req, res) => {
 
       const monthlyIncome = invoices
         .filter(inv => {
-          const invDate = new Date(inv.createdAt);
+          const invDate = new Date(inv.invoiceDate || inv.createdAt);
           return invDate.getMonth() === targetMonth &&
                  invDate.getFullYear() === targetYear &&
                  inv.status === 'Paid';
@@ -68,7 +68,7 @@ export const getDashboardStats = async (req, res) => {
 
       const monthlyUnpaid = invoices
         .filter(inv => {
-          const invDate = new Date(inv.createdAt);
+          const invDate = new Date(inv.invoiceDate || inv.createdAt);
           return invDate.getMonth() === targetMonth &&
                  invDate.getFullYear() === targetYear &&
                  (inv.status === 'Pending' || inv.status === 'Overdue');
@@ -76,9 +76,9 @@ export const getDashboardStats = async (req, res) => {
         .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
 
       chartData.push({
-        name:     monthNames[targetMonth],
+        name:     `${monthNames[targetMonth]} ${String(targetYear).slice(2)}`,
         income:   monthlyIncome,
-        expenses: monthlyExpenseRecords + monthlyUnpaid, // FIX: 'expenses' not 'expense'
+        expenses: monthlyExpenseRecords + monthlyUnpaid,
       });
     }
 

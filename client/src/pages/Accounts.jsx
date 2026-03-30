@@ -32,26 +32,26 @@ const Accounts = () => {
       // Create a unified activity feed
       const combinedFeed = [
         ...expRes.data.map(e => ({ 
-          ...e, 
-          feedType: 'expense', 
-          displayTitle: e.title,
-          finalAmount: e.amount,
-          date: e.date 
-        })),
-        ...invRes.data.map(i => ({ 
-          ...i, 
-          feedType: 'invoice', 
-          displayTitle: i.customerName,
-          finalAmount: i.total,
-          date: i.date 
-        })),
-        ...transRes.data.map(t => ({ 
-          ...t, 
-          feedType: 'transfer', 
-          displayTitle: `Transfer: ${t.fromAccount?.bankName || 'Source'} → ${t.toAccount?.bankName || 'Dest'}`,
-          finalAmount: t.amount,
-          date: t.date 
-        }))
+        ...e, 
+        feedType: 'expense', 
+        displayTitle: e.title,
+        finalAmount: e.amount,
+        date: e.date || e.createdAt
+      })),
+      ...invRes.data.map(i => ({ 
+        ...i, 
+        feedType: 'invoice', 
+        displayTitle: i.customerName || i.clientName || i.client?.name || 'Invoice',
+        finalAmount: i.grandTotal || i.total || i.totalAmount || 0,
+        date: i.invoiceDate || i.date || i.createdAt
+      })),
+      ...transRes.data.map(t => ({ 
+        ...t, 
+        feedType: 'transfer', 
+        displayTitle: `Transfer: ${t.fromAccount?.bankName || 'Source'} → ${t.toAccount?.bankName || 'Dest'}`,
+        finalAmount: t.amount || 0,
+        date: t.transferDate || t.date || t.createdAt
+      }))
       ].sort((a, b) => new Date(b.date) - new Date(a.date));
 
       setActivity(combinedFeed.slice(0, 8)); // Showing top 8 for a fuller list
@@ -210,7 +210,7 @@ const getIcon = (type) => {
                       {item.displayTitle || 'Business Transaction'}
                     </p>
                     <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter">
-                      {new Date(item.date).toLocaleDateString(undefined, { dateStyle: 'medium' })} • {item.feedType}
+                      {item.date ? new Date(item.date).toLocaleDateString(undefined, { dateStyle: 'medium' }) : 'No date'} • {item.feedType}
                     </p>
                   </div>
                 </div>
@@ -221,7 +221,7 @@ const getIcon = (type) => {
                     'text-emerald-600'
                   }`}>
                     {isExpense ? '-' : isInvoice ? '+' : ''}
-                    {symbol}{Number(item.finalAmount).toLocaleString()}
+                    {symbol}{isNaN(Number(item.finalAmount)) ? '0' : Number(item.finalAmount).toLocaleString()}
                   </p>
                 </div>
               </div>
