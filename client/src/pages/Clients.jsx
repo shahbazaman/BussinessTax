@@ -204,7 +204,7 @@ const Clients = () => {
                   </div>
 
                   <button 
-                    onClick={() => navigate(`/invoices?clientId=${client._id}`)} 
+                    onClick={() => navigate(`/clients/${client._id}/invoices`)}
                     className="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-bold hover:bg-slate-900 hover:text-white transition-all flex items-center justify-center gap-2"
                   >
                     <ExternalLink size={14} /> View History

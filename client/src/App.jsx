@@ -15,6 +15,7 @@ import Inventory from './pages/Inventory';
 import Accounts from './pages/Accounts';  
 import Employees from './pages/Employees';
 import { CurrencyProvider } from './context/CurrencyContext';
+import ClientInvoices from './pages/ClientInvoices';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   useEffect(() => {
@@ -56,6 +57,7 @@ useEffect(() => {
             <Route path="/accounts" element={isAuthenticated ? <Accounts /> : <Navigate to="/login" />} />
             <Route path="/employees" element={isAuthenticated ? <Employees /> : <Navigate to="/login" />} />            
             <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} />} />
+            <Route path="/clients/:clientId/invoices" element={isAuthenticated ? <ClientInvoices /> : <Navigate to="/login" />} />
           </Routes>
         </main>
       </div>
