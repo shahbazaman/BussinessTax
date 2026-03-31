@@ -114,8 +114,10 @@ export const closeMonth = async (req, res) => {
     const employees = await Employee.find({ user: userId, status: 'Active' });
     const totalPayroll = employees.reduce((sum, emp) => {
       const amount = emp.salaryType === 'Daily' 
-        ? (Number(emp.workingDays) * Number(emp.dailyRate)) 
-        : Number(emp.dailyRate); // Monthly is a flat rate
+      ? (Number(emp.workingDays) * Number(emp.dailyRate))
+      : emp.salaryType === 'Weekly'
+      ? (Number(emp.dailyRate) * 4)
+      : Number(emp.dailyRate);
       return sum + amount;
     }, 0);
 

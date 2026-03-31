@@ -27,6 +27,7 @@ const Clients = () => {
     taxId: '',
     paymentTerms: 'Immediate',
     businessCategory: '',
+    customBusinessCategory: '',
     creditLimit: 0,
     openingBalance: 0,
     billingAddress: { street: '', city: '', state: '', zip: '', country: '' },
@@ -67,10 +68,16 @@ const Clients = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const submitData = {
+        ...formData,
+        businessCategory: formData.businessCategory === 'Other' 
+          ? formData.customBusinessCategory 
+          : formData.businessCategory
+      };
       if (editingClient) {
-        await api.put(`/clients/${editingClient._id}`, formData);
+        await api.put(`/clients/${editingClient._id}`, submitData);
       } else {
-        await api.post('/clients', formData);
+        await api.post('/clients', submitData);
       }
       setShowModal(false);
       fetchClients();
@@ -281,7 +288,8 @@ const Clients = () => {
                   <input placeholder="Tax ID / GST" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
                     value={formData.taxId} onChange={(e) => setFormData({...formData, taxId: e.target.value})} />
                     <select className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
-                      value={formData.businessCategory} onChange={(e) => setFormData({...formData, businessCategory: e.target.value})}>
+                      value={formData.businessCategory} 
+                      onChange={(e) => setFormData({...formData, businessCategory: e.target.value, customBusinessCategory: ''})}>
                       <option value="">Select Business Category</option>
                       <option value="Supplier">Supplier</option>
                       <option value="Wholesale">Wholesale</option>
@@ -292,6 +300,15 @@ const Clients = () => {
                       <option value="Freelancer">Freelancer</option>
                       <option value="Other">Other</option>
                     </select>
+                    {formData.businessCategory === 'Other' && (
+                      <input
+                        placeholder="Specify business category..."
+                        className="w-full p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl outline-none text-sm font-bold text-blue-700 mt-2"
+                        value={formData.customBusinessCategory}
+                        onChange={(e) => setFormData({...formData, customBusinessCategory: e.target.value})}
+                        required
+                      />
+                    )}
                 </div>
               </div>
 

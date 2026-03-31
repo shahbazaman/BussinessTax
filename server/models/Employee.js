@@ -37,23 +37,20 @@ const employeeSchema = new mongoose.Schema({
   },
   contactNumber: { 
     type: String,
-    required: true 
   },
   homeAddress: { 
     type: String,
-    required: true
   },
   emergencyContact: { 
     type: String 
   },
   verificationIdType: { 
     type: String,
-    enum: ['National ID', 'Passport', 'Driving License', 'Voter ID', 'Other'],
+    enum: ['National ID', 'Passport', 'Driving License', 'Voter ID', 'Aadhaar Card', 'PAN Card', 'Social Security', 'Birth Certificate', 'Other'],
     default: 'National ID'
   },
   idNumber: {
     type: String,
-    required: true,
     trim: true
   },
   role: { 
@@ -67,7 +64,7 @@ const employeeSchema = new mongoose.Schema({
   },
   salaryType: {
     type: String,
-    enum: ['Monthly', 'Daily'],
+    enum: ['Monthly', 'Daily', 'Weekly'],
     default: 'Monthly'
   },
   status: { 

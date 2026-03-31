@@ -65,7 +65,9 @@ const Employees = () => {
     return employees.reduce((sum, emp) => {
       if (Number(emp.workingDays) === 0) return sum + 0;
       const amount = emp.salaryType === 'Daily' 
-        ? (Number(emp.workingDays) * Number(emp.dailyRate)) 
+        ? (Number(emp.workingDays) * Number(emp.dailyRate))
+        : emp.salaryType === 'Weekly'
+        ? (Number(emp.dailyRate) * 4)
         : Number(emp.dailyRate);
       return sum + amount;
     }, 0);
@@ -309,8 +311,10 @@ const handleCloseMonth = async () => {
                     {(Number(emp.workingDays) === 0 
                       ? 0 
                       : (emp.salaryType === 'Daily' 
-                          ? (emp.workingDays * emp.dailyRate) 
-                          : emp.dailyRate)
+                      ? (emp.workingDays * emp.dailyRate)
+                      : emp.salaryType === 'Weekly'
+                      ? (emp.dailyRate * 4)
+                      : emp.dailyRate)
                     ).toLocaleString()}
                     <span className="text-[10px] ml-1 text-slate-400 font-normal">({emp.salaryType})</span>
                   </td>
@@ -437,6 +441,7 @@ const handleCloseMonth = async () => {
                     onChange={e => setFormData({...formData, salaryType: e.target.value})}
                   >
                     <option value="Monthly">Monthly</option>
+                    <option value="Weekly">Weekly</option>
                     <option value="Daily">Daily</option>
                   </select>
                 </div>
@@ -450,7 +455,7 @@ const handleCloseMonth = async () => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Contact Number</label>
-                  <input required className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-sm" value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
+                  <input placeholder="Contact Number (optional)" className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-sm" value={formData.contactNumber} onChange={e => setFormData({...formData, contactNumber: e.target.value})} />
                 </div>
               </div>
 
@@ -469,11 +474,17 @@ const handleCloseMonth = async () => {
                     <option value="National ID">National ID</option>
                     <option value="Passport">Passport</option>
                     <option value="Driving License">Driving License</option>
+                    <option value="Voter ID">Voter ID</option>
+                    <option value="Aadhaar Card">Aadhaar Card</option>
+                    <option value="PAN Card">PAN Card</option>
+                    <option value="Social Security">Social Security</option>
+                    <option value="Birth Certificate">Birth Certificate</option>
+                    <option value="Other">Other</option>
                   </select>
-                  <input required placeholder="ID Number" className="w-full p-4 bg-white rounded-2xl border-none font-bold text-sm" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} />
+                 <input placeholder="ID Number (optional)" className="w-full p-4 bg-white rounded-2xl border-none font-bold text-sm" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} />
+                 </div>
+                 <input placeholder="Home Address (optional)" className="w-full p-4 bg-white rounded-2xl border-none font-bold text-sm" value={formData.homeAddress} onChange={e => setFormData({...formData, homeAddress: e.target.value})} />
                 </div>
-                <input required placeholder="Home Address" className="w-full p-4 bg-white rounded-2xl border-none font-bold text-sm" value={formData.homeAddress} onChange={e => setFormData({...formData, homeAddress: e.target.value})} />
-              </div>
 
               {/* Bank Details */}
               <div className="p-6 bg-slate-900 rounded-4xl space-y-4 shadow-lg shadow-slate-200">
