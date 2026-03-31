@@ -18,9 +18,10 @@ const ClientSchema = new mongoose.Schema({
   taxId: { type: String }, // GST, VAT, or Tax ID
   paymentTerms: { 
     type: String, 
-    enum: ['Immediate', 'Net 15', 'Net 30', 'Net 60', 'Due on Receipt'], 
+    enum: ['Immediate', 'Net 7', 'Net 15', 'Net 30', 'Net 60', 'Due on Receipt'],
     default: 'Immediate' 
   },
+  businessCategory: { type: String, default: '' },
   creditLimit: { type: Number, default: 0 },
   openingBalance: { type: Number, default: 0 },
   

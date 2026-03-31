@@ -43,16 +43,16 @@ router.get('/names', protect, async (req, res) => {
 router.post('/', protect, async (req, res) => {
   try {
     const { 
-      name, email, phone, clientType, businessName, 
-      taxId, paymentTerms, creditLimit, openingBalance,
-      billingAddress, shippingAddress 
-    } = req.body;
+  name, email, phone, clientType, businessName, 
+  taxId, paymentTerms, creditLimit, openingBalance,
+  billingAddress, shippingAddress, businessCategory
+} = req.body;
 
     const client = await Client.create({
       user: req.user.id,
       name, email, phone,
       clientType, businessName, taxId, 
-      paymentTerms, creditLimit, openingBalance,
+      paymentTerms, creditLimit, openingBalance, businessCategory,
       billingAddress, shippingAddress
     });
 

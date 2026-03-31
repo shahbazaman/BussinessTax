@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
-import { Search, AlertTriangle, Plus, Loader2, Trash2, Package, Edit2,  Download } from 'lucide-react';
+import { Search, AlertTriangle, Plus, Loader2, Trash2, Package, Edit2, Download, Barcode } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
 import AddProductModal from '../components/AddProductModal';
@@ -133,90 +133,102 @@ const filteredProducts = useMemo(() => {
         </button>
       </div>
 
-      {/* Inventory Cards */}
-<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-  {filteredProducts.map(product => {
-    const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
-    const hasLowStock = product.variants.some(v => v.stock <= (product.lowStockAlert || 10));
+      {/* Inventory Table */}
+<div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+  <div className="overflow-x-auto">
+    <table className="w-full text-left border-collapse">
+      <thead>
+        <tr className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+          <th className="px-6 py-4">Product</th>
+          <th className="px-6 py-4">Category</th>
+          <th className="px-6 py-4">Supplier</th>
+          <th className="px-6 py-4">Variants</th>
+          <th className="px-6 py-4">Total Stock</th>
+          <th className="px-6 py-4 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-slate-50">
+        {filteredProducts.map(product => {
+          const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
+          const hasLowStock = product.variants.some(v => v.stock <= (product.lowStockAlert || 10));
 
-    return (
-      <div key={product._id} className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-lg transition-all overflow-hidden">
-        
-        {/* Card Header */}
-        <div className="p-6 flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-slate-50 rounded-2xl">
-              <Package size={22} className="text-slate-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-black text-slate-800 text-sm">{product.title}</h3>
-                {hasLowStock && <AlertTriangle size={13} className="text-rose-500" />}
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-[9px] font-black bg-slate-100 px-2 py-0.5 rounded text-slate-500 uppercase">{product.category}</span>
-                {product.supplier && (
-                  <span className="text-[9px] font-bold text-blue-500 uppercase">{product.supplier}</span>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-1">
-            <button onClick={() => handleEdit(product)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
-              <Edit2 size={15} />
-            </button>
-            <button onClick={() => handleDelete(product._id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
-              <Trash2 size={15} />
-            </button>
-          </div>
-        </div>
+          return (
+            <tr key={product._id} className="hover:bg-slate-50/50 transition-colors align-top">
 
-        {/* Total Stock Bar */}
-        <div className="px-6 pb-4 flex items-center justify-between border-b border-slate-50">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Stock</span>
-          <span className={`text-sm font-black ${hasLowStock ? 'text-rose-600' : 'text-emerald-600'}`}>
-            {totalStock} <span className="text-[10px] opacity-60 uppercase">units</span>
-          </span>
-        </div>
-
-        {/* Variants */}
-        <div className="p-4 space-y-2">
-          {product.variants.map((v, idx) => {
-            const isVariantLow = v.stock <= (product.lowStockAlert || 10);
-            return (
-              <div key={idx} className={`flex items-center justify-between px-4 py-3 rounded-2xl border ${isVariantLow ? 'bg-rose-50/50 border-rose-100' : 'bg-slate-50 border-slate-100'}`}>
-                <div>
-                  <p className="text-xs font-black text-slate-700 uppercase">
-                    {v.name} {v.weight ? `· ${v.weight}${v.unit}` : ''}
-                  </p>
-                  <div className="flex gap-3 mt-0.5">
-                    <span className="text-[9px] font-bold text-slate-400">{symbol}{Number(v.price).toFixed(2)}</span>
-                    <span className="text-[9px] font-bold text-indigo-400">GST {v.taxRate || 0}%</span>
-                    {v.sku && <span className="text-[9px] font-bold text-slate-300">{v.sku}</span>}
-                  </div>
+              {/* Product Name */}
+              <td className="px-6 py-5">
+                <div className="flex items-center gap-2">
+                  <span className="font-black text-slate-800 text-sm">{product.title}</span>
+                  {hasLowStock && <AlertTriangle size={13} className="text-rose-500" />}
                 </div>
-                <div className="text-right">
-                  <p className={`text-sm font-black ${isVariantLow ? 'text-rose-600' : 'text-slate-700'}`}>
-                    {v.stock} <span className="text-[9px] opacity-50">qty</span>
-                  </p>
-                  {isVariantLow && (
-                    <p className="text-[8px] font-black text-rose-400 uppercase">Low</p>
-                  )}
+              </td>
+
+              {/* Category */}
+              <td className="px-6 py-5">
+                <span className="text-[9px] font-black bg-slate-100 px-2 py-1 rounded-lg text-slate-500 uppercase">
+                  {product.category}
+                </span>
+              </td>
+
+              {/* Supplier */}
+              <td className="px-6 py-5">
+                <span className="text-xs font-bold text-blue-500">
+                  {product.supplier || <span className="text-slate-300">—</span>}
+                </span>
+              </td>
+
+              {/* Variants inline */}
+              <td className="px-6 py-5">
+                <div className="space-y-1.5">
+                  {product.variants.map((v, idx) => {
+                    const isVariantLow = v.stock <= (product.lowStockAlert || 10);
+                    return (
+                      <div key={idx} className={`flex items-center gap-3 px-3 py-2 rounded-xl border text-[10px] font-bold ${isVariantLow ? 'bg-rose-50 border-rose-100 text-rose-600' : 'bg-slate-50 border-slate-100 text-slate-600'}`}>
+                        <span className="uppercase font-black">{v.name}</span>
+                        {v.weight ? <span className="text-slate-400">{v.weight}{v.unit}</span> : null}
+                        <span className="text-slate-400">{symbol}{Number(v.price).toFixed(2)}</span>
+                        <span className="text-indigo-400">GST {v.taxRate || 0}%</span>
+                        {v.sku && <span className="text-slate-300 flex items-center gap-1"><Barcode size={10}/>{v.sku}</span>}
+                        {isVariantLow && <span className="text-rose-400 uppercase text-[8px] font-black">Low</span>}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              </td>
+
+              {/* Total Stock */}
+              <td className="px-6 py-5">
+                <span className={`font-black text-sm ${hasLowStock ? 'text-rose-600' : 'text-emerald-600'}`}>
+                  {totalStock}
+                  <span className="text-[10px] opacity-50 ml-1 uppercase">units</span>
+                </span>
+              </td>
+
+              {/* Actions */}
+              <td className="px-6 py-5 text-right">
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => handleEdit(product)} className="p-2 text-slate-300 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all">
+                    <Edit2 size={15} />
+                  </button>
+                  <button onClick={() => handleDelete(product._id)} className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </td>
+
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+
+    {filteredProducts.length === 0 && (
+      <div className="py-20 text-center">
+        <Package size={40} className="mx-auto text-slate-200 mb-2" />
+        <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">No Products Found</p>
       </div>
-    );
-  })}
-
-  {filteredProducts.length === 0 && (
-    <div className="col-span-full py-20 text-center bg-white rounded-[2.5rem] border border-slate-100">
-      <Package size={40} className="mx-auto text-slate-200 mb-2" />
-      <p className="text-slate-400 font-bold uppercase text-xs tracking-widest">No Products Found</p>
-    </div>
-  )}
+    )}
+  </div>
 </div>
       <AddProductModal 
         isOpen={isModalOpen} 

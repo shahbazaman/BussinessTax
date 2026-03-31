@@ -28,7 +28,10 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
 
   useEffect(() => {
     if (isOpen) {
-      api.get('/clients/names').then(res => setClients(res.data.map(c => c.name)));
+      api.get('/clients').then(res => setClients(res.data.map(c => ({
+        name: c.name,
+        businessName: c.businessName || ''
+      }))));
       if (editingProduct) {
         const standardCategories = ["Groceries", "Electronics", "Home & Kitchen", "Liquids"];
         const isCustom = editingProduct.category && !standardCategories.includes(editingProduct.category);
@@ -90,8 +93,9 @@ const handleChange = (e) => {
  const handleSupplierInput = (value) => {
   setProductData(prev => ({ ...prev, supplier: value }));
   if (value.trim().length > 0) {
-    const filtered = clients.filter(name =>
-      name.toLowerCase().includes(value.toLowerCase())
+    const filtered = clients.filter(c =>
+      c.name.toLowerCase().includes(value.toLowerCase()) ||
+      c.businessName.toLowerCase().includes(value.toLowerCase())
     );
     setSupplierSuggestions(filtered);
     setShowSupplierDropdown(true);
@@ -227,24 +231,32 @@ const handleChange = (e) => {
     className="w-full p-5 bg-slate-50 rounded-3xl border-2 border-transparent focus:border-blue-200 outline-none font-bold text-slate-700 shadow-inner"
     onChange={(e) => handleSupplierInput(e.target.value)}
     onFocus={() => {
-      setSupplierSuggestions(clients);
+      setSupplierSuggestions(
+        productData.supplier?.trim()
+          ? clients.filter(c =>
+              c.name.toLowerCase().includes(productData.supplier.toLowerCase()) ||
+              c.businessName.toLowerCase().includes(productData.supplier.toLowerCase())
+            )
+          : clients
+      );
       setShowSupplierDropdown(true);
     }}
     onBlur={() => setTimeout(() => setShowSupplierDropdown(false), 150)}
   />
   {showSupplierDropdown && supplierSuggestions.length > 0 && (
     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden">
-      {supplierSuggestions.map((name, i) => (
+      {supplierSuggestions.map((c, i) => (
         <button
           key={i}
           type="button"
           onMouseDown={() => {
-            setProductData(prev => ({ ...prev, supplier: name }));
+            setProductData(prev => ({ ...prev, supplier: c.name }));
             setShowSupplierDropdown(false);
           }}
-          className="w-full text-left px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 border-b border-slate-50 last:border-0"
+          className="w-full text-left px-5 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0"
         >
-          {name}
+          <p className="text-sm font-bold text-slate-700">{c.name}</p>
+          {c.businessName && <p className="text-[10px] font-bold text-slate-400 uppercase">{c.businessName}</p>}
         </button>
       ))}
     </div>

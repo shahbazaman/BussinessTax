@@ -26,6 +26,7 @@ const Clients = () => {
     businessName: '',
     taxId: '',
     paymentTerms: 'Immediate',
+    businessCategory: '',
     creditLimit: 0,
     openingBalance: 0,
     billingAddress: { street: '', city: '', state: '', zip: '', country: '' },
@@ -151,75 +152,93 @@ const Clients = () => {
           </div>
         </div>
 
-        {/* Client Grid */}
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-            <Loader2 className="animate-spin mb-4" size={40}/>
-            <p className="font-bold">Syncing Directory...</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredClients.length > 0 ? (
-              filteredClients.map((client) => (
-                <div key={client._id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-100 hover:shadow-xl transition-all group relative">
-                  <div className="flex justify-between items-start mb-5">
-                    <div className="w-14 h-14 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center font-black text-2xl border border-slate-100 uppercase">
-                      {client.name.charAt(0)}
-                    </div>
-                    <div className="flex gap-1">
-                      <button onClick={() => handleEdit(client)} className="p-2 text-slate-200 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-all">
-                        <Edit2 size={18} />
-                      </button>
-                      <button onClick={() => handleDelete(client._id)} className="p-2 text-slate-200 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all">
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
+{/* Client Table */}
+{loading ? (
+  <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+    <Loader2 className="animate-spin mb-4" size={40}/>
+    <p className="font-bold">Syncing Directory...</p>
+  </div>
+) : (
+  <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse">
+        <thead>
+          <tr className="bg-slate-50/50 text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100">
+            <th className="px-6 py-4">Client</th>
+            <th className="px-6 py-4">Contact</th>
+            <th className="px-6 py-4">Type</th>
+            <th className="px-6 py-4">Category</th>
+            <th className="px-6 py-4">Terms</th>
+            <th className="px-6 py-4">Revenue</th>
+            <th className="px-6 py-4 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-50">
+          {filteredClients.length > 0 ? filteredClients.map((client) => (
+            <tr key={client._id} className="hover:bg-slate-50/50 transition-colors group">
+              <td className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-slate-50 text-slate-500 rounded-2xl flex items-center justify-center font-black text-lg border border-slate-100 uppercase shrink-0">
+                    {client.name.charAt(0)}
                   </div>
-                  
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="font-bold text-slate-800 text-xl">{client.name}</h3>
-                    <span className={`px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter ${client.clientType === 'Business' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
-                      {client.clientType}
-                    </span>
+                  <div>
+                    <p className="font-black text-slate-800 text-sm">{client.name}</p>
+                    <p className="text-[10px] font-bold text-green-600 uppercase">{client.businessName || 'Individual'}</p>
                   </div>
-                  <p className="text-xs font-bold text-green-600 mb-4 flex items-center gap-1 uppercase tracking-wider">
-                    <Building2 size={12} /> {client.businessName || 'Individual Account'}
-                  </p>
-                  
-                  <div className="space-y-2 mb-6">
-                    <div className="flex items-center gap-2 text-slate-500 text-sm font-medium">
-                      <Mail size={14} className="text-slate-300" /> {client.email}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 py-4 border-t border-slate-50 bg-slate-50/50 rounded-3xl px-4 mb-4">
-                    <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Revenue</p>
-                      <p className="font-bold text-slate-800 text-lg">{symbol}{Number(client.totalInvoiced || 0).toLocaleString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest">Terms</p>
-                      <p className="font-bold text-slate-800 text-sm mt-1">{client.paymentTerms}</p>
-                    </div>
-                  </div>
-
-                  <button 
-                    onClick={() => navigate(`/clients/${client._id}/invoices`)}
-                    className="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-2xl text-xs font-bold hover:bg-slate-900 hover:text-white transition-all flex items-center justify-center gap-2"
-                  >
-                    <ExternalLink size={14} /> View History
+                </div>
+              </td>
+              <td className="px-6 py-4">
+                <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
+                  <Mail size={12} className="text-slate-300" /> {client.email}
+                </div>
+              </td>
+              <td className="px-6 py-4">
+                <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase ${client.clientType === 'Business' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                  {client.clientType}
+                </span>
+              </td>
+              <td className="px-6 py-4">
+                <span className="text-[10px] font-bold text-slate-500">
+                  {client.businessCategory || <span className="text-slate-300">—</span>}
+                </span>
+              </td>
+              <td className="px-6 py-4">
+                <span className="text-xs font-bold text-slate-600">{client.paymentTerms}</span>
+              </td>
+              <td className="px-6 py-4">
+                <span className="text-sm font-black text-slate-800">{symbol}{Number(client.totalInvoiced || 0).toLocaleString()}</span>
+              </td>
+              <td className="px-6 py-4">
+                <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button onClick={() => navigate(`/clients/${client._id}/invoices`)}
+                    className="p-2 text-slate-300 hover:text-indigo-500 hover:bg-indigo-50 rounded-xl transition-all" title="View History">
+                    <ExternalLink size={15} />
+                  </button>
+                  <button onClick={() => handleEdit(client)}
+                    className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all">
+                    <Edit2 size={15} />
+                  </button>
+                  <button onClick={() => handleDelete(client._id)}
+                    className="p-2 text-slate-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all">
+                    <Trash2 size={15} />
                   </button>
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full bg-white border-2 border-dashed border-slate-200 rounded-[3rem] p-20 text-center">
+              </td>
+            </tr>
+          )) : (
+            <tr>
+              <td colSpan="7" className="px-6 py-20 text-center">
                 <User className="text-slate-300 mx-auto mb-4" size={40} />
-                <h3 className="text-xl font-bold text-slate-800">No clients found</h3>
+                <p className="text-slate-400 font-bold">No clients found</p>
                 <button onClick={handleOpenAddModal} className="mt-4 bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold text-sm">Create Client</button>
-              </div>
-            )}
-          </div>
-        )}
+              </td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  </div>
+)}
       </div>
 
       {/* Add/Edit Client Modal */}
@@ -261,6 +280,18 @@ const Clients = () => {
                     value={formData.businessName} onChange={(e) => setFormData({...formData, businessName: e.target.value})} disabled={formData.clientType === 'Individual'} />
                   <input placeholder="Tax ID / GST" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
                     value={formData.taxId} onChange={(e) => setFormData({...formData, taxId: e.target.value})} />
+                    <select className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
+                      value={formData.businessCategory} onChange={(e) => setFormData({...formData, businessCategory: e.target.value})}>
+                      <option value="">Select Business Category</option>
+                      <option value="Supplier">Supplier</option>
+                      <option value="Wholesale">Wholesale</option>
+                      <option value="Retailer">Retailer</option>
+                      <option value="Manufacturer">Manufacturer</option>
+                      <option value="Distributor">Distributor</option>
+                      <option value="Service Provider">Service Provider</option>
+                      <option value="Freelancer">Freelancer</option>
+                      <option value="Other">Other</option>
+                    </select>
                 </div>
               </div>
 
@@ -282,6 +313,7 @@ const Clients = () => {
                         <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1"><CreditCard size={12}/> Payment Terms</label>
                         <select className="w-full p-3 bg-white rounded-xl font-bold text-sm outline-none shadow-sm" value={formData.paymentTerms} onChange={(e) => setFormData({...formData, paymentTerms: e.target.value})}>
                           <option value="Immediate">Due on Receipt</option>
+                          <option value="Net 7">Net 7</option>
                           <option value="Net 15">Net 15</option>
                           <option value="Net 30">Net 30</option>
                           <option value="Net 60">Net 60</option>
