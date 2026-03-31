@@ -31,6 +31,9 @@ const Settings = () => {
   // Fetch existing settings and user type on load
   useEffect(() => {
     const fetchSettings = async () => {
+            console.log('googleId:', res.data.googleId);        // ← ADD
+      console.log('authMethod:', res.data.authMethod);    // ← ADD
+      console.log('isGoogleUser:', res.data.authMethod === 'google' || !!res.data.googleId);
       try {
         const res = await api.get('/auth/profile');
         setFormData({
