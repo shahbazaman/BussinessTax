@@ -83,7 +83,7 @@ const handleSettingsSubmit = async (e) => {
 
     setLoading(true);
     try {
-      await api.put('/accounts/update-password', {
+      await api.put('/auth/update-password', {
         currentPassword: passwordData.currentPassword,
         newPassword: passwordData.newPassword
       });

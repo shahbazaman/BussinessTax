@@ -1,5 +1,5 @@
 import express from 'express';
-import { registerUser, loginUser, updateUserSettings, getUserProfile } from '../controllers/authController.js';
+import { registerUser, loginUser, updateUserSettings, getUserProfile, updatePassword } from '../controllers/authController.js';
 import protect from '../middleware/authMiddleware.js'; // Adjust path if needed
 import { googleLogin } from '../controllers/authController.js';
 import multer from 'multer';
@@ -17,5 +17,6 @@ router.get('/profile', protect, getUserProfile);
 router.post('/upload-photo', protect, upload.single('photo'), uploadProfilePhoto);
 // PUT update for the Settings page save
 router.put('/update-settings', protect, updateUserSettings);
+router.put('/update-password', protect, updatePassword);
 
 export default router;
