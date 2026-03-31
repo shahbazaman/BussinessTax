@@ -31,10 +31,12 @@ const Employees = () => {
     homeAddress: '', 
     verificationIdType: 'National ID', 
     idNumber: '', 
+    customIdType: '',
     employmentType: 'Full Time',
     salaryType: 'Monthly',
     bankName: '', 
-    accountNumber: '' 
+    accountNumber: '' ,
+    ifscCode: ''
   };
 
   const [formData, setFormData] = useState(initialState);
@@ -94,7 +96,8 @@ const Employees = () => {
         dailyRate: Number(formData.dailyRate),
         bankDetails: {
           bankName: formData.bankName,
-          accountNumber: formData.accountNumber
+          accountNumber: formData.accountNumber,
+          ifscCode: formData.ifscCode
         }
       };
       
@@ -170,10 +173,12 @@ const handleCloseMonth = async () => {
       homeAddress: emp.homeAddress || '',
       verificationIdType: emp.verificationIdType || 'National ID',
       idNumber: emp.idNumber || '',
+      customIdType: emp.customIdType || '',
       employmentType: emp.employmentType || 'Full Time',
       salaryType: emp.salaryType || 'Monthly',
       bankName: emp.bankDetails?.bankName || '',
-      accountNumber: emp.bankDetails?.accountNumber || ''
+      accountNumber: emp.bankDetails?.accountNumber || '',
+      ifscCode: emp.bankDetails?.ifscCode || ''
     });
     setCurrentId(emp._id);
     setIsEditing(true);
@@ -469,7 +474,7 @@ const handleCloseMonth = async () => {
                   <select 
                     className="w-full p-4 bg-white rounded-2xl border-none font-bold text-sm"
                     value={formData.verificationIdType} 
-                    onChange={e => setFormData({...formData, verificationIdType: e.target.value})}
+                    onChange={e => setFormData({...formData, verificationIdType: e.target.value, customIdType: ''})}
                   >
                     <option value="National ID">National ID</option>
                     <option value="Passport">Passport</option>
@@ -481,8 +486,16 @@ const handleCloseMonth = async () => {
                     <option value="Birth Certificate">Birth Certificate</option>
                     <option value="Other">Other</option>
                   </select>
-                 <input placeholder="ID Number (optional)" className="w-full p-4 bg-white rounded-2xl border-none font-bold text-sm" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} />
-                 </div>
+                  <input placeholder="ID Number (optional)" className="w-full p-4 bg-white rounded-2xl border-none font-bold text-sm" value={formData.idNumber} onChange={e => setFormData({...formData, idNumber: e.target.value})} />
+                  {formData.verificationIdType === 'Other' && (
+                    <input 
+                      placeholder="Specify ID type (e.g. Student Card)..." 
+                      className="md:col-span-2 p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl outline-none font-bold text-sm text-blue-700" 
+                      value={formData.customIdType} 
+                      onChange={e => setFormData({...formData, customIdType: e.target.value})} 
+                    />
+                  )}
+                </div>
                  <input placeholder="Home Address (optional)" className="w-full p-4 bg-white rounded-2xl border-none font-bold text-sm" value={formData.homeAddress} onChange={e => setFormData({...formData, homeAddress: e.target.value})} />
                 </div>
 
@@ -495,6 +508,7 @@ const handleCloseMonth = async () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <input placeholder="Bank Name" className="w-full p-4 bg-slate-800 rounded-2xl border-none font-bold text-sm text-white" value={formData.bankName} onChange={e => setFormData({...formData, bankName: e.target.value})} />
                   <input placeholder="Account Number" className="w-full p-4 bg-slate-800 rounded-2xl border-none font-bold text-sm text-white" value={formData.accountNumber} onChange={e => setFormData({...formData, accountNumber: e.target.value})} />
+                  <input placeholder="IFSC Code (optional)" className="w-full p-4 bg-slate-800 rounded-2xl border-none font-bold text-sm text-white md:col-span-2" value={formData.ifscCode} onChange={e => setFormData({...formData, ifscCode: e.target.value})} />
                 </div>
               </div>
 

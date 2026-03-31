@@ -10,9 +10,8 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const savedUser = localStorage.getItem('userInfo');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
-      // NOTE: Our api.js interceptor automatically handles the Bearer token
-      // so we don't need to manually set axios headers here.
+      const parsed = JSON.parse(savedUser);
+      setUser({ ...parsed, profilePhoto: parsed.profilePhoto || '' });
     }
     setLoading(false);
   }, []);
@@ -42,7 +41,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, register, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, setUser, register, login, logout, loading }}>
       {!loading && children} 
     </AuthContext.Provider>
   );

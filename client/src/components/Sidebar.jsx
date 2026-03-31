@@ -152,8 +152,14 @@ useEffect(() => {
 
         <div className="p-4 border-t border-slate-100 bg-slate-50/30 shrink-0">
           <div className={`flex items-center gap-3 mb-3 ${isCollapsed ? 'justify-center' : ''}`}>
-            <div className="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center font-bold text-white shrink-0 text-xs shadow-sm">
-              {user?.name?.charAt(0) || 'T'}
+            <div
+              onClick={() => navigate('/profile')}
+              className="w-9 h-9 rounded-full bg-green-500 flex items-center justify-center font-bold text-white shrink-0 text-xs shadow-sm cursor-pointer hover:ring-2 hover:ring-green-400 transition-all overflow-hidden"
+            >
+              {user?.profilePhoto
+                ? <img src={user.profilePhoto} alt="avatar" className="w-full h-full object-cover" />
+                : (user?.name?.charAt(0) || 'T')
+              }
             </div>
             {!isCollapsed && (
               <div className="min-w-0 leading-tight">

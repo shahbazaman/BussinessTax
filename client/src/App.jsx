@@ -14,6 +14,8 @@ import Accounts from './pages/Accounts';
 import Employees from './pages/Employees';
 import { CurrencyProvider } from './context/CurrencyContext';
 import ClientInvoices from './pages/ClientInvoices';
+import Profile from './pages/Profile';
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
   useEffect(() => {
@@ -44,6 +46,7 @@ useEffect(() => {
         <main className="flex-1 overflow-x-hidden">
           <Routes>
             <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
+            <Route path="/profile" element={isAuthenticated ? <Profile /> : <Navigate to="/login" />} />
             <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" />} />
             <Route path="/" element={isAuthenticated ? <Dashboard /> : <Navigate to="/login" />} />
             <Route path="/invoices" element={isAuthenticated ? <Invoices /> : <Navigate to="/login" />} />

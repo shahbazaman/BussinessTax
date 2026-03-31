@@ -15,7 +15,10 @@ const Settings = () => {
     businessName: '',
     taxRate: 20,
     currency: 'USD',
-    contactEmail: ''
+    contactEmail: '',
+    phone: '',
+    businessAddress: '',
+    gstNumber: ''
   });
 
   // Password Form State
@@ -34,7 +37,10 @@ const Settings = () => {
           businessName: res.data.businessName || '',
           taxRate: res.data.taxRate || 20,
           currency: res.data.currency || 'USD',
-          contactEmail: res.data.email || ''
+          contactEmail: res.data.email || '',
+          phone: res.data.phone || '',
+          businessAddress: res.data.businessAddress || '',
+          gstNumber: res.data.gstNumber || ''
         });
         // Check if user is a Google Auth user
         setIsGoogleUser(res.data.authMethod === 'google' || !!res.data.googleId);
@@ -128,6 +134,36 @@ const handleSettingsSubmit = async (e) => {
                   className="w-full p-3 bg-slate-200 border-none rounded-2xl outline-none text-slate-500 text-sm cursor-not-allowed font-medium"
                   value={formData.contactEmail}
                   disabled
+                />
+              </div>
+            <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Phone Number</label>
+                <input
+                  type="tel"
+                  className="w-full p-3 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 text-sm transition-all font-bold"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  placeholder="+1 234 567 8900"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">GST / Tax Number</label>
+                <input
+                  type="text"
+                  className="w-full p-3 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 text-sm transition-all font-bold"
+                  value={formData.gstNumber}
+                  onChange={(e) => setFormData({...formData, gstNumber: e.target.value})}
+                  placeholder="e.g. 22AAAAA0000A1Z5"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Business Address</label>
+                <textarea
+                  rows="2"
+                  className="w-full p-3 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-blue-500/20 text-sm transition-all font-bold resize-none"
+                  value={formData.businessAddress}
+                  onChange={(e) => setFormData({...formData, businessAddress: e.target.value})}
+                  placeholder="123 Business St, City, Country"
                 />
               </div>
             </div>

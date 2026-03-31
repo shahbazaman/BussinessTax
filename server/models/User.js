@@ -9,8 +9,12 @@ const UserSchema = new mongoose.Schema({
   businessName: { type: String, default: '' },
   currency: { type: String, default: 'USD', enum: ['USD', 'INR', 'EUR', 'GBP'] },
   taxRate: { type: Number, default: 20 },
+  phone: { type: String, default: '' },
+  businessAddress: { type: String, default: '' },
+  gstNumber: { type: String, default: '' },
   companyName: { type: String },
   logo: { type: String }, 
+  profilePhoto: { type: String, default: '' },
   role: { type: String, enum: ['Admin', 'User'], default: 'Admin' },
 }, { timestamps: true });
 
