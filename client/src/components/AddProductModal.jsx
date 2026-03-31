@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { X, Plus, Trash2, Save, Package, AlertCircle, Edit3, Warehouse, Barcode, Hash, ChevronDown } from 'lucide-react';
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { X, Plus, Trash2, Save, Package, AlertCircle, Edit3, Warehouse, Barcode, Hash } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
 import { CurrencyContext } from '../context/CurrencyContext';
@@ -19,14 +19,16 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
     }]
   };
   const [clients, setClients] = useState([]);
-  const [supplierMode, setSupplierMode] = useState('select');
+  const [supplierSuggestions, setSupplierSuggestions] = useState([]);
+  const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const variantRefs = useRef([]);
   const [productData, setProductData] = useState(initialState);
   const [isOtherCategory, setIsOtherCategory] = useState(false);
   const isEditing = !!editingProduct;
 
   useEffect(() => {
     if (isOpen) {
-      api.get('/clients/names').then(res => setClients(res.data));
+      api.get('/clients/names').then(res => setClients(res.data.map(c => c.name)));
       if (editingProduct) {
         const standardCategories = ["Groceries", "Electronics", "Home & Kitchen", "Liquids"];
         const isCustom = editingProduct.category && !standardCategories.includes(editingProduct.category);
@@ -85,14 +87,30 @@ const handleChange = (e) => {
   }
 };
 
- 
+ const handleSupplierInput = (value) => {
+  setProductData(prev => ({ ...prev, supplier: value }));
+  if (value.trim().length > 0) {
+    const filtered = clients.filter(name =>
+      name.toLowerCase().includes(value.toLowerCase())
+    );
+    setSupplierSuggestions(filtered);
+    setShowSupplierDropdown(true);
+  } else {
+    setShowSupplierDropdown(false);
+    setSupplierSuggestions(clients);
+  }
+};
 
   const addVariantField = () => {
-    setProductData({
-      ...productData,
-      variants: [...productData.variants, { ...initialState.variants[0] }]
-    });
-  };
+  const newIndex = productData.variants.length;
+  setProductData(prev => ({
+    ...prev,
+    variants: [...prev.variants, { ...initialState.variants[0] }]
+  }));
+  setTimeout(() => {
+    variantRefs.current[newIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
+};
 
   const removeVariantField = (index) => {
     if (productData.variants.length > 1) {
@@ -199,41 +217,43 @@ const handleChange = (e) => {
                 <option value="Home & Kitchen">Home & Kitchen</option>
                 <option value="Other">Other</option>
               </select>
-            <div className="space-y-2">
+<div className="space-y-2 relative">
   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier</label>
-  <div className="flex gap-2">
-    {supplierMode === 'select' ? (
-      <select 
-        name="supplier" 
-        value={productData.supplier} 
-        className="flex-1 p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-700 shadow-inner" 
-        onChange={handleChange}
-      >
-        <option value="">Select an existing client...</option>
-        {clients.map(c => <option key={c._id} value={c.name}>{c.name}</option>)}
-        <option value="custom">-- Enter Custom Supplier --</option>
-      </select>
-    ) : (
-      <input 
-        name="supplier" 
-        value={productData.supplier} 
-        placeholder="Enter Supplier Name" 
-        className="flex-1 p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-700 shadow-inner" 
-        onChange={handleChange} 
-      />
-    )}
-    
-    <button 
-      type="button"
-      onClick={() => {
-        setSupplierMode(prev => prev === 'select' ? 'custom' : 'select');
-        setProductData(prev => ({ ...prev, supplier: '' }));
-      }}
-      className="p-5 bg-slate-100 rounded-3xl text-slate-500 hover:bg-slate-200"
-    >
-      {supplierMode === 'select' ? <Plus size={20} /> : <ChevronDown size={20} />}
-    </button>
-  </div>
+  <input
+    name="supplier"
+    value={productData.supplier || ''}
+    placeholder="Type supplier name..."
+    autoComplete="off"
+    className="w-full p-5 bg-slate-50 rounded-3xl border-2 border-transparent focus:border-blue-200 outline-none font-bold text-slate-700 shadow-inner"
+    onChange={(e) => handleSupplierInput(e.target.value)}
+    onFocus={() => {
+      setSupplierSuggestions(clients);
+      setShowSupplierDropdown(true);
+    }}
+    onBlur={() => setTimeout(() => setShowSupplierDropdown(false), 150)}
+  />
+  {showSupplierDropdown && supplierSuggestions.length > 0 && (
+    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden">
+      {supplierSuggestions.map((name, i) => (
+        <button
+          key={i}
+          type="button"
+          onMouseDown={() => {
+            setProductData(prev => ({ ...prev, supplier: name }));
+            setShowSupplierDropdown(false);
+          }}
+          className="w-full text-left px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 border-b border-slate-50 last:border-0"
+        >
+          {name}
+        </button>
+      ))}
+    </div>
+  )}
+  {showSupplierDropdown && supplierSuggestions.length === 0 && productData.supplier?.trim() && (
+    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl px-5 py-3">
+      <p className="text-xs font-bold text-slate-400">No match — <span className="text-blue-600">"{productData.supplier}"</span> will be saved as new supplier</p>
+    </div>
+  )}
 </div>
             
             {isOtherCategory && (
@@ -260,7 +280,7 @@ const handleChange = (e) => {
 
             <div className="space-y-4">
               {productData.variants.map((variant, index) => (
-                <div key={index} className="p-6 bg-white rounded-4xl border border-slate-100 shadow-sm space-y-4">                  
+                <div key={index} ref={el => variantRefs.current[index] = el} className="p-6 bg-white rounded-4xl border border-slate-100 shadow-sm space-y-4">                 
                   <div className="grid grid-cols-12 gap-3 items-center">
                     <div className="col-span-12 md:col-span-4">
                       <input name="name" value={variant.name} placeholder="Variant Name (e.g. Red, XL)" className="w-full p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} required />
