@@ -105,7 +105,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           sku: variant.sku,
           barcode: variant.barcode,
           quantity: 1,
-          price: variant.price
+          price: ''
         }
       ]
     });
@@ -291,6 +291,21 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
       </div>
     </div>
   )}
+
+  {/* Status */}
+  <div>
+    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Status</label>
+    <select
+      className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none cursor-pointer"
+      value={formData.status}
+      onChange={e => setFormData({ ...formData, status: e.target.value })}
+    >
+      <option value="Pending">Pending</option>
+      <option value="Paid">Paid</option>
+      <option value="Partially Paid">Partially Paid</option>
+      <option value="Cancelled">Cancelled</option>
+    </select>
+  </div>
 
 </div>
 
