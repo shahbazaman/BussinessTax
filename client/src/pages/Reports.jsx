@@ -134,7 +134,6 @@ const Reports = () => {
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
-      <ToastContainer position="top-center" theme="dark" />
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
