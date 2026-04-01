@@ -212,38 +212,6 @@ const Profile = () => {
             </div>
           </div>
 
-          {/* Tax & Currency */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
-            <div className="flex items-center gap-2 mb-6 text-slate-800">
-              <Percent size={20} className="text-green-500" />
-              <h3 className="font-bold">Tax & Currency</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Default Tax Rate (%)</label>
-                <input
-                  type="number"
-                  className="w-full p-3 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold border-none"
-                  value={formData.taxRate}
-                  onChange={e => setFormData({ ...formData, taxRate: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Currency</label>
-                <select
-                  className="w-full p-3 bg-slate-50 rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold border-none cursor-pointer"
-                  value={formData.currency}
-                  onChange={e => setFormData({ ...formData, currency: e.target.value })}
-                >
-                  <option value="USD">USD ($)</option>
-                  <option value="EUR">EUR (€)</option>
-                  <option value="GBP">GBP (£)</option>
-                  <option value="INR">INR (₹)</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
           <div className="flex justify-end">
             <button
               type="submit"
