@@ -4,7 +4,7 @@ import Product from '../models/Product.js';
 export const createInvoice = async (req, res) => {
   try {
     const {
-      client: rawClient, items, discount, type, invoiceDate, status,
+      client: rawClient, clientName, items, discount, type, invoiceDate, status,
       notes, globalTaxRate, gstNumber, billingAddress,
       shippingAddress, referenceNumber, invoiceNumber, purchaseNumber
     } = req.body;
@@ -52,6 +52,7 @@ export const createInvoice = async (req, res) => {
     const invoice = new Invoice({
       user:            req.user._id,
       client,
+      clientName: clientName?.trim() || undefined,
       invoiceDate:     invoiceDate || new Date(),
       type:            invoiceType,
       invoiceNumber:   invoiceType === 'Sale' ? (invoiceNumber || undefined) : undefined,

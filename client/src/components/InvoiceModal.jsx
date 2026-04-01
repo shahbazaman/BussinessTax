@@ -12,6 +12,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
     referenceNumber: '',
     invoiceDate: new Date().toISOString().split('T')[0],
     client: '',
+    clientName: '',
+    useManualClient: false,
     gstNumber: '',
     billingAddress: '',
     shippingAddress: '',
@@ -31,6 +33,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           ...editData,
           invoiceDate: new Date(editData.invoiceDate).toISOString().split('T')[0],
           client: editData.client?._id || editData.client,
+          clientName: editData.clientName || '',
+          useManualClient: !editData.client && !!editData.clientName,
         });
       } else {
         const type = initialType || 'Sale';
@@ -42,6 +46,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           referenceNumber: '',
           invoiceDate: new Date().toISOString().split('T')[0],
           client: '',
+          clientName: '',
+          useManualClient: false,
           gstNumber: '',
           billingAddress: '',
           shippingAddress: '',
@@ -105,7 +111,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           sku: variant.sku,
           barcode: variant.barcode,
           quantity: 1,
-          price: ''
+          price: formData.type === 'Sale' ? (variant.price || '') : ''
         }
       ]
     });
@@ -133,14 +139,17 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
   const handleSubmit = async (e) => {
     e.preventDefault();
 if (formData.items.length === 0) return toast.error("Add at least one item");
-
+    const clientFields = formData.useManualClient
+  ? { client: undefined, clientName: formData.clientName?.trim() || undefined }
+  : { client: formData.client || undefined, clientName: undefined };
     setLoading(true);
     try {
       if (editData) {
         const editPayload = {
           ...formData,
-          invoiceNumber:   editData.invoiceNumber,   // never change on edit
-          purchaseNumber:  editData.purchaseNumber,  // never change on edit
+          ...clientFields,
+          invoiceNumber:   editData.invoiceNumber,  
+          purchaseNumber:  editData.purchaseNumber,  
           referenceNumber: formData.referenceNumber?.trim() || undefined,
         };
         await api.put(`/invoices/${editData._id}`, editPayload);
@@ -148,6 +157,7 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
       } else {
         const payload = {
         ...formData,
+        ...clientFields,
         invoiceNumber:   formData.type === 'Sale' ? formData.invoiceNumber : undefined,
         purchaseNumber:  formData.type === 'Purchase' ? formData.purchaseNumber : undefined,
         referenceNumber: formData.referenceNumber?.trim() || undefined,
@@ -256,9 +266,27 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
 
   {/* Client — always visible */}
   <div>
-    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">
+  <div className="flex items-center justify-between mb-2">
+    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">
       {formData.type === 'Sale' ? 'Customer Name' : 'Supplier Name'}
     </label>
+    <button
+      type="button"
+      onClick={() => setFormData(prev => ({ ...prev, useManualClient: !prev.useManualClient, client: '', clientName: '' }))}
+      className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg transition-all ${formData.useManualClient ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+    >
+      {formData.useManualClient ? '← Pick from list' : 'Enter manually →'}
+    </button>
+  </div>
+  {formData.useManualClient ? (
+    <input
+      type="text"
+      placeholder="Type customer name..."
+      className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none"
+      value={formData.clientName}
+      onChange={e => setFormData({ ...formData, clientName: e.target.value })}
+    />
+  ) : (
     <select
       className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none"
       value={formData.client}
@@ -267,7 +295,8 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
       <option value="">Choose Party...</option>
       {clients.map(c => <option key={c._id} value={c._id}>{c.name}</option>)}
     </select>
-  </div>
+  )}
+</div>
 
   {/* Reference Number — Purchase only */}
   {formData.type === 'Purchase' && (
@@ -290,20 +319,6 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
     </div>
   )}
 
-  {/* Status */}
-  <div>
-    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Payment Status</label>
-    <select
-      className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none cursor-pointer"
-      value={formData.status}
-      onChange={e => setFormData({ ...formData, status: e.target.value })}
-    >
-      <option value="Pending">Pending</option>
-      <option value="Paid">Paid</option>
-      <option value="Partially Paid">Partially Paid</option>
-      <option value="Cancelled">Cancelled</option>
-    </select>
-  </div>
 
 </div>
 
@@ -358,7 +373,7 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
                          <input type="number" min="1" className="w-full p-2 border rounded-lg text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={item.quantity} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
                         </td>
                         <td className="px-4 py-3">
-                          <input type="number" step="0.01" className="w-full p-2 border rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={item.price} onChange={e => handleItemChange(idx, 'price', e.target.value)} />
+                          <input type="number" step="0.01" placeholder={formData.type === 'Purchase' ? 'Enter rate...' : ''} className={`w-full p-2 border rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${formData.type === 'Purchase' ? 'border-amber-200 bg-amber-50 placeholder:text-amber-300' : ''}`} value={item.price} onChange={e => handleItemChange(idx, 'price', e.target.value)}/>
                         </td>
                         <td className="px-4 py-3">
                           <button type="button" onClick={() => removeItem(idx)} className="text-rose-400"><Trash2 size={16} /></button>
@@ -398,6 +413,19 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
                 <div className="flex justify-between items-center py-2">
                   <span className="text-xs font-bold text-slate-400">Tax Amount</span>
                   <span className="text-sm font-bold text-slate-800">₹{totals.tax.toFixed(2)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4 pt-2 border-t border-slate-100">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Payment Status</span>
+                  <select
+                    className="w-40 bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-sm font-bold outline-none cursor-pointer"
+                    value={formData.status}
+                    onChange={e => setFormData({ ...formData, status: e.target.value })}
+                  >
+                    <option value="Pending">Pending</option>
+                    <option value="Paid">Paid</option>
+                    <option value="Partially Paid">Partially Paid</option>
+                    <option value="Cancelled">Cancelled</option>
+                  </select>
                 </div>
                 <div className="flex justify-between items-center py-4 border-t border-slate-200">
                   <span className="text-lg font-black text-slate-900 uppercase tracking-widest">Grand Total</span>

@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const invoiceSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   client: { type: mongoose.Schema.Types.ObjectId, ref: 'Client' },
+  clientName: { type: String },
   type: { type: String, enum: ['Sale', 'Purchase'], default: 'Sale' },
   
   invoiceNumber:  { type: String },
