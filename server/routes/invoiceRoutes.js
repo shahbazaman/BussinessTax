@@ -13,11 +13,10 @@ import {
 router.route('/')
   .get(protect, getInvoices) 
   .post(protect, createInvoice);
-
+router.get('/next-number', protect, getNextInvoiceNumber);
 router.route('/:id')
   .put(protect, updateInvoice)
   .delete(protect, deleteInvoice); 
 
 router.put('/:id/status', protect, updateInvoiceStatus);
-router.get('/next-number', protect, getNextInvoiceNumber);
 export default router;

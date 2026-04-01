@@ -18,17 +18,6 @@ import Profile from './pages/Profile';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
-  useEffect(() => {
-    const checkAuth = () => {
-      setIsAuthenticated(!!localStorage.getItem('token'));
-    };
-    window.addEventListener('storage', checkAuth);
-    window.addEventListener('authChange', checkAuth);
-    return () => {
-      window.removeEventListener('storage', checkAuth);
-      window.removeEventListener('authChange', checkAuth);
-    };
-  }, []);
 
 useEffect(() => {
   const checkAuth = () => {

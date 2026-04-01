@@ -15,7 +15,7 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
     lowStockAlert: 10,
     reorderQuantity: 50,
     variants: [{ 
-      name: '', weight: '', unit: 'pcs', costPrice: '', salePrice: '', stock: '', sku: '', barcode: '', taxRate: 0 
+      name: '', weight: '', unit: 'pcs', costPrice: '', salePrice: '', stock: '', sku: '', barcode: undefined, taxRate: 0 
     }]
   };
   const [clients, setClients] = useState([]);
@@ -149,15 +149,7 @@ const handleChange = (e) => {
     category: finalCategory, 
     lowStockAlert: Number(productData.lowStockAlert) || 0,
     reorderQuantity: Number(productData.reorderQuantity) || 0,
-    variants: productData.variants.map((v, index) => ({
-      ...v,
-      weight: Number(v.weight) || 0,
-      costPrice: Number(v.costPrice) || 0,
-      price: Number(v.salePrice) || 0,
-      taxRate: Number(v.taxRate) || 0,
-      stock: Number(v.stock) || 0,
-      sku: v.sku?.trim() || generateUniqueSKU(productData.title, v, index)
-    }))
+    variants: validVariants
   };
 
     try {
@@ -321,7 +313,7 @@ const handleChange = (e) => {
                     </div>
                     <div className="col-span-6 md:col-span-4 relative">
                       <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                      <input name="barcode" value={variant.barcode} placeholder="Barcode" className="w-full pl-9 p-3 rounded-xl bg-slate-100 text-sm font-bold outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} />
+                      <input name="barcode" value={variant.barcode || ''} placeholder="Barcode" className="w-full pl-9 p-3 rounded-xl bg-slate-100 text-sm font-bold outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} />
                     </div>
                   </div>
 

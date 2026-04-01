@@ -2,8 +2,8 @@ import mongoose from 'mongoose';
 
 const variantSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  sku: { type: String, sparse: true }, 
-  barcode: { type: String, sparse: true },
+  sku: { type: String },
+  barcode: { type: String },
   price: { type: Number, required: true },
   costPrice: { type: Number, default: 0 },
   stock: { type: Number, default: 0 },

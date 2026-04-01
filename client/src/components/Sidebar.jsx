@@ -22,10 +22,18 @@ const Sidebar = () => {
       const [products, invoices] = await Promise.all([
         api.get('/products'), api.get('/invoices')
       ]);
-      const lowStock = products.data.filter(p => p.stock <= (p.reorderLevel ?? p.minStock ?? 5));
-      const overdue = invoices.data.filter(i => i.status !== 'Paid' && i.dueDate && new Date(i.dueDate) < new Date());
-      setAlerts([
-        ...lowStock.map(p => `🔴 Low stock: ${p.name} (${p.stock} left)`),
+      const overdue = invoices.data.filter(i => {
+  if (i.status === 'Paid') return false;
+  const due = i.dueDate ? new Date(i.dueDate) : new Date(new Date(i.invoiceDate).getTime() + 30 * 86400000);
+  return due < new Date();
+});
+      const lowStock = products.data.flatMap(p =>
+          (p.variants || [])
+            .filter(v => v.stock <= (p.lowStockAlert || 10))
+            .map(v => `🔴 Low stock: ${p.title} - ${v.name} (${v.stock} left)`)
+        );
+        setAlerts([
+          ...lowStock,
         ...overdue.map(i => `⚠️ Overdue: Invoice #${i.invoiceNumber || i._id?.slice(-5)}`)
       ]);
     } catch (err) {

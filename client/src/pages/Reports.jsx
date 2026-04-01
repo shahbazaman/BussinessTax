@@ -230,10 +230,10 @@ const Reports = () => {
       const aging = { '0–30 days': 0, '31–60 days': 0, '61–90 days': 0, '90+ days': 0 };
       invoices.filter(i => i.status !== 'Paid').forEach(inv => {
         const days = Math.floor((today - new Date(inv.dueDate)) / 86400000);
-        if (days <= 30) aging['0–30 days'] += inv.total || 0;
-        else if (days <= 60) aging['31–60 days'] += inv.total || 0;
-        else if (days <= 90) aging['61–90 days'] += inv.total || 0;
-        else aging['90+ days'] += inv.total || 0;
+        if (days <= 30) aging['0–30 days'] += inv.totalAmount || 0;
+        else if (days <= 60) aging['31–60 days'] += inv.totalAmount || 0;
+        else if (days <= 90) aging['61–90 days'] += inv.totalAmount || 0;
+        else aging['90+ days'] += inv.totalAmount || 0;
       });
       const colors = ['text-emerald-600', 'text-yellow-600', 'text-orange-500', 'text-rose-600'];
       const bg = ['bg-emerald-50', 'bg-yellow-50', 'bg-orange-50', 'bg-rose-50'];
