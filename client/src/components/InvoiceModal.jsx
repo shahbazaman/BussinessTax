@@ -132,7 +132,6 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-if (!formData.client) return toast.error("Please select a party");
 if (formData.items.length === 0) return toast.error("Add at least one item");
 
     setLoading(true);
@@ -261,7 +260,6 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
       {formData.type === 'Sale' ? 'Customer Name' : 'Supplier Name'}
     </label>
     <select
-      required
       className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none"
       value={formData.client}
       onChange={e => setFormData({ ...formData, client: e.target.value })}
@@ -357,10 +355,10 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
                       <tr key={item.variantId} className="bg-white">
                         <td className="px-4 py-3"><div className="text-sm font-bold">{item.name}</div></td>
                         <td className="px-4 py-3">
-                          <input type="number" min="1" className="w-full p-2 border rounded-lg text-center" value={item.quantity} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
+                         <input type="number" min="1" className="w-full p-2 border rounded-lg text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={item.quantity} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
                         </td>
                         <td className="px-4 py-3">
-                          <input type="number" step="0.01" className="w-full p-2 border rounded-lg" value={item.price} onChange={e => handleItemChange(idx, 'price', e.target.value)} />
+                          <input type="number" step="0.01" className="w-full p-2 border rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={item.price} onChange={e => handleItemChange(idx, 'price', e.target.value)} />
                         </td>
                         <td className="px-4 py-3">
                           <button type="button" onClick={() => removeItem(idx)} className="text-rose-400"><Trash2 size={16} /></button>

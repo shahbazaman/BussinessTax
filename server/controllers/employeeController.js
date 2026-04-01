@@ -163,3 +163,23 @@ export const deleteEmployee = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+export const getNextEmployeeId = async (req, res) => {
+  try {
+    const prefix = 'EMP-';
+    const employees = await Employee.find({
+      user: req.user._id,
+      employeeId: { $regex: `^${prefix}` }
+    }).select('employeeId');
+
+    let maxNum = 0;
+    for (const emp of employees) {
+      const num = parseInt(emp.employeeId.replace(prefix, ''), 10);
+      if (!isNaN(num) && num > maxNum) maxNum = num;
+    }
+
+    const nextNum = String(maxNum + 1).padStart(3, '0');
+    res.json({ employeeId: `${prefix}${nextNum}` });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to generate employee ID' });
+  }
+};

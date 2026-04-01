@@ -86,7 +86,14 @@ const Employees = () => {
   }, [employees, searchTerm, roleFilter]);
 
   const roles = ['All', ...new Set(employees.map(e => e.role))];
-
+  const fetchNextEmployeeId = async () => {
+    try {
+      const res = await api.get('/employees/next-id');
+      setFormData(prev => ({ ...prev, employeeId: res.data.employeeId }));
+    } catch {
+      // silently fail — user can still type manually
+    }
+  };
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -256,7 +263,7 @@ const handleCloseMonth = async () => {
            </button>
         </div>
 
-        <button onClick={() => setShowModal(true)} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 active:scale-95 self-start md:self-center">
+        <button onClick={() => { setShowModal(true); fetchNextEmployeeId(); }} className="bg-slate-900 text-white px-6 py-4 rounded-2xl font-black text-xs uppercase tracking-widest flex items-center gap-2 hover:bg-blue-600 transition-all shadow-xl shadow-slate-200 active:scale-95 self-start md:self-center">
           <UserPlus size={16} /> Add Employee
         </button>
       </div>
@@ -392,7 +399,9 @@ const handleCloseMonth = async () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Hash size={10}/> Employee ID</label>
-                  <input required placeholder="EMP-001" className="w-full p-4 bg-slate-50 rounded-2xl border-none outline-none font-bold text-sm" value={formData.employeeId} onChange={e => setFormData({...formData, employeeId: e.target.value})} />
+                  <input
+  required
+  readOnly={!isEditing} placeholder="EMP-001" className={`w-full p-4 rounded-2xl border-none outline-none font-bold text-sm ${isEditing ? 'bg-slate-50' : 'bg-slate-100 cursor-not-allowed'}`} value={formData.employeeId} onChange={e => isEditing && setFormData({...formData, employeeId: e.target.value})}/>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1"><Calendar size={10}/> Joining Date</label>

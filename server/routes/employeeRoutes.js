@@ -7,13 +7,15 @@ import {
   updateAttendance, 
   closeMonth, 
   updateEmployee, 
-  deleteEmployee 
+  deleteEmployee,
+  getNextEmployeeId
 } from '../controllers/employeeController.js';
 
 router.route('/')
   .get(protect, getEmployees)
   .post(protect, addEmployee);
 router.post('/close-month', protect, closeMonth);
+router.get('/next-id', protect, getNextEmployeeId);
 router.route('/:id')
   .put(protect, updateEmployee) 
   .delete(protect, deleteEmployee);
