@@ -169,3 +169,30 @@ export const updateInvoiceStatus = async (req, res) => {
     res.status(500).json({ message: "Status update failed" });
   }
 };
+export const getNextInvoiceNumber = async (req, res) => {
+  try {
+    const { type } = req.query; // 'Sale' or 'Purchase'
+    const field = type === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
+    const prefix = type === 'Sale' ? 'INV-S-' : 'INV-P-';
+
+    // Find all invoices for this user of this type, get the highest number
+    const invoices = await Invoice.find({
+      user: req.user._id,
+      [field]: { $regex: `^${prefix}` }
+    }).select(field);
+
+    let maxNum = 0;
+    for (const inv of invoices) {
+      const val = inv[field];
+      if (val) {
+        const num = parseInt(val.replace(prefix, ''), 10);
+        if (!isNaN(num) && num > maxNum) maxNum = num;
+      }
+    }
+
+    const nextNum = String(maxNum + 1).padStart(3, '0');
+    res.json({ number: `${prefix}${nextNum}` });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to generate number' });
+  }
+};

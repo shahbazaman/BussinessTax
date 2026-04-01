@@ -33,9 +33,6 @@ const Settings = () => {
     const fetchSettings = async () => {
   try {
     const res = await api.get('/auth/profile');
-    console.log('googleId:', res.data.googleId);
-    console.log('authMethod:', res.data.authMethod);
-    console.log('isGoogleUser:', res.data.authMethod === 'google' || !!res.data.googleId);
         setFormData({
           businessName: res.data.businessName || '',
           taxRate: res.data.taxRate || 20,

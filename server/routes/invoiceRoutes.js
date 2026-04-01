@@ -6,7 +6,8 @@ import {
   getInvoices, 
   deleteInvoice, 
   updateInvoice, 
-  updateInvoiceStatus 
+  updateInvoiceStatus,
+  getNextInvoiceNumber
 } from '../controllers/invoiceController.js';
 
 router.route('/')
@@ -18,5 +19,5 @@ router.route('/:id')
   .delete(protect, deleteInvoice); 
 
 router.put('/:id/status', protect, updateInvoiceStatus);
-
+router.get('/next-number', protect, getNextInvoiceNumber);
 export default router;
