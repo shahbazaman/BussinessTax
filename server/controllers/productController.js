@@ -12,17 +12,19 @@ export const getProducts = async (req, res) => {
 export const addProduct = async (req, res) => {
   try {
     const { title, category, variants, lowStockAlert, supplier, reorderQuantity } = req.body;
-    
+    if (!variants || variants.length === 0) {
+      return res.status(400).json({ message: 'At least one variant is required' });
+    }
     const formattedVariants = variants.map((v, index) => ({
       name: v.name,
-      sku: v.sku || `${category.substring(0,3).toUpperCase()}-${title.substring(0,3).toUpperCase()}-${Date.now()}-${index}`,
-      barcode: v.barcode,
-      price: v.price, 
-      costPrice: v.costPrice,
-      stock: v.stock,
-      taxRate: v.taxRate,
-      weight: v.weight,
-      unit: v.unit
+      sku: v.sku?.trim() || `${category.substring(0,3).toUpperCase()}-${title.substring(0,3).toUpperCase()}-${Date.now()}-${index}`,
+      barcode: v.barcode?.trim() || undefined,
+      price: Number(v.price) || 0,
+      costPrice: Number(v.costPrice) || 0,
+      stock: Number(v.stock) || 0,
+      taxRate: Number(v.taxRate) || 0,
+      weight: Number(v.weight) || 0,
+      unit: v.unit || 'pcs'
     }));
 
     const product = new Product({
