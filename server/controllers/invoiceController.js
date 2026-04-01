@@ -4,12 +4,15 @@ import Product from '../models/Product.js';
 export const createInvoice = async (req, res) => {
   try {
     const {
-      client, items, discount, type, invoiceDate, status,
+      client: rawClient, items, discount, type, invoiceDate, status,
       notes, globalTaxRate, gstNumber, billingAddress,
       shippingAddress, referenceNumber, invoiceNumber, purchaseNumber
     } = req.body;
 
     if (!req.user?._id) return res.status(401).json({ message: "Auth failed" });
+
+    // Sanitize client — empty string will fail ObjectId cast
+    const client = rawClient && String(rawClient).trim() !== '' ? rawClient : undefined;
 
     const invoiceType = type || 'Sale';
     const field = invoiceType === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
@@ -96,10 +99,10 @@ export const updateInvoice = async (req, res) => {
       );
     }
 
-    const invoiceType = req.body.type || oldInvoice.type;
-
     const cleanedUpdate = {
       ...req.body,
+      // Sanitize client — empty string will fail ObjectId cast
+      client: (req.body.client && String(req.body.client).trim() !== '') ? req.body.client : undefined,
       // Preserve original numbers — never overwrite on edit
       invoiceNumber:   oldInvoice.invoiceNumber,
       purchaseNumber:  oldInvoice.purchaseNumber,
@@ -169,13 +172,13 @@ export const updateInvoiceStatus = async (req, res) => {
     res.status(500).json({ message: "Status update failed" });
   }
 };
+
 export const getNextInvoiceNumber = async (req, res) => {
   try {
-    const { type } = req.query; // 'Sale' or 'Purchase'
+    const { type } = req.query;
     const field = type === 'Sale' ? 'invoiceNumber' : 'purchaseNumber';
     const prefix = type === 'Sale' ? 'INV-S-' : 'INV-P-';
 
-    // Find all invoices for this user of this type, get the highest number
     const invoices = await Invoice.find({
       user: req.user._id,
       [field]: { $regex: `^${prefix}` }
