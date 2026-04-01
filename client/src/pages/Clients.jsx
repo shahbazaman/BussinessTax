@@ -265,6 +265,14 @@ const Clients = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Core Identity</h4>
+                  <div className="flex p-1 bg-slate-100 rounded-2xl w-fit">
+                    {['Individual', 'Business'].map((type) => (
+                      <button key={type} type="button" onClick={() => setFormData({...formData, clientType: type})}
+                        className={`px-5 py-2 rounded-xl text-xs font-black transition-all ${formData.clientType === type ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>
+                        {type}
+                      </button>
+                    ))}
+                  </div>
                   <input required placeholder="Individual / Business Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
                     value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                   <input required type="email" placeholder="Email Address" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
