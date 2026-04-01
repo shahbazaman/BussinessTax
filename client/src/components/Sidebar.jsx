@@ -101,7 +101,7 @@ useEffect(() => {
           {!isCollapsed && (
 <div className="relative bell-wrapper">
     <button
-      onClick={(e) => { e.stopPropagation(); setShowAlerts(!showAlerts); }}
+      onClick={(e) => { e.stopPropagation(); navigate('/inventory'); }}
       className="p-1.5 rounded-md hover:bg-slate-100 text-slate-400 relative"
     >
       <Bell size={18} />
@@ -109,16 +109,6 @@ useEffect(() => {
         <span className="absolute top-0 right-0 w-2 h-2 bg-rose-500 rounded-full" />
       )}
     </button>
-    {showAlerts && alerts.length > 0 && (
-      <div className="absolute left-0 top-10 w-72 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 overflow-hidden">
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-4 pt-4 pb-2">Alerts</p>
-        {alerts.map((alert, i) => (
-          <div key={i} className="px-4 py-2.5 text-xs font-medium text-slate-700 border-t border-slate-50 hover:bg-slate-50">
-            {alert}
-          </div>
-        ))}
-      </div>
-    )}
   </div>
 )}
           <button 
