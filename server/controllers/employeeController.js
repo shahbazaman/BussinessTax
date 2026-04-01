@@ -40,7 +40,8 @@ export const addEmployee = async (req, res) => {
       idNumber,
       bankDetails: {
         bankName: bankName || '',
-        accountNumber: accountNumber || ''
+        accountNumber: accountNumber || '',
+        ifscCode: req.body.ifscCode || ''
       }
     });
     
@@ -54,16 +55,17 @@ export const addEmployee = async (req, res) => {
 // @desc    Update employee profile & handle nested bank details
 export const updateEmployee = async (req, res) => {
   try {
-    const { bankName, accountNumber, ...otherData } = req.body;
 
-    // Prepare update object to handle nested bankDetails correctly
-    const updateData = {
-      ...otherData,
-      bankDetails: {
-        bankName: bankName,
-        accountNumber: accountNumber
-      }
-    };
+    const { bankName, accountNumber, ifscCode, ...otherData } = req.body;
+
+const updateData = {
+  ...otherData,
+  bankDetails: {
+    bankName: bankName,
+    accountNumber: accountNumber,
+    ifscCode: ifscCode
+  }
+};
 
     const employee = await Employee.findOneAndUpdate(
       { _id: req.params.id, user: req.user._id },
