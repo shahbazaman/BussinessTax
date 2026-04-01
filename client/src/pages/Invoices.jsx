@@ -97,7 +97,7 @@ const Invoices = () => {
       const invDate = new Date(inv.invoiceDate || inv.createdAt).getTime();
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
       const end = endDate ? new Date(endDate).setHours(23, 59, 59, 999) : null;
-      const clientName = inv.client?.name || "Unknown Party";
+      const clientName = inv.client?.name || inv.clientName || "";
       
       return inv.type === activeTab && 
              clientName.toLowerCase().includes(searchTerm.toLowerCase()) && 
@@ -203,7 +203,7 @@ const handleDelete = (id) => {
     
     doc.text(`Party Details:`, 14, 50);
     doc.setFontSize(9);
-    doc.text(`${invoice.client?.name || 'N/A'}`, 14, 55);
+    doc.text(`${invoice.client?.name || invoice.clientName || 'N/A'}`, 14, 55);
     doc.text(`${invoice.billingAddress || 'N/A'}`, 14, 60, { maxWidth: 80 });
     
     if(isSale && invoice.shippingAddress) {
@@ -347,7 +347,7 @@ const handleDelete = (id) => {
                         </div>
                       </td>
                       <td className="px-8 py-6">
-                        <div className="font-black text-slate-900 text-sm">{inv.client?.name || "Deleted Client"}</div>
+                        <div className="font-black text-slate-900 text-sm">{inv.client?.name || inv.clientName || "—"}</div>
                         <div className="text-[10px] text-slate-400 font-black uppercase mt-0.5 tracking-wider">{new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
                       </td>
                       <td className="px-8 py-6">

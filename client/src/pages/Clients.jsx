@@ -261,21 +261,11 @@ const Clients = () => {
               </button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-8 overflow-y-auto no-scrollbar flex-1">
-              {/* Client Type Toggle */}
-              <div className="flex p-1 bg-slate-100 rounded-2xl w-fit mb-8">
-                {['Individual', 'Business'].map((type) => (
-                  <button key={type} type="button" onClick={() => setFormData({...formData, clientType: type})}
-                    className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${formData.clientType === type ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>
-                    {type}
-                  </button>
-                ))}
-              </div>
-
+            <form onSubmit={handleSubmit} className="p-8 overflow-y-auto no-scrollbar flex-1">            
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Core Identity</h4>
-                  <input required placeholder="Full Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
+                  <input required placeholder="Individual / Business Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
                     value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
                   <input required type="email" placeholder="Email Address" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
                     value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
@@ -283,8 +273,7 @@ const Clients = () => {
 
                 <div className="space-y-4">
                   <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1">Business Specs</h4>
-                  <input placeholder="Company Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
-                    value={formData.businessName} onChange={(e) => setFormData({...formData, businessName: e.target.value})} disabled={formData.clientType === 'Individual'} />
+                  
                   <input placeholder="Tax ID / GST" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold" 
                     value={formData.taxId} onChange={(e) => setFormData({...formData, taxId: e.target.value})} />
                     <select className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
