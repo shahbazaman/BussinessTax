@@ -51,12 +51,13 @@ const Dashboard = () => {
   const [transferData, setTransferData] = useState({ fromId: '', toId: '', amount: 0 });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const initialClientFormState = {
-    name: '', email: '', phone: '', clientType: 'Individual',
-    businessName: '', taxId: '', paymentTerms: 'Immediate', creditLimit: 0,
-    openingBalance: 0,
-    billingAddress: { street: '', city: '', state: '', zip: '', country: '' },
-    shippingAddress: { street: '', city: '', state: '', zip: '', country: '' }
-  };
+  name: '', email: '', phone: '', clientType: 'Individual',
+  businessName: '', taxId: '', paymentTerms: 'Immediate', creditLimit: 0,
+  openingBalance: 0,
+  businessCategory: '', customBusinessCategory: '',
+  billingAddress: { street: '', city: '', state: '', zip: '', country: '' },
+  shippingAddress: { street: '', city: '', state: '', zip: '', country: '' }
+};
   const [newClient, setNewClient] = useState(initialClientFormState);
   const [newAccount,   setNewAccount]  = useState({
     bankName: '', balance: '', accountType: 'Checking', accountNumber: ''
@@ -174,9 +175,15 @@ const Dashboard = () => {
   };
 
     const handleAddClient = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/clients', newClient);
+  e.preventDefault();
+  try {
+    const submitData = {
+      ...newClient,
+      businessCategory: newClient.businessCategory === 'Other'
+        ? newClient.customBusinessCategory
+        : newClient.businessCategory
+    };
+    await api.post('/clients', submitData);
       setShowClientModal(false);
       setNewClient(initialClientFormState); 
       setShowAdvanced(false);              
@@ -568,23 +575,22 @@ const handleDeleteAccount = (accountId) => {
         </div>
       )}
 
-      {/* ── Add Client Modal ── */}
-     {/* ── Add Client Modal ── */}
+{/* ── Add Client Modal ── */}
 {showClientModal && (
   <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-50 p-4">
-    <div className="bg-white rounded-[3rem] w-full max-w-2xl max-h-[90vh] shadow-2xl overflow-hidden flex flex-col">
+    <div className="bg-white rounded-[3rem] w-full max-w-2xl max-h-[90vh] shadow-2xl animate-in fade-in zoom-in duration-200 overflow-hidden flex flex-col">
       <div className="p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
         <h3 className="text-2xl font-black text-slate-800 uppercase tracking-tight">New Client Onboarding</h3>
         <button onClick={() => setShowClientModal(false)} className="text-slate-400 hover:text-slate-600 bg-white p-2 rounded-full shadow-sm">
-          <X size={20} />
+          <X size={20}/>
         </button>
       </div>
 
-      <form onSubmit={handleAddClient} className="p-8 overflow-y-auto flex-1">
+      <form onSubmit={handleAddClient} className="p-8 overflow-y-auto no-scrollbar flex-1">
         {/* Client Type Toggle */}
         <div className="flex p-1 bg-slate-100 rounded-2xl w-fit mb-8">
           {['Individual', 'Business'].map((type) => (
-            <button key={type} type="button" onClick={() => setNewClient({ ...newClient, clientType: type })}
+            <button key={type} type="button" onClick={() => setNewClient({...newClient, clientType: type})}
               className={`px-6 py-2 rounded-xl text-xs font-black transition-all ${newClient.clientType === type ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400'}`}>
               {type}
             </button>
@@ -594,23 +600,42 @@ const handleDeleteAccount = (accountId) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest ml-1">Core Identity</h4>
-            <input required placeholder="Full Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
-              value={newClient.name} onChange={(e) => setNewClient({ ...newClient, name: e.target.value })} />
-            <input required type="email" placeholder="Email Address" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
-              value={newClient.email} onChange={(e) => setNewClient({ ...newClient, email: e.target.value })} />
+            <input required placeholder="Individual / Business Name"
+              className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
+              value={newClient.name} onChange={(e) => setNewClient({...newClient, name: e.target.value})} />
+            <input required type="email" placeholder="Email Address"
+              className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
+              value={newClient.email} onChange={(e) => setNewClient({...newClient, email: e.target.value})} />
           </div>
 
           <div className="space-y-4">
             <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1">Business Specs</h4>
-            <input placeholder="Company Name" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
-              value={newClient.businessName} onChange={(e) => setNewClient({ ...newClient, businessName: e.target.value })}
-              disabled={newClient.clientType === 'Individual'} />
-            <input placeholder="Tax ID / GST" className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
-              value={newClient.taxId} onChange={(e) => setNewClient({ ...newClient, taxId: e.target.value })} />
+            <input placeholder="Tax ID / GST"
+              className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
+              value={newClient.taxId} onChange={(e) => setNewClient({...newClient, taxId: e.target.value})} />
+            <select className="w-full p-4 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-green-500/20 text-sm font-bold"
+              value={newClient.businessCategory}
+              onChange={(e) => setNewClient({...newClient, businessCategory: e.target.value, customBusinessCategory: ''})}>
+              <option value="">Select Business Category</option>
+              <option value="Supplier">Supplier</option>
+              <option value="Wholesale">Wholesale</option>
+              <option value="Retailer">Retailer</option>
+              <option value="Manufacturer">Manufacturer</option>
+              <option value="Distributor">Distributor</option>
+              <option value="Service Provider">Service Provider</option>
+              <option value="Freelancer">Freelancer</option>
+              <option value="Other">Other</option>
+            </select>
+            {newClient.businessCategory === 'Other' && (
+              <input placeholder="Specify business category..."
+                className="w-full p-4 bg-blue-50 border-2 border-blue-200 rounded-2xl outline-none text-sm font-bold text-blue-700"
+                value={newClient.customBusinessCategory}
+                onChange={(e) => setNewClient({...newClient, customBusinessCategory: e.target.value})}
+                required />
+            )}
           </div>
         </div>
 
-        {/* Advanced Section */}
         <div className="mt-8 pt-6 border-t border-slate-100">
           <button type="button" onClick={() => setShowAdvanced(!showAdvanced)}
             className="flex items-center gap-2 text-slate-400 hover:text-slate-900 transition-all font-black text-[10px] uppercase tracking-widest">
@@ -619,60 +644,54 @@ const handleDeleteAccount = (accountId) => {
           </button>
 
           {showAdvanced && (
-            <div className="mt-6 space-y-8">
-              {/* Financials */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-3xl">
+            <div className="mt-6 space-y-8 animate-in slide-in-from-top-4 duration-300">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-6 rounded-4xl">
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1">
-                    <CreditCard size={12} /> Payment Terms
-                  </label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1"><CreditCard size={12}/> Payment Terms</label>
                   <select className="w-full p-3 bg-white rounded-xl font-bold text-sm outline-none shadow-sm"
-                    value={newClient.paymentTerms} onChange={(e) => setNewClient({ ...newClient, paymentTerms: e.target.value })}>
+                    value={newClient.paymentTerms} onChange={(e) => setNewClient({...newClient, paymentTerms: e.target.value})}>
                     <option value="Immediate">Due on Receipt</option>
+                    <option value="Net 7">Net 7</option>
                     <option value="Net 15">Net 15</option>
                     <option value="Net 30">Net 30</option>
                     <option value="Net 60">Net 60</option>
                   </select>
                 </div>
                 <div className="space-y-3">
-                  <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1">
-                    <ShieldCheck size={12} /> Credit Limit
-                  </label>
+                  <label className="text-[10px] font-black text-slate-500 uppercase flex items-center gap-1"><ShieldCheck size={12}/> Credit Limit</label>
                   <input type="number" className="w-full p-3 bg-white rounded-xl font-bold text-sm outline-none"
-                    value={newClient.creditLimit} onChange={(e) => setNewClient({ ...newClient, creditLimit: e.target.value })} />
+                    value={newClient.creditLimit} onChange={(e) => setNewClient({...newClient, creditLimit: e.target.value})} />
                 </div>
               </div>
 
-              {/* Addresses */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
-                  <h5 className="text-[10px] font-black text-slate-800 flex items-center gap-2"><MapPin size={14} /> BILLING ADDRESS</h5>
+                  <h5 className="text-[10px] font-black text-slate-800 flex items-center gap-2"><MapPin size={14}/> BILLING ADDRESS</h5>
                   <input placeholder="Street" className="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
-                    value={newClient.billingAddress.street} onChange={(e) => setNewClient({ ...newClient, billingAddress: { ...newClient.billingAddress, street: e.target.value } })} />
+                    value={newClient.billingAddress.street} onChange={(e) => setNewClient({...newClient, billingAddress: {...newClient.billingAddress, street: e.target.value}})} />
                   <div className="grid grid-cols-2 gap-2">
                     <input placeholder="City" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
-                      value={newClient.billingAddress.city} onChange={(e) => setNewClient({ ...newClient, billingAddress: { ...newClient.billingAddress, city: e.target.value } })} />
+                      value={newClient.billingAddress.city} onChange={(e) => setNewClient({...newClient, billingAddress: {...newClient.billingAddress, city: e.target.value}})} />
                     <input placeholder="Country" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
-                      value={newClient.billingAddress.country} onChange={(e) => setNewClient({ ...newClient, billingAddress: { ...newClient.billingAddress, country: e.target.value } })} />
+                      value={newClient.billingAddress.country} onChange={(e) => setNewClient({...newClient, billingAddress: {...newClient.billingAddress, country: e.target.value}})} />
                   </div>
                 </div>
 
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
-                    <h5 className="text-[10px] font-black text-slate-800 flex items-center gap-2"><Truck size={14} /> SHIPPING ADDRESS</h5>
-                    <button type="button"
-                      onClick={() => setNewClient({ ...newClient, shippingAddress: { ...newClient.billingAddress } })}
+                    <h5 className="text-[10px] font-black text-slate-800 flex items-center gap-2"><Truck size={14}/> SHIPPING ADDRESS</h5>
+                    <button type="button" onClick={() => setNewClient({...newClient, shippingAddress: {...newClient.billingAddress}})}
                       className="text-[8px] font-black text-blue-600 uppercase flex items-center gap-1 hover:bg-blue-50 px-2 py-1 rounded-lg transition-all">
-                      <Copy size={10} /> Same as billing
+                      <Copy size={10}/> Same as billing
                     </button>
                   </div>
                   <input placeholder="Street" className="w-full p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
-                    value={newClient.shippingAddress.street} onChange={(e) => setNewClient({ ...newClient, shippingAddress: { ...newClient.shippingAddress, street: e.target.value } })} />
+                    value={newClient.shippingAddress.street} onChange={(e) => setNewClient({...newClient, shippingAddress: {...newClient.shippingAddress, street: e.target.value}})} />
                   <div className="grid grid-cols-2 gap-2">
                     <input placeholder="City" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
-                      value={newClient.shippingAddress.city} onChange={(e) => setNewClient({ ...newClient, shippingAddress: { ...newClient.shippingAddress, city: e.target.value } })} />
+                      value={newClient.shippingAddress.city} onChange={(e) => setNewClient({...newClient, shippingAddress: {...newClient.shippingAddress, city: e.target.value}})} />
                     <input placeholder="Country" className="p-3 bg-slate-50 rounded-xl text-sm font-bold outline-none"
-                      value={newClient.shippingAddress.country} onChange={(e) => setNewClient({ ...newClient, shippingAddress: { ...newClient.shippingAddress, country: e.target.value } })} />
+                      value={newClient.shippingAddress.country} onChange={(e) => setNewClient({...newClient, shippingAddress: {...newClient.shippingAddress, country: e.target.value}})} />
                   </div>
                 </div>
               </div>
@@ -743,7 +762,7 @@ const handleDeleteAccount = (accountId) => {
           <div style={{ marginTop: '40px', display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
             <div>
               <p style={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '8px' }}>Billed To</p>
-             <h3 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>{lastInvoice?.clientName || 'Valued Client'}</h3>
+            <h3 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0' }}>{lastInvoice?.client?.name || lastInvoice?.clientName || 'Valued Client'}</h3>
             </div>
             <div style={{ textAlign: 'right' }}>
               <p style={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', color: '#94a3b8', marginBottom: '8px' }}>Due Date</p>
