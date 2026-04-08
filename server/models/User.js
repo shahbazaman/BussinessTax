@@ -16,6 +16,11 @@ const UserSchema = new mongoose.Schema({
   logo: { type: String }, 
   profilePhoto: { type: String, default: '' },
   role: { type: String, enum: ['Admin', 'User'], default: 'Admin' },
+  // Add this field to your existing userSchema
+customUnits: {
+  type: [String],
+  default: []
+},
 }, { timestamps: true });
 
 // Corrected Async Pre-save Hook

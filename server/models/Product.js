@@ -9,7 +9,7 @@ const variantSchema = new mongoose.Schema({
   stock: { type: Number, default: 0 },
   taxRate: { type: Number, default: 0 },
   weight: Number,
-  unit: { type: String, enum: ['g', 'kg', 'ml', 'L', 'pcs', 'box', 'mtr', 'set'], default: 'pcs' }
+  unit: { type: String, default: 'pcs' }
 });
 
 const productSchema = new mongoose.Schema({

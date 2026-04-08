@@ -25,13 +25,18 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   const [productData, setProductData] = useState(initialState);
   const [isOtherCategory, setIsOtherCategory] = useState(false);
   const isEditing = !!editingProduct;
-
+  const [allUnits, setAllUnits] = useState(['pcs', 'kg', 'g', 'ml', 'L', 'box', 'mtr', 'set']);
   useEffect(() => {
     if (isOpen) {
       api.get('/clients').then(res => setClients(res.data.map(c => ({
         name: c.name,
         businessName: c.businessName || ''
       }))));
+      api.get('/auth/custom-units').then(res => {
+  const defaults = ['pcs', 'kg', 'g', 'ml', 'L', 'box', 'mtr', 'set'];
+  const merged = [...new Set([...defaults, ...(res.data.customUnits || [])])];
+  setAllUnits(merged);
+});
       if (editingProduct) {
         const standardCategories = ["Groceries", "Electronics", "Home & Kitchen", "Liquids"];
         const isCustom = editingProduct.category && !standardCategories.includes(editingProduct.category);
@@ -60,9 +65,6 @@ const handleVariantChange = (index, e) => {
   setProductData(prev => {
     const newVariants = [...prev.variants];
     newVariants[index][name] = value;
-    if (name === "weight" || name === "unit") {
-      newVariants[index].sku = generateUniqueSKU(prev.title, newVariants[index], index);
-    }
     return { ...prev, variants: newVariants };
   });
 };
@@ -80,12 +82,6 @@ const handleChange = (e) => {
     }));
   } else {
     let updatedProductData = { ...productData, [name]: value };
-    if (name === "title") {
-      updatedProductData.variants = updatedProductData.variants.map((v, idx) => ({
-        ...v,
-        sku: v.sku || generateUniqueSKU(value, v, idx)
-      }));
-    }
     setProductData(updatedProductData);
   }
 };
@@ -199,20 +195,23 @@ const handleChange = (e) => {
                 onChange={handleChange} required
               />
             </div>            
-            <select 
-                name="category" 
-                value={productData.category} 
-                className="p-5 bg-slate-50 rounded-3xl border-none outline-none font-bold text-slate-600 shadow-inner" 
-                onChange={handleChange} 
-                required
-              >
-                <option value="">Select Category</option>
-                <option value="Groceries">Groceries</option>
-                <option value="Liquids">Liquids</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Home & Kitchen">Home & Kitchen</option>
-                <option value="Other">Other</option>
-              </select>
+            <div className="space-y-2">
+  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
+  <select 
+    name="category" 
+    value={productData.category} 
+    className="w-full p-4 text-sm bg-slate-50 rounded-2xl border-2 border-transparent focus:border-blue-200 outline-none font-bold text-slate-600 shadow-inner" 
+    onChange={handleChange} 
+    required
+  >
+    <option value="">Select Category</option>
+    <option value="Groceries">Groceries</option>
+    <option value="Liquids">Liquids</option>
+    <option value="Electronics">Electronics</option>
+    <option value="Home & Kitchen">Home & Kitchen</option>
+    <option value="Other">Other</option>
+  </select>
+</div>
 <div className="space-y-2 relative">
   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier</label>
   <input
@@ -321,7 +320,7 @@ const handleChange = (e) => {
                   <div className="grid grid-cols-12 gap-3">
                     <input name="weight" type="number" value={variant.weight} placeholder="Weight" className="col-span-4 md:col-span-3 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)} />
                     <select name="unit" value={variant.unit} className="col-span-4 md:col-span-3 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)}>
-                      <option value="pcs">pcs</option><option value="kg">kg</option><option value="g">g</option><option value="ml">ml</option><option value="L">L</option><option value="box">box</option>
+                      {allUnits.map(u => <option key={u} value={u}>{u}</option>)}
                     </select>
                     <div className="col-span-4 md:col-span-6 flex flex-col gap-1">
                       <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Default Tax %</label>

@@ -5,7 +5,7 @@ import {
   Loader2, Lock, Eye, EyeOff, AlertCircle 
 } from 'lucide-react';
 import { toast } from 'react-toastify';
-
+import { Package } from 'lucide-react';
 const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -20,6 +20,9 @@ const Settings = () => {
     businessAddress: '',
     gstNumber: ''
   });
+  const DEFAULT_UNITS = ['pcs', 'kg', 'g', 'ml', 'L', 'box', 'mtr', 'set'];
+const [customUnits, setCustomUnits] = useState([]);
+const [newUnit, setNewUnit] = useState('');
 
   // Password Form State
   const [passwordData, setPasswordData] = useState({
@@ -44,6 +47,8 @@ const Settings = () => {
         });
         // Check if user is a Google Auth user
         setIsGoogleUser(res.data.authMethod === 'google' || !!res.data.googleId);
+        const unitsRes = await api.get('/auth/custom-units');
+        setCustomUnits(unitsRes.data.customUnits || []);
       } catch (err) {
         console.error("Failed to load settings");
         toast.error("Failed to load profile settings");
@@ -66,7 +71,25 @@ const handleSettingsSubmit = async (e) => {
     setLoading(false);
   }
 };
-  // Update Password Logic
+const handleAddUnit = () => {
+  const trimmed = newUnit.trim().toLowerCase();
+  if (!trimmed) return toast.error("Enter a unit name");
+  if ([...DEFAULT_UNITS, ...customUnits].includes(trimmed)) return toast.error("Unit already exists");
+  setCustomUnits(prev => [...prev, trimmed]);
+  setNewUnit('');
+};
+
+const handleRemoveUnit = async (unit) => {
+  const updated = customUnits.filter(u => u !== unit);
+  setCustomUnits(updated);
+  await api.put('/auth/custom-units', { customUnits: updated });
+  toast.success(`Unit "${unit}" removed`);
+};
+
+const handleSaveUnits = async () => {
+  await api.put('/auth/custom-units', { customUnits });
+  toast.success("Units saved!");
+};
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
     
@@ -299,6 +322,83 @@ const handleSettingsSubmit = async (e) => {
             </form>
           )}
         </div>
+        <hr className="my-10 border-slate-200" />
+
+{/* UNITS MANAGEMENT */}
+<div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm">
+  <div className="flex items-center gap-2 mb-6 text-slate-800">
+    <Package size={20} className="text-purple-500" />
+    <h3 className="font-bold">Product Units</h3>
+  </div>
+
+  {/* Default units — read only */}
+  <div className="mb-5">
+    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">
+      Default Units
+    </label>
+    <div className="flex flex-wrap gap-2">
+      {DEFAULT_UNITS.map(unit => (
+        <span key={unit} className="px-3 py-1.5 bg-slate-100 text-slate-500 text-xs font-black rounded-xl uppercase">
+          {unit}
+        </span>
+      ))}
+    </div>
+  </div>
+
+  {/* Custom units — removable */}
+  <div className="mb-5">
+    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block ml-1">
+      Custom Units
+    </label>
+    {customUnits.length === 0 ? (
+      <p className="text-xs text-slate-400 font-medium ml-1">No custom units added yet.</p>
+    ) : (
+      <div className="flex flex-wrap gap-2">
+        {customUnits.map(unit => (
+          <span key={unit} className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 text-xs font-black rounded-xl uppercase border border-purple-100">
+            {unit}
+            <button
+              type="button"
+              onClick={() => handleRemoveUnit(unit)}
+              className="text-purple-400 hover:text-purple-700 transition-colors"
+            >
+              <X size={12} />
+            </button>
+          </span>
+        ))}
+      </div>
+    )}
+  </div>
+
+  {/* Add new unit */}
+  <div className="flex gap-3">
+    <input
+      type="text"
+      placeholder="e.g. dozen, pack, ft..."
+      value={newUnit}
+      onChange={(e) => setNewUnit(e.target.value)}
+      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddUnit())}
+      className="flex-1 p-3 bg-slate-50 border-none rounded-2xl outline-none focus:ring-2 focus:ring-purple-500/20 text-sm font-bold"
+    />
+    <button
+      type="button"
+      onClick={handleAddUnit}
+      className="px-5 py-3 bg-purple-600 text-white rounded-2xl text-xs font-black uppercase hover:bg-purple-700 transition-all"
+    >
+      Add
+    </button>
+  </div>
+
+  <div className="flex justify-end mt-4">
+    <button
+      type="button"
+      onClick={handleSaveUnits}
+      className="bg-slate-900 text-white px-8 py-3 rounded-2xl font-bold flex items-center gap-2 hover:bg-purple-600 transition-all shadow-xl shadow-slate-200"
+    >
+      <Save size={18} /> Save Units
+    </button>
+  </div>
+</div>
       </div>
     </div>
   );

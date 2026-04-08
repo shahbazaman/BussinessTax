@@ -4,11 +4,14 @@ import protect from '../middleware/authMiddleware.js'; // Adjust path if needed
 import { googleLogin } from '../controllers/authController.js';
 import multer from 'multer';
 import { uploadProfilePhoto } from '../controllers/authController.js';
+import { getCustomUnits, updateCustomUnits } from '../controllers/userController.js';
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } }); 
 const router = express.Router();
 
+router.get('/custom-units', protect, getCustomUnits);
+router.put('/custom-units', protect, updateCustomUnits);
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 router.post('/google', googleLogin);

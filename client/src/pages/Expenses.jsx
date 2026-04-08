@@ -267,7 +267,7 @@ const handleReceiptUpload = async (e) => {
             <div className="space-y-4">
               <div><label className="text-[10px] font-black text-slate-400 uppercase">Title</label><p className="font-bold text-slate-800">{viewingExpense.title}</p></div>
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-[10px] font-black text-slate-400 uppercase">Amount</label><p className="font-bold text-slate-800">{viewingExpense.currency} {viewingExpense.amount}</p></div>
+                <div><label className="text-[10px] font-black text-slate-400 uppercase">Amount</label><p className="font-bold text-slate-800">{symbol} {viewingExpense.amount}</p></div>
                 <div><label className="text-[10px] font-black text-slate-400 uppercase">Category</label><p className="font-bold text-slate-800">{viewingExpense.category}</p></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
