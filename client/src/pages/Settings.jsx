@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../utils/api';
 import { 
   Save, Building2, Percent, Globe, ShieldCheck, 
-  Loader2, Lock, Eye, EyeOff, AlertCircle 
+  Loader2, Lock, Eye, EyeOff, AlertCircle ,X
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { Package } from 'lucide-react';
