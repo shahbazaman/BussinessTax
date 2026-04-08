@@ -5,7 +5,7 @@ import { AuthContext } from '../context/AuthContext';
 import { 
   LayoutDashboard, FileText, Receipt, Users, 
   Settings, Landmark, ChevronLeft, ChevronRight, LogOut, Menu, X,
-  Package, PieChart 
+  Package, PieChart, BookOpen, ScrollText
 } from 'lucide-react';
 import { Bell } from 'lucide-react';
 const Sidebar = () => {
@@ -55,6 +55,8 @@ useEffect(() => {
     { icon: <Receipt />, label: 'Expenses', path: '/expenses' },
     { icon: <Package />, label: 'Inventory', path: '/inventory' }, 
     { icon: <Landmark />, label: 'Accounts', path: '/accounts' }, 
+    { icon: <BookOpen />, label: 'Ledger', path: '/ledger' },
+    { icon: <ScrollText />, label: 'Tax Reports', path: '/tax-reports' },
     { icon: <PieChart />, label: 'Reports', path: '/reports' }, 
     { icon: <Users />, label: 'Clients', path: '/clients' },
     { icon: <Users />, label: 'Employees', path: '/employees' },

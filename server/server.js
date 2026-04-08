@@ -13,6 +13,7 @@ import employeeRoutes from './routes/employeeRoutes.js';
 import productRoutes from './routes/productRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
+import ledgerRoutes from './routes/ledgerRoutes.js';
 
 dotenv.config();
 
@@ -36,19 +37,16 @@ app.use('/api/accounts', accountRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/ledger', ledgerRoutes);
 app.use('/api/transactions', transactionRoutes);
+
 app.get('/', (req, res) => {
   res.send('BusinessTax API is running...');
 });
 app.get('/health', (req, res) => res.status(200).send('Server is running'));
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });
-try {
-  const rates = await fetchRates();
-} catch (error) {
-  console.log("Rate API down, using static fallback (1 USD = 1)");
-  // fallback logic
-}
