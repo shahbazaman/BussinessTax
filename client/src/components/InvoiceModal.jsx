@@ -306,8 +306,8 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
         <span className="px-3 py-3 text-sm font-black text-slate-500 bg-slate-100 border-r border-slate-200 whitespace-nowrap">REF-</span>
         <input
           type="text"
-          maxLength={3}
-          placeholder="001"
+          maxLength={10}
+          placeholder="enter reference number..."
           className="flex-1 px-3 py-3 bg-transparent text-sm font-black outline-none text-slate-800 w-16"
           value={formData.referenceNumber.replace('REF-', '')}
           onChange={e => {
