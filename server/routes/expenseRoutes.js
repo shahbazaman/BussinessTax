@@ -3,9 +3,39 @@ import Expense from '../models/Expense.js';
 import protect from '../middleware/authMiddleware.js';
 import axios from 'axios';
 import { deleteExpense } from '../controllers/expenseController.js';
+import multer from 'multer';
+import streamifier from 'streamifier';
+import { v2 as cloudinary } from 'cloudinary';
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 const router = express.Router();
+router.post('/upload-receipt', protect, upload.single('receipt'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
 
+    const streamUpload = (buffer) =>
+      new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: 'expense_receipts' },
+          (error, result) => (error ? reject(error) : resolve(result))
+        );
+        streamifier.createReadStream(buffer).pipe(stream);
+      });
+
+    const result = await streamUpload(req.file.buffer);
+    res.json({ receiptUrl: result.secure_url });
+  } catch (err) {
+    console.error('Receipt upload error:', err);
+    res.status(500).json({ message: 'Upload failed' });
+  }
+});
 router.post('/', protect, async (req, res) => {
   try {
     const { 

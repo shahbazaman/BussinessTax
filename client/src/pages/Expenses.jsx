@@ -18,7 +18,8 @@ const Expenses = () => {
   const [viewingExpense, setViewingExpense] = useState(null);
   const categories = ['Software', 'Rent', 'Marketing', 'Travel', 'Salaries', 'Utilities', 'Other'];
   const paymentMethods = ['Bank Transfer', 'Cash', 'Card', 'UPI',  'Check', 'Other'];
-
+  const [receiptMode, setReceiptMode] = useState('url');        // 'url' | 'upload'
+const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [formData, setFormData] = useState({ 
     title: '', 
     amount: '', 
@@ -108,17 +109,38 @@ const Expenses = () => {
       toast.error(err.response?.data?.message || "Failed to save");
     }
   };
+const handleReceiptUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
 
-  const handleCloseModal = () => {
-    setShowModal(false);
-    setEditingId(null);
-    setOtherCategory('');
-    setFormData({ 
-      title: '', amount: '', category: 'Software', currency: 'USD',
-      expenseDate: new Date().toISOString().split('T')[0], receiptUrl: '',
-      paymentMethod: 'Bank Transfer', paidFromAccount: '', notes: ''
+  const form = new FormData();
+  form.append('receipt', file);
+
+  try {
+    setUploadingReceipt(true);
+    const res = await api.post('/expenses/upload-receipt', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
     });
-  };
+    setFormData((prev) => ({ ...prev, receiptUrl: res.data.receiptUrl }));
+    toast.success('Receipt uploaded!');
+  } catch (err) {
+    toast.error('Receipt upload failed');
+  } finally {
+    setUploadingReceipt(false);
+  }
+};
+  const handleCloseModal = () => {
+  setShowModal(false);
+  setEditingId(null);
+  setOtherCategory('');
+  setReceiptMode('url');           
+  setUploadingReceipt(false);     
+  setFormData({ 
+    title: '', amount: '', category: 'Software', currency: 'USD',
+    expenseDate: new Date().toISOString().split('T')[0], receiptUrl: '',
+    paymentMethod: 'Bank Transfer', paidFromAccount: '', notes: ''
+  });
+};
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter(exp => {
@@ -355,14 +377,68 @@ const Expenses = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">Receipt Link</label>
-                  <input 
-                    type="text" placeholder="https://..." 
-                    className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-sm" 
-                    value={formData.receiptUrl}
-                    onChange={(e) => setFormData({...formData, receiptUrl: e.target.value})} 
-                  />
-                </div>
+  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block ml-1">
+    Receipt
+  </label>
+
+  {/* Toggle between URL and file upload */}
+  <div className="flex gap-2 mb-2">
+    <button
+      type="button"
+      onClick={() => setReceiptMode('url')}
+      className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+        receiptMode === 'url'
+          ? 'bg-slate-900 text-white'
+          : 'bg-slate-100 text-slate-500'
+      }`}
+    >
+      URL Link
+    </button>
+    <button
+      type="button"
+      onClick={() => setReceiptMode('upload')}
+      className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${
+        receiptMode === 'upload'
+          ? 'bg-slate-900 text-white'
+          : 'bg-slate-100 text-slate-500'
+      }`}
+    >
+      Upload File
+    </button>
+  </div>
+
+  {receiptMode === 'url' ? (
+    <input
+      type="text"
+      placeholder="https://..."
+      className="w-full p-4 rounded-2xl bg-slate-50 border-none outline-none font-bold text-sm"
+      value={formData.receiptUrl}
+      onChange={(e) => setFormData({ ...formData, receiptUrl: e.target.value })}
+    />
+  ) : (
+    <div className="w-full p-4 rounded-2xl bg-slate-50 space-y-2">
+      <input
+        type="file"
+        accept="image/*,application/pdf"
+        className="text-xs font-bold text-slate-600 w-full"
+        onChange={handleReceiptUpload}
+      />
+      {uploadingReceipt && (
+        <p className="text-xs text-slate-400 font-bold animate-pulse">Uploading...</p>
+      )}
+      {formData.receiptUrl && receiptMode === 'upload' && (
+          <a
+            href={formData.receiptUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-indigo-500 font-bold hover:underline block"
+          >
+            ✓ Receipt uploaded — view it
+          </a>
+        )}
+    </div>
+  )}
+</div>
               </div>
 
               <div>
