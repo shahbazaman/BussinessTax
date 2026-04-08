@@ -195,7 +195,7 @@ const handleChange = (e) => {
                 onChange={handleChange} required
               />
             </div>            
-            <div className="space-y-2">
+            <div className="space-y-2 p-5">
   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
   <select 
     name="category" 

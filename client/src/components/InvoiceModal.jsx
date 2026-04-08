@@ -63,7 +63,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           setFormData(prev => ({
             ...prev,
             [type === 'Sale' ? 'invoiceNumber' : 'purchaseNumber']: res.data.number,
-            referenceNumber: type === 'Purchase' ? `REF-${suffix}` : prev.referenceNumber
+            referenceNumber:''
           }));
         });
       }
@@ -208,7 +208,7 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
                         ...prev,
                         type: t,
                         [t === 'Sale' ? 'invoiceNumber' : 'purchaseNumber']: res.data.number,
-                        referenceNumber: t === 'Purchase' ? `REF-${suffix}` : prev.referenceNumber
+                        referenceNumber: ''
                       }));
                     });
                   }}
