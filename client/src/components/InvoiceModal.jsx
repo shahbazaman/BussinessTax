@@ -311,7 +311,7 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
           className="flex-1 px-3 py-3 bg-transparent text-sm font-black outline-none text-slate-800 w-16"
           value={formData.referenceNumber.replace('REF-', '')}
           onChange={e => {
-            const val = e.target.value.replace(/\D/g, '').slice(0, 3);
+            const val = e.target.value.replace(/\D/g, '').slice(0, 10);
             setFormData({ ...formData, referenceNumber: val ? `REF-${val}` : '' });
           }}
         />
