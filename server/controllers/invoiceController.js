@@ -88,34 +88,29 @@ export const createInvoice = async (req, res) => {
 
 export const updateInvoice = async (req, res) => {
   try {
-    const oldInvoice = await Invoice.findById(req.params.id);
-    if (!oldInvoice) return res.status(404).json({ message: "Invoice not found" });
+    const invoice = await Invoice.findById(req.params.id);
+    if (!invoice) return res.status(404).json({ message: "Invoice not found" });
 
     // Revert stock from old items
-    for (const item of oldInvoice.items) {
-      const revertQty = oldInvoice.type === 'Purchase' ? -item.quantity : item.quantity;
+    for (const item of invoice.items) {
+      const revertQty = invoice.type === 'Purchase' ? -item.quantity : item.quantity;
       await Product.updateOne(
         { _id: item.productId, "variants._id": item.variantId },
         { $inc: { "variants.$.stock": revertQty } }
       );
     }
 
-    const cleanedUpdate = {
+    // Merge updates and trigger calculation hook by using .save()
+    Object.assign(invoice, {
       ...req.body,
-      // Sanitize client — empty string will fail ObjectId cast
       client: (req.body.client && String(req.body.client).trim() !== '') ? req.body.client : undefined,
-      // Preserve original numbers — never overwrite on edit
-      invoiceNumber:   oldInvoice.invoiceNumber,
-      purchaseNumber:  oldInvoice.purchaseNumber,
-      referenceNumber: (req.body.referenceNumber?.trim()) ? req.body.referenceNumber.trim() : undefined,
-    };
+      invoiceNumber: invoice.invoiceNumber, // Preserve original
+      purchaseNumber: invoice.purchaseNumber // Preserve original
+    });
 
-    const updatedInvoice = await Invoice.findByIdAndUpdate(
-      req.params.id,
-      cleanedUpdate,
-      { new: true, runValidators: true }
-    );
+    const updatedInvoice = await invoice.save(); // Totals are recalculated here
 
+    // Apply new stock adjustments
     for (const item of updatedInvoice.items) {
       const adjustment = updatedInvoice.type === 'Purchase' ? item.quantity : -item.quantity;
       await Product.updateOne(

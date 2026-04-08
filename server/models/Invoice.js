@@ -40,32 +40,22 @@ const invoiceSchema = new mongoose.Schema({
   notes:           { type: String },
   paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }
 }, { timestamps: true });
-
 invoiceSchema.pre('save', async function () {
-  // Never store empty strings — they break sparse indexes
-  if (this.referenceNumber === '' || this.referenceNumber == null) {
-    this.referenceNumber = undefined;
-    this.unmarkModified('referenceNumber');
-  }
-  if (this.invoiceNumber === '' || this.invoiceNumber == null) {
-    this.invoiceNumber = undefined;
-    this.unmarkModified('invoiceNumber');
-  }
-  if (this.purchaseNumber === '' || this.purchaseNumber == null) {
-    this.purchaseNumber = undefined;
-    this.unmarkModified('purchaseNumber');
-  }
+  // 1. Cleanup Numbers
+  if (!this.referenceNumber) this.referenceNumber = undefined;
+  if (!this.invoiceNumber) this.invoiceNumber = undefined;
+  if (!this.purchaseNumber) this.purchaseNumber = undefined;
 
+  // 2. Recalculate Totals
   const items = this.items || [];
-
   const calculatedSubtotal = items.reduce((acc, item) => {
     return acc + (Number(item.price || 0) * Number(item.quantity || 0));
   }, 0);
 
   const calculatedTax = calculatedSubtotal * (Number(this.globalTaxRate || 0) / 100);
 
-  this.subtotal   = Number(calculatedSubtotal.toFixed(2));
-  this.taxAmount  = Number(calculatedTax.toFixed(2));
+  this.subtotal = Number(calculatedSubtotal.toFixed(2));
+  this.taxAmount = Number(calculatedTax.toFixed(2));
   this.totalAmount = Number(
     ((this.subtotal + this.taxAmount) - Number(this.discount || 0)).toFixed(2)
   );
