@@ -498,18 +498,31 @@ const Employees = () => {
                     </td>
 
                     {/* Worked */}
-                    <td className="px-8 py-5 font-bold text-slate-700">
-                      {emp.salaryType === 'Daily'
-                        ? `${emp.workingDays} / 1 Day`
-                        : emp.salaryType === 'Weekly'
-                        ? `${emp.workingDays} / 7 Days`
-                        : (() => {
+                    <td className="px-8 py-5">
+                        {(() => {
+                          let worked = emp.workingDays;
+                          let total, color;
+
+                          if (emp.salaryType === 'Daily') {
+                            total = 1;
+                            color = 'bg-orange-50 text-orange-600';
+                          } else if (emp.salaryType === 'Weekly') {
+                            total = 7;
+                            color = 'bg-purple-50 text-purple-600';
+                          } else {
                             const joined = new Date(emp.lastPaymentDate || emp.joiningDate);
-                            const daysInMonth = new Date(joined.getFullYear(), joined.getMonth() + 1, 0).getDate();
-                            return `${emp.workingDays} / ${daysInMonth} Days`;
-                          })()
-                      }
-                    </td>
+                            total = new Date(joined.getFullYear(), joined.getMonth() + 1, 0).getDate();
+                            color = 'bg-blue-50 text-blue-600';
+                          }
+
+                          return (
+                            <div className={`inline-flex items-baseline gap-1 px-3 py-1.5 rounded-xl ${color}`}>
+                              <span className="text-base font-black">{worked}</span>
+                              <span className="text-[10px] font-black uppercase tracking-widest opacity-60">/ {total} days</span>
+                            </div>
+                          );
+                        })()}
+                      </td>
 
                     {/* Pending Wage */}
                     <td className="px-8 py-5 font-black text-slate-900">
