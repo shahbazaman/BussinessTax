@@ -38,22 +38,32 @@ export const getLedger = async (req, res) => {
       .populate('paidIntoAccount', 'bankName')
       .lean();
 
-    const invoiceEntries = invoices.map(inv => ({
-      _id: inv._id,
-      date: inv.invoiceDate || inv.createdAt,
-      description: inv.type === 'Purchase'
-        ? `Purchase: ${inv.clientName || inv.client?.name || 'Vendor'}`
-        : `Invoice: ${inv.clientName || inv.client?.name || 'Customer'}`,
-      reference: inv.invoiceNumber || inv.purchaseNumber || inv.referenceNumber || '',
-      category: inv.type === 'Purchase' ? 'Purchase' : 'Sales',
-      entryType: inv.type === 'Purchase' ? 'debit' : 'credit',
-      amount: Number(inv.totalAmount || inv.grandTotal || 0),
-      account: inv.paidIntoAccount?.bankName || '—',
-      accountId: inv.paidIntoAccount?._id || null,
-      status: inv.status || 'Pending',
-      source: 'invoice',
-      rawType: inv.type === 'Purchase' ? 'expense' : 'income',
-    }));
+const invoiceEntries = invoices.map(inv => {
+  const isSale = inv.type !== 'Purchase';
+  return {
+    _id: inv._id,
+    date: inv.invoiceDate || inv.createdAt,
+    description: isSale
+      ? `Invoice: ${inv.clientName || inv.client?.name || 'Customer'}`
+      : `Purchase: ${inv.clientName || inv.client?.name || 'Vendor'}`,
+    reference: inv.invoiceNumber || inv.purchaseNumber || inv.referenceNumber || '',
+    category: isSale ? 'Sales' : 'Purchase',
+    entryType: isSale ? 'credit' : 'debit',
+    amount: Number(inv.totalAmount || inv.grandTotal || 0),
+    account: inv.paidIntoAccount?.bankName || '—',
+    accountId: inv.paidIntoAccount?._id || null,
+    status: inv.status || 'Pending',
+    source: 'invoice',
+    rawType: isSale ? 'income' : 'expense',
+    // ── Double-entry fields ──
+    debitAccount: isSale
+      ? (inv.paidIntoAccount?.bankName || 'Bank / Cash')   // Asset account increases
+      : 'Purchase / COGS',                                  // Expense account increases
+    creditAccount: isSale
+      ? 'Sales Revenue'                                     // Revenue account increases
+      : (inv.paidIntoAccount?.bankName || 'Bank / Cash'),  // Asset account decreases
+  };
+});
 
     // ---- 2. Fetch Expenses (Debit) ----
     const expenseQuery = { user: userId };
@@ -63,20 +73,23 @@ export const getLedger = async (req, res) => {
       .populate('paidFromAccount', 'bankName')
       .lean();
 
-    const expenseEntries = expenses.map(exp => ({
-      _id: exp._id,
-      date: exp.date || exp.createdAt,
-      description: `Expense: ${exp.title}`,
-      reference: exp.category || '',
-      category: exp.category || 'Other',
-      entryType: 'debit',
-      amount: Number(exp.amount || 0),
-      account: exp.paidFromAccount?.bankName || '—',
-      accountId: exp.paidFromAccount?._id || null,
-      status: exp.status || 'Paid',
-      source: 'expense',
-      rawType: 'expense',
-    }));
+const expenseEntries = expenses.map(exp => ({
+  _id: exp._id,
+  date: exp.date || exp.createdAt,
+  description: `Expense: ${exp.title}`,
+  reference: exp.category || '',
+  category: exp.category || 'Other',
+  entryType: 'debit',
+  amount: Number(exp.amount || 0),
+  account: exp.paidFromAccount?.bankName || '—',
+  accountId: exp.paidFromAccount?._id || null,
+  status: exp.status || 'Paid',
+  source: 'expense',
+  rawType: 'expense',
+  // ── Double-entry fields ──
+  debitAccount: exp.category || 'Expense Account',         // Expense account increases
+  creditAccount: exp.paidFromAccount?.bankName || 'Bank / Cash', // Asset decreases
+}));
 
     // ---- 3. Fetch Internal Transfers ----
     const transQuery = { userId };
@@ -89,36 +102,43 @@ export const getLedger = async (req, res) => {
 
     // Each transfer creates two entries (debit from source, credit to dest)
     const transferEntries = [];
-    transactions.forEach(txn => {
-      transferEntries.push({
-        _id: `${txn._id}_debit`,
-        date: txn.transferDate || txn.createdAt,
-        description: `Transfer to ${txn.toAccount?.bankName || 'Account'}`,
-        reference: txn.description || '',
-        category: 'Transfer',
-        entryType: 'debit',
-        amount: Number(txn.amount || 0),
-        account: txn.fromAccount?.bankName || '—',
-        accountId: txn.fromAccount?._id || null,
-        status: txn.status || 'Completed',
-        source: 'transfer',
-        rawType: 'transfer',
-      });
-      transferEntries.push({
-        _id: `${txn._id}_credit`,
-        date: txn.transferDate || txn.createdAt,
-        description: `Transfer from ${txn.fromAccount?.bankName || 'Account'}`,
-        reference: txn.description || '',
-        category: 'Transfer',
-        entryType: 'credit',
-        amount: Number(txn.amount || 0),
-        account: txn.toAccount?.bankName || '—',
-        accountId: txn.toAccount?._id || null,
-        status: txn.status || 'Completed',
-        source: 'transfer',
-        rawType: 'transfer',
-      });
-    });
+transactions.forEach(txn => {
+  transferEntries.push({
+    _id: `${txn._id}_debit`,
+    date: txn.transferDate || txn.createdAt,
+    description: `Transfer to ${txn.toAccount?.bankName || 'Account'}`,
+    reference: txn.description || '',
+    category: 'Transfer',
+    entryType: 'debit',
+    amount: Number(txn.amount || 0),
+    account: txn.fromAccount?.bankName || '—',
+    accountId: txn.fromAccount?._id || null,
+    status: txn.status || 'Completed',
+    source: 'transfer',
+    rawType: 'transfer',
+    // ── Double-entry fields ──
+    debitAccount: txn.toAccount?.bankName || 'Destination Account',  // Destination increases
+    creditAccount: txn.fromAccount?.bankName || 'Source Account',    // Source decreases
+  });
+  // The credit side row (optional — keep if you want both rows, or remove if you want compact view)
+  transferEntries.push({
+    _id: `${txn._id}_credit`,
+    date: txn.transferDate || txn.createdAt,
+    description: `Transfer from ${txn.fromAccount?.bankName || 'Account'}`,
+    reference: txn.description || '',
+    category: 'Transfer',
+    entryType: 'credit',
+    amount: Number(txn.amount || 0),
+    account: txn.toAccount?.bankName || '—',
+    accountId: txn.toAccount?._id || null,
+    status: txn.status || 'Completed',
+    source: 'transfer',
+    rawType: 'transfer',
+    // ── Double-entry fields ──
+    debitAccount: txn.toAccount?.bankName || 'Destination Account',
+    creditAccount: txn.fromAccount?.bankName || 'Source Account',
+  });
+});
 
     // ---- 4. Merge and filter ----
     let allEntries = [...invoiceEntries, ...expenseEntries, ...transferEntries];

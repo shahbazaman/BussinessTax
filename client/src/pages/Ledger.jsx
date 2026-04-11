@@ -25,19 +25,20 @@ const entryIcon = (entry) => {
 
 // ── CSV export ────────────────────────────────────────────────────────────────
 const exportCSV = (entries, symbol) => {
-  const header = ['Date', 'Description', 'Category', 'Reference', 'Account', 'Type', 'Debit', 'Credit', 'Balance', 'Status'];
-  const rows = [...entries].reverse().map(e => [
-    new Date(e.date).toLocaleDateString(),
-    `"${e.description}"`,
-    e.category,
-    e.reference,
-    e.account,
-    e.entryType === 'credit' ? 'Credit' : 'Debit',
-    e.entryType === 'debit'  ? e.amount.toFixed(2) : '',
-    e.entryType === 'credit' ? e.amount.toFixed(2) : '',
-    e.runningBalance.toFixed(2),
-    e.status,
-  ]);
+  const header = ['Date', 'Description', 'Category', 'Reference', 'Debit Account', 'Credit Account', 'Type', 'Debit', 'Credit', 'Balance', 'Status'];
+const rows = [...entries].reverse().map(e => [
+  new Date(e.date).toLocaleDateString(),
+  `"${e.description}"`,
+  e.category,
+  e.reference,
+  e.debitAccount || '—',   // <-- new
+  e.creditAccount || '—',  // <-- new
+  e.entryType === 'credit' ? 'Credit' : 'Debit',
+  e.entryType === 'debit'  ? e.amount.toFixed(2) : '',
+  e.entryType === 'credit' ? e.amount.toFixed(2) : '',
+  e.runningBalance.toFixed(2),
+  e.status,
+]);
   const csv = [header, ...rows].map(r => r.join(',')).join('\n');
   const blob = new Blob([csv], { type: 'text/csv' });
   const url  = URL.createObjectURL(blob);
@@ -311,8 +312,8 @@ const Ledger = () => {
       {/* ── Ledger Table ── */}
       <div className="bg-white rounded-4xl border border-slate-100 shadow-sm overflow-hidden">
         {/* Table Header */}
-        <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1.2fr_0.8fr] gap-4 px-6 py-3 bg-slate-50/80 border-b border-slate-100">
-          {['Description', 'Date', 'Category', 'Account', 'Debit', 'Credit', 'Balance'].map(h => (
+        <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_1.2fr_0.8fr] gap-4 px-6 py-3 bg-slate-50/80 border-b border-slate-100">
+         {['Description', 'Date', 'Category', 'Dr Account', 'Cr Account', 'Debit', 'Credit', 'Balance'].map(h => (
             <span key={h} className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</span>
           ))}
         </div>
@@ -330,7 +331,7 @@ const Ledger = () => {
           ) : paginated.map((entry, idx) => (
             <div
               key={`${entry._id}-${idx}`}
-              className="px-4 lg:px-6 py-4 hover:bg-slate-50/50 transition-colors lg:grid lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_1.2fr_0.8fr] lg:gap-4 lg:items-center"
+              className="px-4 lg:px-6 py-4 hover:bg-slate-50/50 transition-colors lg:grid lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_1.2fr_0.8fr] lg:gap-4 lg:items-center"
             >
               {/* Description (mobile: full row) */}
               <div className="flex items-center gap-3 mb-2 lg:mb-0">
@@ -363,7 +364,17 @@ const Ledger = () => {
                 </span>
 
                 {/* Account */}
-                <span className="text-slate-500 font-medium truncate">{entry.account}</span>
+                {/* Debit Account */}
+                    <span className="text-slate-600 font-semibold text-xs truncate flex items-center gap-1">
+                      <span className="text-rose-400 font-black text-[10px]">Dr</span>
+                      {entry.debitAccount || '—'}
+                    </span>
+
+                    {/* Credit Account */}
+                    <span className="text-slate-600 font-semibold text-xs truncate flex items-center gap-1">
+                      <span className="text-emerald-500 font-black text-[10px]">Cr</span>
+                      {entry.creditAccount || '—'}
+                    </span>
 
                 {/* Debit */}
                 <span className={`font-black text-sm ${entry.entryType === 'debit' ? 'text-rose-600' : 'text-slate-200'}`}>
