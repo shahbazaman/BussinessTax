@@ -235,11 +235,14 @@ const Employees = () => {
   useEffect(() => { fetchData(); }, []);
 
   const totalPayrollAmount = useMemo(() => {
-    return employees.reduce((sum, emp) => {
-      if (Number(emp.workingDays) === 0 && emp.salaryType === 'Daily') return sum;
-      return sum + computeSalary(emp);
-    }, 0);
-  }, [employees]);
+  return employees
+    .filter(isPaymentDue)
+    .reduce((sum, emp) => sum + computeSalary(emp), 0);
+}, [employees]);
+
+const totalAllEmployees = useMemo(() => {
+  return employees.reduce((sum, emp) => sum + computeSalary(emp), 0);
+}, [employees]);
 
   const filteredEmployees = useMemo(() => {
     return employees.filter(emp => {
@@ -417,10 +420,16 @@ const Employees = () => {
         </div>
         
         <div className="bg-emerald-50 p-4 rounded-3xl flex items-center gap-6 border border-emerald-100 shadow-sm">
-           <div>
-             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Monthly Payout</p>
-             <p className="text-2xl font-black text-slate-900">{symbol}{totalPayrollAmount.toLocaleString()}</p>
-           </div>
+   <div className="flex gap-6">
+     <div>
+       <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Due Now</p>
+       <p className="text-2xl font-black text-slate-900">{symbol}{totalPayrollAmount.toLocaleString()}</p>
+     </div>
+     <div className="border-l border-emerald-200 pl-6">
+       <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Payroll</p>
+       <p className="text-2xl font-black text-slate-400">{symbol}{totalAllEmployees.toLocaleString()}</p>
+     </div>
+   </div>
            <button 
              onClick={() => setShowPayrollModal(true)}
              disabled={totalPayrollAmount === 0}
