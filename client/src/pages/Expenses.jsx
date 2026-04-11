@@ -87,6 +87,18 @@ const [uploadingReceipt, setUploadingReceipt] = useState(false);
         return toast.error("Please specify the category name");
     }
 
+    // Check balance before submitting (client-side pre-check)
+    if (formData.paidFromAccount && !editingId) {
+      const selectedAcc = accounts.find(a => a._id === formData.paidFromAccount);
+      if (selectedAcc && selectedAcc.balance < Number(formData.amount)) {
+        toast.error(
+          `Insufficient balance in "${selectedAcc.bankName}". Available: ${symbol}${selectedAcc.balance.toLocaleString()}`,
+          { position: 'top-center', autoClose: 5000 }
+        );
+        return;
+      }
+    }
+
     try {
       const payload = {
         ...formData,
@@ -97,16 +109,19 @@ const [uploadingReceipt, setUploadingReceipt] = useState(false);
 
       if (editingId) {
         await api.put(`/expenses/${editingId}`, payload);
-        toast.success("Expense updated");
+        toast.success("Expense updated — balance adjusted", { position: 'top-center' });
       } else {
         await api.post('/expenses', payload);
-        toast.success("Expense recorded");
+        toast.success("Expense recorded — amount deducted from account", { position: 'top-center' });
       }
 
       handleCloseModal(); 
       fetchData();
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to save");
+      toast.error(
+        err.response?.data?.message || "Failed to save",
+        { position: 'top-center', autoClose: 5000 }
+      );
     }
   };
 const handleReceiptUpload = async (e) => {

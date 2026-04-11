@@ -307,7 +307,7 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
         <input
           type="text"
           maxLength={10}
-          placeholder="enter reference number..."
+          placeholder="0000000001"
           className="flex-1 px-3 py-3 bg-transparent text-sm font-black outline-none text-slate-800 w-16"
           value={formData.referenceNumber.replace('REF-', '')}
           onChange={e => {
@@ -426,6 +426,47 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
                     <option value="Partially Paid">Partially Paid</option>
                     <option value="Cancelled">Cancelled</option>
                   </select>
+                </div>
+
+                {/* ── Deposit / Pay-from Account ── */}
+                <div className="pt-2 border-t border-slate-100 space-y-2">
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                    {formData.type === 'Sale' ? '💳 Deposit Into Account' : '🏦 Pay From Account'}
+                  </span>
+                  {accounts && accounts.length === 0 ? (
+                    <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold px-4 py-3 rounded-xl">
+                      ⚠️ No bank accounts found. Please add one in Accounts first.
+                    </div>
+                  ) : (
+                    <>
+                      <select
+                        className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-sm font-bold outline-none cursor-pointer"
+                        value={formData.paidIntoAccount}
+                        onChange={e => setFormData({ ...formData, paidIntoAccount: e.target.value })}
+                      >
+                        <option value="">— Select Account —</option>
+                        {(accounts || []).map(acc => (
+                          <option key={acc._id} value={acc._id}>
+                            {acc.bankName} · Balance: {Number(acc.balance).toLocaleString()}
+                          </option>
+                        ))}
+                      </select>
+                      {formData.paidIntoAccount && (() => {
+                        const sel = (accounts || []).find(a => a._id === formData.paidIntoAccount);
+                        if (!sel) return null;
+                        const isLow = formData.type === 'Purchase' && sel.balance < totals.total;
+                        return isLow ? (
+                          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2">
+                            ⚠️ Insufficient balance! Available: {Number(sel.balance).toLocaleString()} · Need: {totals.total.toFixed(2)}
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-50 border border-emerald-100 text-emerald-700 text-xs font-bold px-4 py-2 rounded-xl">
+                            ✓ {sel.bankName} · Available: {Number(sel.balance).toLocaleString()}
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )}
                 </div>
                 <div className="flex justify-between items-center py-4 border-t border-slate-200">
                   <span className="text-lg font-black text-slate-900 uppercase tracking-widest">Grand Total</span>

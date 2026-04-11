@@ -76,13 +76,16 @@ const Invoices = () => {
 
   useEffect(() => { fetchData(); }, []);
 
-  const handleUpdateStatus = async (id, newStatus) => {
+  const handleUpdateStatus = async (id, newStatus, accountId) => {
     try {
-      await api.put(`/invoices/${id}/status`, { status: newStatus });
-      toast.success(`Status updated to ${newStatus}`);
+      await api.put(`/invoices/${id}/status`, { status: newStatus, accountId });
+      toast.success(`Status updated to ${newStatus}`, { position: 'top-center' });
       fetchData();
     } catch (err) {
-      toast.error("Failed to update status");
+      toast.error(
+        err.response?.data?.message || "Failed to update status",
+        { position: 'top-center', autoClose: 5000 }
+      );
     }
   };
 
