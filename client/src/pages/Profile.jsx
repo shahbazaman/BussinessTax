@@ -8,7 +8,7 @@ import {
 import { toast } from 'react-toastify';
 
 const Profile = () => {
-  const { user, setUser } = useContext(AuthContext);
+  const { user, setUser, updateUser } = useContext(AuthContext);
   const [fetching, setFetching] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -58,7 +58,7 @@ const Profile = () => {
       });
       const newPhoto = res.data.profilePhoto;
       setFormData(prev => ({ ...prev, profilePhoto: newPhoto }));
-      setUser(prev => ({ ...prev, profilePhoto: newPhoto })); // update sidebar instantly
+      updateUser({ profilePhoto: newPhoto }); // update sidebar + persist to localStorage
       toast.success('Profile photo updated!');
     } catch {
       toast.error('Photo upload failed');
@@ -72,7 +72,7 @@ const Profile = () => {
     setSaving(true);
     try {
       await api.put('/auth/update-settings', formData);
-      setUser(prev => ({ ...prev, name: formData.name, profilePhoto: formData.profilePhoto }));
+      updateUser({ name: formData.name, profilePhoto: formData.profilePhoto });
       toast.success('Profile saved!');
     } catch {
       toast.error('Save failed');

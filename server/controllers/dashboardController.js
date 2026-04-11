@@ -84,7 +84,7 @@ export const getDashboardStats = async (req, res) => {
 
     res.json({
       customers:     clientsCount,
-      vendors:       0,
+      expensesCount: expenses.length,
       invoiceCount,
       bills:         unpaidBillsCount,
       totalIncome:   Number(totalIncome.toFixed(2)),

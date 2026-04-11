@@ -32,7 +32,13 @@ export const AuthProvider = ({ children }) => {
     window.dispatchEvent(new Event('authChange')); 
     return data;
   };
-
+const updateUser = (updatedFields) => {
+    setUser(prev => {
+      const merged = { ...prev, ...updatedFields };
+      localStorage.setItem('userInfo', JSON.stringify(merged));
+      return merged;
+    });
+  };
   const logout = () => {
     localStorage.removeItem('userInfo');
     localStorage.removeItem('token'); 
@@ -41,7 +47,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, register, login, logout, loading }}>
+    <AuthContext.Provider value={{ user, setUser, updateUser, register, login, logout, loading }}>
       {!loading && children} 
     </AuthContext.Provider>
   );

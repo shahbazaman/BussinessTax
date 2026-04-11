@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Landmark, Receipt, ArrowUpRight, ArrowDownRight, Calculator, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import api from '../utils/api';
 import { CurrencyContext } from '../context/CurrencyContext';
 import { toast } from 'react-toastify';
@@ -43,6 +45,62 @@ const TaxReports = () => {
   const fmt = (val) =>
     `${symbol}${Number(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const today = new Date().toLocaleDateString();
+
+    // Header
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Tax Report', 14, 20);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100);
+    doc.text(`Generated: ${today}`, 14, 28);
+
+    // Summary boxes
+    doc.setFontSize(11);
+    doc.setTextColor(0);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Summary', 14, 42);
+    autoTable(doc, {
+      startY: 46,
+      head: [['Item', 'Amount']],
+      body: [
+        ['Tax Collected (from Sales)', fmt(taxCollected)],
+        ['Tax Deductible (15% on Expenses)', fmt(taxDeductible)],
+        ['Net Tax Owed', fmt(Math.abs(netTaxOwed))],
+      ],
+      styles: { fontSize: 10, fontStyle: 'bold' },
+      headStyles: { fillColor: [15, 23, 42] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+    });
+
+    // Invoice breakdown table
+    const invoiceSales = invoices.filter(inv => inv.type === 'Sale');
+    if (invoiceSales.length > 0) {
+      doc.setFont('helvetica', 'bold');
+      doc.text('Invoice Tax Breakdown', 14, doc.lastAutoTable.finalY + 14);
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 18,
+        head: [['Invoice No.', 'Client', 'Subtotal', 'Tax Rate', 'Tax Amount']],
+        body: invoiceSales.map(inv => [
+          inv.invoiceNumber || '—',
+          inv.clientName || inv.client?.name || 'N/A',
+          fmt(inv.subtotal),
+          `${inv.globalTaxRate || 0}%`,
+          fmt(inv.taxAmount),
+        ]),
+        styles: { fontSize: 9 },
+        headStyles: { fillColor: [79, 70, 229] },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+      });
+    }
+
+    doc.save(`Tax-Report-${today.replace(/\//g, '-')}.pdf`);
+    toast.success('Tax report exported!', { position: 'top-center' });
+  };
+
   if (loading) return (
     <div className="flex justify-center items-center h-screen bg-slate-50">
       <div className="animate-pulse text-slate-400 font-black tracking-widest uppercase text-sm">
@@ -59,9 +117,12 @@ const TaxReports = () => {
           <h1 className="text-3xl font-black text-slate-900">Tax Reports</h1>
           <p className="text-slate-500 font-medium text-sm">Quarterly breakdown of your tax position.</p>
         </div>
-        <button className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all text-sm">
-          <Calculator size={18} /> Export for Accountant
-        </button>
+        <button
+        onClick={handleExportPDF}
+        className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-800 transition-all text-sm"
+      >
+        <Download size={18} /> Export for Accountant
+      </button>
       </div>
 
       {/* Summary Cards */}

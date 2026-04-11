@@ -283,7 +283,7 @@ const handleDeleteAccount = (accountId) => {
         {/* ── Summary Stats ── */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard label="Customers"       value={stats?.customers}    icon={<Users size={20} />}     color="bg-blue-500"    />
-          <StatCard label="Vendors"         value={stats?.vendors}      icon={<UserCheck size={20} />} color="bg-emerald-500" />
+          <StatCard label="Expenses" value={stats?.expensesCount} icon={<UserCheck size={20} />} color="bg-emerald-500" />
           <StatCard label="Active Invoices" value={stats?.invoiceCount} icon={<FileCheck size={20} />} color="bg-amber-500"   />
           <StatCard label="Unpaid Bills"    value={stats?.bills}        icon={<Receipt size={20} />}   color="bg-rose-500"    />
         </div>
@@ -314,16 +314,25 @@ const handleDeleteAccount = (accountId) => {
 
         {/* ── Tax & Take-Home ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-slate-900 p-6 rounded-[2.5rem] border border-slate-800 shadow-xl relative overflow-hidden group">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all" />
-            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-              Projected Tax ({(TAX_RATE * 100).toFixed(0)}%)
-            </p>
-            <h3 className="text-3xl font-black text-white mt-1">
-              {currencySymbol}{estimatedTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </h3>
-            <p className="text-slate-400 text-[10px] mt-2 italic">*Estimated based on current net profit</p>
-          </div>
+          <div className={`p-6 rounded-[2.5rem] border shadow-xl relative overflow-hidden group ${(stats?.netProfit ?? 0) <= 0 ? 'bg-orange-950 border-orange-800' : 'bg-slate-900 border-slate-800'}`}>
+  <div className="absolute -right-4 -top-4 w-24 h-24 bg-blue-500/10 rounded-full blur-2xl group-hover:bg-blue-500/20 transition-all" />
+  <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+    Projected Tax ({(TAX_RATE * 100).toFixed(0)}%)
+  </p>
+  <h3 className="text-3xl font-black text-white mt-1">
+    {currencySymbol}{estimatedTax.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+  </h3>
+  {(stats?.netProfit ?? 0) <= 0 ? (
+    <div className="mt-3 flex items-start gap-2 bg-orange-900/50 border border-orange-700 rounded-xl px-3 py-2">
+      <span className="text-orange-400 text-sm mt-0.5">⚠️</span>
+      <p className="text-orange-300 text-[10px] font-bold leading-tight">
+        Expenses exceed income by {currencySymbol}{Math.abs(stats?.netProfit ?? 0).toLocaleString()}. No tax due, but review your spending.
+      </p>
+    </div>
+  ) : (
+    <p className="text-slate-400 text-[10px] mt-2 italic">*Estimated based on current net profit</p>
+  )}
+</div>
           <div className="bg-white p-6 rounded-[2.5rem] border-2 border-emerald-500 shadow-sm">
             <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">True Take-Home Pay</p>
             <h3 className="text-3xl font-black text-slate-800 mt-1">
