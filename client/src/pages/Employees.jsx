@@ -499,11 +499,15 @@ const Employees = () => {
 
                     {/* Worked */}
                     <td className="px-8 py-5 font-bold text-slate-700">
-                      {emp.salaryType === 'Daily' 
-                        ? `${emp.workingDays} Days`
+                      {emp.salaryType === 'Daily'
+                        ? `${emp.workingDays} / 1 Day`
                         : emp.salaryType === 'Weekly'
-                        ? <span className="text-purple-600 text-xs font-black">7-day cycle</span>
-                        : <span className="text-blue-600 text-xs font-black">Monthly</span>
+                        ? `${emp.workingDays} / 7 Days`
+                        : (() => {
+                            const joined = new Date(emp.lastPaymentDate || emp.joiningDate);
+                            const daysInMonth = new Date(joined.getFullYear(), joined.getMonth() + 1, 0).getDate();
+                            return `${emp.workingDays} / ${daysInMonth} Days`;
+                          })()
                       }
                     </td>
 
