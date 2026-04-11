@@ -16,7 +16,6 @@ import { AuthContext } from '../context/AuthContext';
  * Returns the cycle length in days for a given salaryType.
  * Monthly ≈ 30 days,  Weekly = 7 days,  Daily = 1 day.
  */
-const { user } = useContext(AuthContext);
 const getCycleDays = (salaryType) => {
   if (salaryType === 'Weekly') return 7;
   if (salaryType === 'Daily') return 1;
@@ -61,7 +60,7 @@ const computeSalary = (emp) => {
 
 // ─── Payment Modal ──────────────────────────────────────────────────────────
 
-const PaymentModal = ({ employee, accounts, symbol, onClose, onPaid }) => {
+const PaymentModal = ({ employee, accounts, symbol, businessName, onClose, onPaid }) => {
   const [selectedAccountId, setSelectedAccountId] = useState(
     accounts.length > 0 ? accounts[0]._id : ''
   );
@@ -219,6 +218,7 @@ const Employees = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const { symbol } = useContext(CurrencyContext);
+  const { user } = useContext(AuthContext);
   const [lastSlip, setLastSlip] = useState(null);
   const slipRef = React.useRef();
 
@@ -623,12 +623,13 @@ const downloadSlip = async () => {
       {/* ── INDIVIDUAL PAYMENT MODAL ─────────────────────────────── */}
       {payingEmployee && (
         <PaymentModal
-          employee={payingEmployee}
-          accounts={accounts}
-          symbol={symbol}
-          onClose={() => setPayingEmployee(null)}
-          onPaid={handlePaymentDone}
-        />
+        employee={payingEmployee}
+        accounts={accounts}
+        symbol={symbol}
+        businessName={user?.businessName || user?.name || 'Your Business'}
+        onClose={() => setPayingEmployee(null)}
+        onPaid={handlePaymentDone}
+      />
       )}
 
       {/* ── PAYROLL REVIEW MODAL (Pay All) ──────────────────────── */}
