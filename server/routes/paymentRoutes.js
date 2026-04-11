@@ -18,7 +18,6 @@ router.post('/create-order', auth, async (req, res) => {
   try {
     const { amount, currency } = req.body; 
     const finalAmount = Math.round(Number(amount) * 100);
-console.log("SENDING TO RAZORPAY:", finalAmount); // Check your Render logs for this!
 
 const options = {
   amount: finalAmount,

@@ -1,9 +1,7 @@
 import axios from 'axios';
 
-// 1. Sanitize the Base URL (Removes accidental double slashes)
 const getBaseURL = () => {
   let url = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-  // If the user added a trailing slash in Vercel settings, remove it to prevent //api/auth
   return url.endsWith('/') ? url.slice(0, -1) : url;
 };
 
@@ -14,7 +12,6 @@ const api = axios.create({
   }
 });
 
-// 2. Interceptor: Request (Inject Token)
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -25,8 +22,8 @@ api.interceptors.request.use(
   },
   (error) => Promise.reject(error)
 );
+const SKIP_AUTO_LOGOUT_URLS = ['/auth/update-password'];
 
-// 3. Interceptor: Response (Global Error & Auto-Logout)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -34,10 +31,22 @@ api.interceptors.response.use(
 
     // Handle 401 Unauthorized (Expired or Invalid Token)
     if (error.response?.status === 401 && !originalRequest._retry) {
+      
+      // Check if this 401 came from a route that uses 401 for its own logic
+      const isSkippedUrl = SKIP_AUTO_LOGOUT_URLS.some(url =>
+        originalRequest.url?.includes(url)
+      );
+
+      if (isSkippedUrl) {
+        // Let the calling component handle this error normally (e.g. "wrong password")
+        return Promise.reject(error);
+      }
+
       console.warn("Unauthorized/Expired session. Redirecting to login...");
       
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('userInfo');
       
       // Prevent infinite redirect loops
       if (window.location.pathname !== '/login') {
