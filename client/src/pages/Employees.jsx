@@ -85,30 +85,30 @@ const PaymentModal = ({ employee, accounts, symbol, onClose, onPaid }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-[2.5rem] w-full max-w-md shadow-2xl border border-slate-100 overflow-hidden">
+    <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl border border-slate-100 overflow-hidden my-auto">
         {/* Header */}
-        <div className="bg-linear-to-br from-emerald-500 to-teal-600 p-8 text-white relative">
+        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 text-white relative">
           <button
             onClick={onClose}
             className="absolute top-5 right-5 p-2 bg-white/20 rounded-xl hover:bg-white/30 transition-all"
           >
             <X size={16} />
           </button>
-          <div className="h-14 w-14 bg-white/20 rounded-2xl flex items-center justify-center mb-4">
-            <BanknoteIcon size={28} />
+          <div className="h-10 w-10 bg-white/20 rounded-xl flex items-center justify-center mb-3">
+            <BanknoteIcon size={20} />
           </div>
-          <h3 className="text-xl font-black">Process Payment</h3>
-          <p className="text-emerald-100 text-sm mt-1">{employee.name} • {employee.salaryType} Pay</p>
+          <h3 className="text-lg font-black">Process Payment</h3>
+          <p className="text-emerald-100 text-xs mt-0.5">{employee.name} • {employee.salaryType} Pay</p>
         </div>
 
         {/* Body */}
-        <div className="p-8 space-y-6">
+        <div className="p-5 space-y-4">
           {/* Amount due */}
-          <div className="bg-emerald-50 rounded-2xl p-5 flex items-center justify-between border border-emerald-100">
-            <div>
-              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Amount Due</p>
-              <p className="text-3xl font-black text-slate-900 mt-1">{symbol}{amount.toLocaleString()}</p>
+          <div className="bg-emerald-50 rounded-2xl p-4 flex items-center justify-between border border-emerald-100">
+          <div>
+            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Amount Due</p>
+            <p className="text-2xl font-black text-slate-900 mt-0.5">{symbol}{amount.toLocaleString()}</p>
             </div>
             <div className="text-right text-xs text-slate-400 font-medium">
               {employee.salaryType === 'Daily' 
@@ -154,7 +154,7 @@ const PaymentModal = ({ employee, accounts, symbol, onClose, onPaid }) => {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-1">
             <button
               onClick={onClose}
               className="flex-1 py-4 font-bold text-slate-400 hover:text-slate-600 transition-colors"
