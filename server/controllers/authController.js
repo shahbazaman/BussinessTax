@@ -144,8 +144,9 @@ export const updatePassword = async (req, res) => {
     if (!isMatch) {
       return res.status(401).json({ message: "Current password is incorrect" });
     }
-    const salt = await bcrypt.genSalt(10);
-    user.password = await bcrypt.hash(newPassword, salt);
+    // Assign plain text — the User model's pre('save') hook will hash it automatically.
+    // Do NOT manually bcrypt here, or the password will be double-hashed in MongoDB.
+    user.password = newPassword;
     await user.save();
     res.status(200).json({ message: "Password updated successfully" });
   } catch (error) {
