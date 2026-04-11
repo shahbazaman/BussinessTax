@@ -173,57 +173,104 @@ export const payEmployee = async (req, res) => {
   }
 };
 
-// @desc    Process payroll for ALL employees and reset month
+// Helper — mirrors the frontend isPaymentDue logic
+const getCycleDays = (salaryType) => {
+  if (salaryType === 'Weekly') return 7;
+  if (salaryType === 'Daily') return 1;
+  return 30;
+};
+
+const isPaymentDue = (emp) => {
+  const cycleStart = emp.lastPaymentDate
+    ? new Date(emp.lastPaymentDate)
+    : new Date(emp.joiningDate);
+  const dueDate = new Date(cycleStart);
+  dueDate.setDate(dueDate.getDate() + getCycleDays(emp.salaryType));
+  return new Date() >= dueDate;
+};
+
 export const closeMonth = async (req, res) => {
   try {
     const userId = req.user._id;
-    const { accountId } = req.body; 
+    const { accountId } = req.body;
     if (!accountId) {
       return res.status(400).json({ message: "Please select a bank account for payment." });
     }
+
     const sourceAccount = await Account.findOne({ _id: accountId, userId });
     if (!sourceAccount) {
       return res.status(404).json({ message: "Selected account not found." });
     }
-    const employees = await Employee.find({ user: userId, status: 'Active' });
-    const totalPayroll = employees.reduce((sum, emp) => {
-      const amount = emp.salaryType === 'Daily' 
-      ? (Number(emp.workingDays) * Number(emp.dailyRate))
-      : Number(emp.dailyRate);
-      return sum + amount;
-    }, 0);
+
+    const allEmployees = await Employee.find({ user: userId, status: 'Active' });
+
+    // Only process employees whose cycle is actually due
+    const dueEmployees = allEmployees.filter(isPaymentDue);
+
+    if (dueEmployees.length === 0) {
+      return res.status(400).json({ message: "No employees have a payment due right now." });
+    }
+
+    // Compute individual amounts
+    const payrollItems = dueEmployees.map(emp => ({
+      emp,
+      amount: emp.salaryType === 'Daily'
+        ? Number(emp.workingDays) * Number(emp.dailyRate)
+        : Number(emp.dailyRate)
+    }));
+
+    const totalPayroll = payrollItems.reduce((sum, item) => sum + item.amount, 0);
 
     if (totalPayroll <= 0) {
       return res.status(400).json({ message: "No pending wages to process." });
     }
 
     if (sourceAccount.balance < totalPayroll) {
-      return res.status(400).json({ 
-        message: `Insufficient Funds: Needs ${totalPayroll}, but only ${sourceAccount.balance} available.` 
+      return res.status(400).json({
+        message: `Insufficient funds. Need ${totalPayroll}, but only ${sourceAccount.balance} available.`
       });
     }
 
-    await Transaction.create({
-      userId,
-      fromAccount: sourceAccount._id,
-      toAccount: sourceAccount._id, 
-      amount: totalPayroll,
-      category: 'Salaries',
-      description: `Payroll: ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`,
-      status: 'Completed',
-      type: 'Expense'
-    });
+    const now = new Date();
+    const monthLabel = now.toLocaleString('default', { month: 'long', year: 'numeric' });
 
+    // Create one transaction per employee
+    await Promise.all(
+      payrollItems.map(({ emp, amount }) =>
+        Transaction.create({
+          userId,
+          fromAccount: sourceAccount._id,
+          toAccount: sourceAccount._id,
+          amount,
+          category: 'Salaries',
+          description: `Salary paid to ${emp.name} (${emp.salaryType}) — ${monthLabel}`,
+          status: 'Completed',
+          type: 'Expense'
+        })
+      )
+    );
+
+    // Deduct total from account
     sourceAccount.balance -= totalPayroll;
     await sourceAccount.save();
 
-    const now = new Date();
-    await Employee.updateMany(
-      { user: userId }, 
-      { $set: { workingDays: 0, lastAttendanceDate: null, lastPaymentDate: now } }
+    // Reset only the due employees
+    await Promise.all(
+      dueEmployees.map(emp => {
+        emp.workingDays = 0;
+        emp.lastAttendanceDate = null;
+        emp.lastPaymentDate = now;
+        return emp.save();
+      })
     );
 
-    res.json({ success: true, message: "Payroll processed successfully!", payout: totalPayroll });
+    res.json({
+      success: true,
+      message: `Payroll processed for ${dueEmployees.length} employee(s).`,
+      payout: totalPayroll,
+      paidCount: dueEmployees.length,
+      skippedCount: allEmployees.length - dueEmployees.length
+    });
   } catch (error) {
     res.status(500).json({ message: "Server error: " + error.message });
   }
