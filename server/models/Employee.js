@@ -32,31 +32,17 @@ const employeeSchema = new mongoose.Schema({
     required: true,
     lowercase: true 
   },
-  phone: { 
-    type: String
-  },
-  contactNumber: { 
-    type: String,
-  },
-  homeAddress: { 
-    type: String,
-  },
-  emergencyContact: { 
-    type: String 
-  },
+  phone: { type: String },
+  contactNumber: { type: String },
+  homeAddress: { type: String },
+  emergencyContact: { type: String },
   verificationIdType: { 
     type: String,
     enum: ['National ID', 'Passport', 'Driving License', 'Voter ID', 'Aadhaar Card', 'PAN Card', 'Social Security', 'Birth Certificate', 'Other'],
     default: 'National ID'
   },
-  idNumber: {
-    type: String,
-    trim: true
-  },
-  role: { 
-    type: String, 
-    required: true 
-  }, 
+  idNumber: { type: String, trim: true },
+  role: { type: String, required: true }, 
   employmentType: { 
     type: String, 
     enum: ['Full Time', 'Part Time', 'Contract'], 
@@ -72,19 +58,10 @@ const employeeSchema = new mongoose.Schema({
     enum: ['Active', 'On Leave', 'Terminated'], 
     default: 'Active' 
   },
-  // --- Financial Logic ---
-  dailyRate: { 
-    type: Number, 
-    required: true 
-  },
-  workingDays: { 
-    type: Number, 
-    default: 0 
-  },
-  lastAttendanceDate: { 
-    type: Date, 
-    default: null 
-  },
+  dailyRate: { type: Number, required: true },
+  workingDays: { type: Number, default: 0 },
+  lastAttendanceDate: { type: Date, default: null },
+  lastPaymentDate: { type: Date, default: null },
   bankDetails: {
     bankName: { type: String },
     accountNumber: { type: String },

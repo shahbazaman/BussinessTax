@@ -8,7 +8,8 @@ import {
   closeMonth, 
   updateEmployee, 
   deleteEmployee,
-  getNextEmployeeId
+  getNextEmployeeId,
+  payEmployee
 } from '../controllers/employeeController.js';
 
 router.route('/')
@@ -20,4 +21,6 @@ router.route('/:id')
   .put(protect, updateEmployee) 
   .delete(protect, deleteEmployee);
 router.put('/:id/attendance', protect, updateAttendance);
+router.post('/:id/pay', protect, payEmployee);
+
 export default router;

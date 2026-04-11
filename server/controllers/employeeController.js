@@ -55,17 +55,16 @@ export const addEmployee = async (req, res) => {
 // @desc    Update employee profile & handle nested bank details
 export const updateEmployee = async (req, res) => {
   try {
-
     const { bankName, accountNumber, ifscCode, ...otherData } = req.body;
 
-const updateData = {
-  ...otherData,
-  bankDetails: {
-    bankName: bankName,
-    accountNumber: accountNumber,
-    ifscCode: ifscCode
-  }
-};
+    const updateData = {
+      ...otherData,
+      bankDetails: {
+        bankName: bankName,
+        accountNumber: accountNumber,
+        ifscCode: ifscCode
+      }
+    };
 
     const employee = await Employee.findOneAndUpdate(
       { _id: req.params.id, user: req.user._id },
@@ -101,7 +100,80 @@ export const updateAttendance = async (req, res) => {
   }
 };
 
-// @desc    Process payroll and reset month
+/**
+ * @desc  Pay a single employee — deducts from chosen account, records transaction,
+ *        resets workingDays to 0, and stamps lastPaymentDate = now.
+ * @route POST /api/employees/:id/pay
+ */
+export const payEmployee = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { accountId } = req.body;
+
+    if (!accountId) {
+      return res.status(400).json({ message: "Please select a bank account for payment." });
+    }
+
+    const employee = await Employee.findOne({ _id: req.params.id, user: userId });
+    if (!employee) return res.status(404).json({ message: "Employee not found." });
+
+    const account = await Account.findOne({ _id: accountId, userId });
+    if (!account) return res.status(404).json({ message: "Selected account not found." });
+
+    // Calculate the salary amount due
+    let amount = 0;
+    if (employee.salaryType === 'Daily') {
+      amount = Number(employee.workingDays) * Number(employee.dailyRate);
+    } else if (employee.salaryType === 'Weekly') {
+      amount = Number(employee.dailyRate); // dailyRate stores the weekly pay rate
+    } else {
+      // Monthly
+      amount = Number(employee.dailyRate); // dailyRate stores the monthly pay rate
+    }
+
+    if (amount <= 0) {
+      return res.status(400).json({ message: "No payable amount for this employee." });
+    }
+
+    if (account.balance < amount) {
+      return res.status(400).json({ 
+        message: `Insufficient funds. Need ${amount}, have ${account.balance}.` 
+      });
+    }
+
+    // Deduct from account
+    account.balance -= amount;
+    await account.save();
+
+    // Record transaction
+    await Transaction.create({
+      userId,
+      fromAccount: account._id,
+      toAccount: account._id,
+      amount,
+      category: 'Salaries',
+      description: `Salary paid to ${employee.name} (${employee.salaryType}) — ${new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}`,
+      status: 'Completed',
+      type: 'Expense'
+    });
+
+    // Reset working days and stamp payment date
+    employee.workingDays = 0;
+    employee.lastPaymentDate = new Date();
+    await employee.save();
+
+    res.json({ 
+      success: true, 
+      message: `Payment of ${amount} processed for ${employee.name}.`,
+      payout: amount,
+      employee 
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error: " + error.message });
+  }
+};
+
+// @desc    Process payroll for ALL employees and reset month
 export const closeMonth = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -117,8 +189,6 @@ export const closeMonth = async (req, res) => {
     const totalPayroll = employees.reduce((sum, emp) => {
       const amount = emp.salaryType === 'Daily' 
       ? (Number(emp.workingDays) * Number(emp.dailyRate))
-      : emp.salaryType === 'Weekly'
-      ? (Number(emp.dailyRate) * 4)
       : Number(emp.dailyRate);
       return sum + amount;
     }, 0);
@@ -133,7 +203,6 @@ export const closeMonth = async (req, res) => {
       });
     }
 
-    // Create the expense record
     await Transaction.create({
       userId,
       fromAccount: sourceAccount._id,
@@ -147,7 +216,12 @@ export const closeMonth = async (req, res) => {
 
     sourceAccount.balance -= totalPayroll;
     await sourceAccount.save();
-  await Employee.updateMany({ user: userId }, { $set: { workingDays: 0, lastAttendanceDate: null } });
+
+    const now = new Date();
+    await Employee.updateMany(
+      { user: userId }, 
+      { $set: { workingDays: 0, lastAttendanceDate: null, lastPaymentDate: now } }
+    );
 
     res.json({ success: true, message: "Payroll processed successfully!", payout: totalPayroll });
   } catch (error) {
@@ -165,6 +239,7 @@ export const deleteEmployee = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 export const getNextEmployeeId = async (req, res) => {
   try {
     const prefix = 'EMP-';
