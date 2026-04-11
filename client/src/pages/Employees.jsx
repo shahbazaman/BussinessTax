@@ -7,13 +7,16 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { CurrencyContext } from '../context/CurrencyContext';
-
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
+import { AuthContext } from '../context/AuthContext';
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 /**
  * Returns the cycle length in days for a given salaryType.
  * Monthly ≈ 30 days,  Weekly = 7 days,  Daily = 1 day.
  */
+const { user } = useContext(AuthContext);
 const getCycleDays = (salaryType) => {
   if (salaryType === 'Weekly') return 7;
   if (salaryType === 'Daily') return 1;
@@ -73,9 +76,11 @@ const PaymentModal = ({ employee, accounts, symbol, onClose, onPaid }) => {
     }
     setLoading(true);
     try {
-      const res = await api.post(`/employees/${employee._id}/pay`, { accountId: selectedAccountId });
-      toast.success(res.data.message || "Payment processed!");
-      onPaid(res.data.employee);
+      const workedDaysSnapshot = employee.workingDays; // capture BEFORE reset
+const res = await api.post(`/employees/${employee._id}/pay`, { accountId: selectedAccountId });
+const chosenAccount = accounts.find(a => a._id === selectedAccountId);
+toast.success(res.data.message || "Payment processed!");
+onPaid(res.data.employee, res.data.payout, chosenAccount?.bankName || 'N/A', workedDaysSnapshot);
       onClose();
     } catch (err) {
       toast.error(err.response?.data?.message || "Payment failed");
@@ -214,6 +219,8 @@ const Employees = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('All');
   const { symbol } = useContext(CurrencyContext);
+  const [lastSlip, setLastSlip] = useState(null);
+  const slipRef = React.useRef();
 
   const fetchData = async () => {
     try {
@@ -330,11 +337,17 @@ const totalAllEmployees = useMemo(() => {
   };
 
   // Called after a successful individual payment
-  const handlePaymentDone = (updatedEmployee) => {
-    setEmployees(prev =>
-      prev.map(e => e._id === updatedEmployee._id ? updatedEmployee : e)
-    );
-  };
+  const handlePaymentDone = (updatedEmployee, paidAmount, accountName, workedDays) => {
+  setEmployees(prev =>
+    prev.map(e => e._id === updatedEmployee._id ? updatedEmployee : e)
+  );
+  setLastSlip({
+    employee: { ...updatedEmployee, workingDays: workedDays }, // restore snapshot
+    amount: paidAmount,
+    accountName,
+    paidDate: new Date(),
+  });
+};
 
   const openEditModal = (emp) => {
     setFormData({ 
@@ -409,7 +422,21 @@ const totalAllEmployees = useMemo(() => {
       <Loader2 className="animate-spin text-blue-600" size={40}/>
     </div>
   );
-
+const downloadSlip = async () => {
+  const element = slipRef.current;
+  if (!element) return;
+  element.style.display = 'block';
+  const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+  element.style.display = 'none';
+  const imgData = canvas.toDataURL('image/png');
+  const pdf = new jsPDF('p', 'mm', 'a4');
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = (canvas.height * pageWidth) / canvas.width;
+  pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+  const empName = lastSlip.employee.name.replace(/\s+/g, '_');
+  const month = lastSlip.paidDate.toLocaleString('default', { month: 'long', year: 'numeric' }).replace(' ', '_');
+  pdf.save(`SalarySlip_${empName}_${month}.pdf`);
+};
   return (
     <div className="p-4 md:p-8 space-y-8 bg-slate-50 min-h-screen">
       {/* Header & Payroll Summary */}
@@ -777,6 +804,168 @@ const totalAllEmployees = useMemo(() => {
           </div>
         </div>
       )}
+    {/* ── SALARY SLIP DOWNLOAD BUTTON ── */}
+      {lastSlip && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2">
+          <button
+            onClick={downloadSlip}
+            className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all"
+          >
+            <Receipt size={16} /> Download Salary Slip — {lastSlip.employee.name}
+          </button>
+          <button
+            onClick={() => setLastSlip(null)}
+            className="p-3 bg-white text-slate-400 rounded-2xl shadow-2xl hover:text-rose-500 transition-all border border-slate-100"
+          >
+            <X size={14} />
+          </button>
+        </div>    
+      )}
+
+      {/* ── HIDDEN SALARY SLIP TEMPLATE ── */}
+      <div ref={slipRef} style={{ display: 'none', width: '794px', fontFamily: 'Arial, sans-serif', backgroundColor: '#fff', padding: '0' }}>
+        {lastSlip && (() => {
+          const { employee: emp, amount, accountName, paidDate } = lastSlip;
+          const monthLabel = paidDate.toLocaleString('default', { month: 'long', year: 'numeric' });
+          const slipId = `SLIP-${emp.employeeId}-${paidDate.getFullYear()}${String(paidDate.getMonth()+1).padStart(2,'0')}`;
+          return (
+            <div style={{ padding: '48px', backgroundColor: '#fff' }}>
+
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', paddingBottom: '24px', borderBottom: '3px solid #0f172a' }}>
+                <div>
+                  <div style={{ fontSize: '24px', fontWeight: '900', color: '#0f172a', letterSpacing: '-0.5px' }}>
+                    SALARY SLIP
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', fontWeight: '600' }}>
+                    {monthLabel}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '2px' }}>
+                    Ref: {slipId}
+                  </div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontSize: '20px', fontWeight: '900', color: '#0f172a' }}>
+                    {user?.businessName || user?.name || 'Your Business'}
+                  </div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                    Salary processed on {paidDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Employee Info */}
+              <div style={{ backgroundColor: '#f8fafc', borderRadius: '16px', padding: '24px', marginBottom: '24px' }}>
+                <div style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '16px' }}>
+                  Employee Details
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                  {[
+                    ['Full Name', emp.name],
+                    ['Employee ID', emp.employeeId || '—'],
+                    ['Department', emp.department || '—'],
+                    ['Designation', emp.role || '—'],
+                    ['Employment Type', emp.employmentType || '—'],
+                    ['Joining Date', new Date(emp.joiningDate).toLocaleDateString('en-IN')],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <div style={{ fontSize: '9px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#0f172a', marginTop: '2px' }}>{value}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Earnings Table */}
+              <div style={{ marginBottom: '24px' }}>
+                <div style={{ fontSize: '10px', fontWeight: '900', color: '#94a3b8', letterSpacing: '1.5px', textTransform: 'uppercase', marginBottom: '12px' }}>
+                  Earnings Breakdown
+                </div>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#0f172a' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '10px', fontWeight: '700', color: '#fff', letterSpacing: '1px', textTransform: 'uppercase', borderRadius: '8px 0 0 8px' }}>Description</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '10px', fontWeight: '700', color: '#fff', letterSpacing: '1px', textTransform: 'uppercase' }}>Type</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '10px', fontWeight: '700', color: '#fff', letterSpacing: '1px', textTransform: 'uppercase' }}>Days / Cycle</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '10px', fontWeight: '700', color: '#fff', letterSpacing: '1px', textTransform: 'uppercase', borderRadius: '0 8px 8px 0' }}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style={{ borderBottom: '1px solid #f1f5f9' }}>
+                      <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: '600', color: '#0f172a' }}>Base Salary</td>
+                      <td style={{ padding: '14px 16px', textAlign: 'center' }}>
+                        <span style={{ backgroundColor: '#eff6ff', color: '#3b82f6', fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '20px', textTransform: 'uppercase' }}>
+                          {emp.salaryType}
+                        </span>
+                      </td>
+                      <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '13px', color: '#64748b' }}>
+                        {emp.salaryType === 'Daily' ? `${emp.workingDays} days worked` : emp.salaryType === 'Weekly' ? '7-day cycle' : '30-day cycle'}
+                      </td>
+                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>
+                        {symbol}{Number(emp.dailyRate).toLocaleString()}
+                      </td>
+                    </tr>
+                    {emp.salaryType === 'Daily' && (
+                      <tr style={{ borderBottom: '1px solid #f1f5f9', backgroundColor: '#fafafa' }}>
+                        <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>Daily Rate × Working Days</td>
+                        <td style={{ padding: '14px 16px' }}></td>
+                        <td style={{ padding: '14px 16px', textAlign: 'center', fontSize: '13px', color: '#64748b' }}>
+                          {symbol}{emp.dailyRate} × {emp.workingDays}
+                        </td>
+                        <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: '13px', fontWeight: '700', color: '#0f172a' }}>
+                          {symbol}{(emp.dailyRate * emp.workingDays).toLocaleString()}
+                        </td>
+                      </tr>
+                    )}
+                    {/* Gross total row */}
+                    <tr style={{ backgroundColor: '#f0fdf4' }}>
+                      <td colSpan={3} style={{ padding: '14px 16px', fontSize: '14px', fontWeight: '900', color: '#15803d' }}>Gross Pay</td>
+                      <td style={{ padding: '14px 16px', textAlign: 'right', fontSize: '18px', fontWeight: '900', color: '#15803d' }}>
+                        {symbol}{Number(amount).toLocaleString()}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Payment Info */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '32px' }}>
+                <div style={{ backgroundColor: '#f0fdf4', borderRadius: '12px', padding: '20px', border: '1px solid #bbf7d0' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Payment Status</div>
+                  <div style={{ fontSize: '16px', fontWeight: '900', color: '#15803d' }}>✓ PAID</div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>
+                    {paidDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </div>
+                </div>
+                <div style={{ backgroundColor: '#f8fafc', borderRadius: '12px', padding: '20px', border: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: '9px', fontWeight: '700', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>Paid From Account</div>
+                  <div style={{ fontSize: '14px', fontWeight: '700', color: '#0f172a' }}>{accountName}</div>
+                  {emp.bankDetails?.accountNumber && (
+                    <div style={{ fontSize: '11px', color: '#94a3b8', marginTop: '4px', fontFamily: 'monospace' }}>
+                      To: {emp.bankDetails.accountNumber}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                <div style={{ fontSize: '10px', color: '#94a3b8', lineHeight: '1.6' }}>
+                  This is a computer-generated salary slip and does not require a physical signature.<br />
+                  Generated on {new Date().toLocaleString('en-IN')}
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ width: '120px', borderTop: '1px solid #0f172a', paddingTop: '6px', fontSize: '10px', color: '#64748b', textAlign: 'center' }}>
+                    Authorized Signature
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          );
+        })()}
+      </div>
+
     </div>
   );
 };
