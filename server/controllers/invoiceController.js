@@ -334,7 +334,13 @@ export const deleteInvoice = async (req, res) => {
         { $inc: { 'variants.$.stock': revertQty } }
       ).session(session);
     }
-
+    await reverseJournalEntries({
+      userId: req.user._id,
+      sourceId: invoice._id,
+      sourceType: 'Invoice',
+      date: new Date(),
+      session,
+    });
     await invoice.deleteOne({ session });
     await session.commitTransaction();
     res.json({ message: 'Invoice removed, stock & balance reverted' });

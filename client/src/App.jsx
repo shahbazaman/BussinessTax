@@ -18,6 +18,7 @@ import Profile from './pages/Profile';
 import Ledger from './pages/Ledger';
 import TaxReports from './pages/TaxReports';
 import LedgerAccounts from './pages/LedgerAccounts';
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
 

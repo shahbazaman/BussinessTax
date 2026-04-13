@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   BookMarked, Plus, Trash2, RefreshCw, Loader2,
-  ShieldCheck, ChevronDown, X, Info, Search
+  ShieldCheck, ChevronDown, X, Info, Search,
+  Eye
 } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
@@ -24,16 +25,19 @@ const EMPTY_FORM = { name: '', type: 'Asset', code: '', description: '' };
 
 // ── Main Component ────────────────────────────────────────────────────────────
 const LedgerAccounts = () => {
-  const [accounts, setAccounts]       = useState([]);
-  const [loading, setLoading]         = useState(true);
-  const [seeding, setSeeding]         = useState(false);
-  const [showForm, setShowForm]       = useState(false);
-  const [form, setForm]               = useState(EMPTY_FORM);
-  const [saving, setSaving]           = useState(false);
-  const [search, setSearch]           = useState('');
-  const [filterType, setFilterType]   = useState('all');
-  const [deletingId, setDeletingId]   = useState(null);
-
+    const [accounts, setAccounts]       = useState([]);
+    const [loading, setLoading]         = useState(true);
+    const [seeding, setSeeding]         = useState(false);
+    const [showForm, setShowForm]       = useState(false);
+    const [form, setForm]               = useState(EMPTY_FORM);
+    const [saving, setSaving]           = useState(false);
+    const [search, setSearch]           = useState('');
+    const [filterType, setFilterType]   = useState('all');
+    const [deletingId, setDeletingId]   = useState(null);
+    const [viewAccount,    setViewAccount]    = useState(null); 
+    const [viewEntries,    setViewEntries]    = useState([]);
+    const [viewSummary,    setViewSummary]    = useState(null);
+    const [viewLoading,    setViewLoading]    = useState(false);
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
@@ -95,7 +99,21 @@ const LedgerAccounts = () => {
       setDeletingId(null);
     }
   };
-
+const handleView = async (account) => {
+  setViewAccount(account);
+  setViewEntries([]);
+  setViewSummary(null);
+  setViewLoading(true);
+  try {
+    const { data } = await api.get(`/ledger-accounts/${account._id}/entries`);
+    setViewEntries(data.entries || []);
+    setViewSummary({ totalDebit: data.totalDebit, totalCredit: data.totalCredit, closingBalance: data.closingBalance });
+  } catch {
+    toast.error('Failed to load account entries.');
+  } finally {
+    setViewLoading(false);
+  }
+};
   // ── Filter + search ───────────────────────────────────────────────────────
   const filtered = accounts.filter(a => {
     const matchType   = filterType === 'all' || a.type === filterType;
@@ -389,7 +407,13 @@ const LedgerAccounts = () => {
                       <span className={`hidden sm:inline-block text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wide ${TYPE_CONFIG[type]?.color}`}>
                         {type}
                       </span>
-
+                            <button
+                                onClick={() => handleView(account)}
+                                className="p-2 rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                                title="View entries"
+                                >
+                                <Eye size={14} />
+                                </button>
                       {/* Delete button — only for non-system accounts */}
                       {!account.isSystem ? (
                         <button
@@ -419,6 +443,100 @@ const LedgerAccounts = () => {
       <p className="text-center text-[10px] text-slate-300 font-bold uppercase tracking-widest pb-4">
         Chart of accounts · Used in all journal entries and the general ledger
       </p>
+      {/* ── View Account Modal ── */}
+{viewAccount && (
+  <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col">
+      
+      {/* Modal Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{viewAccount.type} Account</p>
+          <h3 className="text-lg font-black text-slate-800">{viewAccount.name}</h3>
+        </div>
+        <button onClick={() => setViewAccount(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
+          <X size={18} />
+        </button>
+      </div>
+
+      {/* Summary Bar */}
+      {viewSummary && (
+        <div className="grid grid-cols-3 gap-4 px-6 py-3 bg-slate-50 border-b border-slate-100">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Debit</p>
+            <p className="text-base font-black text-rose-600">₹{viewSummary.totalDebit.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Credit</p>
+            <p className="text-base font-black text-emerald-600">₹{viewSummary.totalCredit.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Closing Balance</p>
+            <p className={`text-base font-black ${viewSummary.closingBalance >= 0 ? 'text-indigo-600' : 'text-orange-600'}`}>
+              ₹{Math.abs(viewSummary.closingBalance).toLocaleString(undefined,{minimumFractionDigits:2})}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Entries Table */}
+      <div className="overflow-y-auto flex-1">
+        {viewLoading ? (
+          <div className="flex justify-center items-center py-16">
+            <Loader2 className="animate-spin text-indigo-500" size={28} />
+          </div>
+        ) : viewEntries.length === 0 ? (
+          <div className="py-16 text-center">
+            <p className="text-slate-400 font-bold text-sm">No journal entries for this account yet.</p>
+            <p className="text-slate-300 text-xs mt-1">Entries appear automatically when invoices or expenses are created.</p>
+          </div>
+        ) : (
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-slate-50 border-b border-slate-100">
+              <tr>
+                {['Date','Description','Dr Account','Cr Account','Debit','Credit','Balance','Status'].map(h => (
+                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {viewEntries.map((e, i) => (
+                <tr key={i} className={`hover:bg-slate-50 ${e.isReversed ? 'opacity-50' : ''}`}>
+                  <td className="px-4 py-2.5 whitespace-nowrap text-slate-500">
+                    {new Date(e.date).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}
+                  </td>
+                  <td className="px-4 py-2.5 max-w-[180px] truncate text-slate-700 font-medium">{e.description}</td>
+                  <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
+                    <span className="text-rose-400 font-black text-[9px] mr-1">Dr</span>{e.debitAccount || '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
+                    <span className="text-emerald-500 font-black text-[9px] mr-1">Cr</span>{e.creditAccount || '—'}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-black text-rose-600">
+                    {e.debit ? `₹${e.debit.toLocaleString(undefined,{minimumFractionDigits:2})}` : <span className="text-slate-200">—</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-black text-emerald-600">
+                    {e.credit ? `₹${e.credit.toLocaleString(undefined,{minimumFractionDigits:2})}` : <span className="text-slate-200">—</span>}
+                  </td>
+                  <td className={`px-4 py-2.5 text-right font-black whitespace-nowrap ${e.balance >= 0 ? 'text-slate-800' : 'text-orange-600'}`}>
+                    ₹{Math.abs(e.balance).toLocaleString(undefined,{minimumFractionDigits:2})}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {e.isReversed
+                      ? <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-400 uppercase">Reversed</span>
+                      : <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 uppercase">Active</span>
+                    }
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+    </div>
+  </div>
+)}
     </div>
   );
 };
