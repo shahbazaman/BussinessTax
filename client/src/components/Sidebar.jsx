@@ -5,9 +5,8 @@ import { AuthContext } from '../context/AuthContext';
 import { 
   LayoutDashboard, FileText, Receipt, Users, 
   Settings, Landmark, ChevronLeft, ChevronRight, LogOut, Menu, X,
-  Package, PieChart, BookOpen, ScrollText
+  Package, PieChart, BookOpen, ScrollText, BookMarked, Bell
 } from 'lucide-react';
-import { Bell } from 'lucide-react';
 const Sidebar = () => {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMobileOpen, setIsMobileOpen] = useState(false);
