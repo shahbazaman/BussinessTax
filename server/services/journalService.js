@@ -56,3 +56,51 @@ export const reverseJournalEntries = async ({ userId, sourceId, sourceType, date
     await JournalEntry.findByIdAndUpdate(orig._id, { isReversed: true }, { session });
   }
 };
+/**
+ * Get or create a ledger account by name and type for a user.
+ * Alias used by paymentRoutes and other routes needing a flexible account lookup.
+ * @param {string} userId
+ * @param {string} name   - Account name (e.g. 'Accounts Receivable')
+ * @param {string} type   - Account type (e.g. 'Asset', 'Revenue', 'Expense')
+ * @param {string} [subType] - Optional sub-type (ignored if not needed by schema)
+ * @param {ClientSession|null} session - Mongoose session for transactions
+ */
+export const getOrCreateAccount = async (userId, name, type, subType = null, session = null) => {
+  const query = LedgerAccount.findOne({ userId, name });
+  if (session) query.session(session);
+  let acc = await query;
+  if (!acc) {
+    const docs = await LedgerAccount.create(
+      [{ userId, name, type, isSystem: true, isActive: true }],
+      session ? { session } : {}
+    );
+    acc = docs[0];
+  }
+  return acc;
+};
+
+/**
+ * Sync a bank Account document to the LedgerAccount table so journal entries
+ * can reference it.  If a LedgerAccount with the given name already exists for
+ * this user it is left untouched; otherwise one is created.
+ *
+ * @param {string} userId
+ * @param {string} bankName    - Human-readable bank name (e.g. 'HDFC Bank')
+ * @param {string} accountId   - Account._id from the Accounts collection
+ * @param {ClientSession|null} session
+ * @param {*} _unused          - kept for call-site compatibility
+ */
+export const syncBankToLedger = async (userId, bankName, accountId, session = null, _unused = null) => {
+  const name = bankName || 'Bank Account';
+  const query = LedgerAccount.findOne({ userId, name });
+  if (session) query.session(session);
+  let ledger = await query;
+  if (!ledger) {
+    const docs = await LedgerAccount.create(
+      [{ userId, name, type: 'Asset', isSystem: true, isActive: true, linkedAccountId: accountId }],
+      session ? { session } : {}
+    );
+    ledger = docs[0];
+  }
+  return ledger;
+};
