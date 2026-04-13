@@ -1,8 +1,8 @@
 import Expense from '../models/Expense.js';
 import Account from '../models/Account.js';
 import mongoose from 'mongoose';
-
-// ─── CREATE expense ───────────────────────────────────────────────────────────
+import { createJournalEntry, getSystemAccount } from '../services/journalService.js';
+import LedgerAccount from '../models/LedgerAccount.js';
 export const createExpense = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -28,6 +28,7 @@ export const createExpense = async (req, res) => {
       await account.save({ session });
     }
 
+    // Save the expense FIRST
     const expense = await Expense.create([{
       user: userId, title, category, amount: numAmount, currency,
       paymentMethod: paymentMethod || 'Bank Transfer',
@@ -36,8 +37,58 @@ export const createExpense = async (req, res) => {
       date: date || new Date()
     }], { session });
 
+    const savedExpense = expense[0];
+
+    // ── DOUBLE-ENTRY: Expense Created (runs AFTER save, uses session) ──────────
+    try {
+      // Find or create ledger account for this category
+      let expenseAccount = await LedgerAccount.findOne({
+        userId, name: savedExpense.category || 'General Expense'
+      }).session(session);
+      if (!expenseAccount) {
+        [expenseAccount] = await LedgerAccount.create([{
+          userId,
+          name: savedExpense.category || 'General Expense',
+          type: 'Expense',
+          isSystem: false,
+        }], { session });
+      }
+
+      // Find the bank's ledger account by matching the Account's bankName
+      let bankLedgerAccount = null;
+      if (paidFromAccount) {
+        const bankDoc = await Account.findById(paidFromAccount).session(session);
+        const bankName = bankDoc?.bankName || 'Bank Account';
+        bankLedgerAccount = await LedgerAccount.findOne({ userId, name: bankName }).session(session);
+        if (!bankLedgerAccount) {
+          [bankLedgerAccount] = await LedgerAccount.create([{
+            userId, name: bankName, type: 'Asset', isSystem: false,
+          }], { session });
+        }
+      } else {
+        // Fallback: use/create a generic "Cash / Bank" ledger account
+        bankLedgerAccount = await getSystemAccount(userId, 'Bank Account', 'Asset', session);
+      }
+
+      await createJournalEntry({
+        userId,
+        debitAccountId:  expenseAccount._id,
+        creditAccountId: bankLedgerAccount._id,
+        amount: savedExpense.amount,
+        date: savedExpense.date,
+        description: `Expense: ${savedExpense.title}`,
+        narration: savedExpense.category || '',
+        sourceType: 'Expense',
+        sourceId: savedExpense._id,
+        session,  // ← pass the real session, not null
+      });
+    } catch (jeErr) {
+      console.warn('Journal entry creation failed for expense:', jeErr.message);
+    }
+    // ────────────────────────────────────────────────────────────────────────────
+
     await session.commitTransaction();
-    res.status(201).json(expense[0]);
+    res.status(201).json(savedExpense);
   } catch (error) {
     await session.abortTransaction();
     res.status(400).json({ message: error.message });

@@ -2,13 +2,10 @@ import Invoice from '../models/Invoice.js';
 import Product from '../models/Product.js';
 import Account from '../models/Account.js';
 import mongoose from 'mongoose';
+import { createJournalEntry, getSystemAccount, reverseJournalEntries } from '../services/journalService.js';
+import { ACCOUNTS, ACCOUNT_TYPES } from '../services/systemAccounts.js';
+import LedgerAccount from '../models/LedgerAccount.js';
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-/**
- * Credit or debit an account balance inside an existing mongoose session.
- * direction: 'credit' (add) | 'debit' (subtract)
- * Returns { ok, message } — caller decides how to handle failure.
- */
 const adjustAccount = async (accountId, userId, amount, direction, session) => {
   if (!accountId) return { ok: false, message: 'No account specified' };
   const account = await Account.findOne({ _id: accountId, userId }).session(session);
@@ -87,13 +84,64 @@ export const createInvoice = async (req, res) => {
     });
 
     const savedInvoice = await invoice.save({ session });
-    const invoiceAmount = savedInvoice.totalAmount;
+const invoiceAmount = savedInvoice.totalAmount;
 
-    // ── Account balance adjustment on creation ────────────────────────────
-    const isPaid   = status === 'Paid';
-    const isSale   = invoiceType === 'Sale';
-    const accountId = paidIntoAccount;
+// ── Define these BEFORE the double-entry block ──
+const isPaid    = status === 'Paid';
+const isSale    = invoiceType === 'Sale';
+const accountId = paidIntoAccount;
 
+// ── DOUBLE-ENTRY: Invoice Created ────
+if (isSale) {
+  // Always post Dr Accounts Receivable / Cr Sales Revenue on invoice creation
+  const arAccount  = await getSystemAccount(req.user._id, ACCOUNTS.ACCOUNTS_RECEIVABLE, 'Asset', session);
+  const revAccount = await getSystemAccount(req.user._id, ACCOUNTS.SALES_REVENUE, 'Revenue', session);
+
+  await createJournalEntry({
+    userId: req.user._id,
+    debitAccountId:  arAccount._id,
+    creditAccountId: revAccount._id,
+    amount: invoiceAmount,
+    date: savedInvoice.invoiceDate,
+    description: `Invoice: ${savedInvoice.invoiceNumber || savedInvoice.referenceNumber || savedInvoice._id}`,
+    narration: `Sale to ${savedInvoice.clientName || 'Customer'}`,
+    sourceType: 'Invoice',
+    sourceId: savedInvoice._id,
+    entrySequence: 1,
+    session,
+  });
+
+  // If invoice is immediately Paid, also post the payment entry
+if (isPaid && accountId) {
+  // Get the actual bank name from the Account record
+  const bankAccountDoc = await Account.findById(accountId).session(session);
+  const bankName = bankAccountDoc?.bankName || 'Bank Account';
+
+  // Find or create a LedgerAccount with the same name
+  let bankLedgerAccount = await LedgerAccount.findOne({
+    userId: req.user._id, name: bankName
+  }).session(session);
+  if (!bankLedgerAccount) {
+    [bankLedgerAccount] = await LedgerAccount.create([{
+      userId: req.user._id, name: bankName, type: 'Asset', isSystem: false
+    }], { session });
+  }
+
+  await createJournalEntry({
+    userId: req.user._id,
+    debitAccountId:  bankLedgerAccount._id,
+    creditAccountId: arAccount._id,
+    amount: invoiceAmount,
+    date: savedInvoice.invoiceDate,
+    description: `Payment received: ${savedInvoice.invoiceNumber || savedInvoice._id}`,
+    narration: `Payment from ${savedInvoice.clientName || 'Customer'}`,
+    sourceType: 'Invoice',
+    sourceId: savedInvoice._id,
+    entrySequence: 2,
+    session,
+  });
+}
+}
     if (accountId) {
       let result;
       if (isSale && isPaid) {
@@ -192,6 +240,39 @@ export const updateInvoice = async (req, res) => {
         }
       }
     }
+    // ── DOUBLE-ENTRY: Status changed to Paid ─────────────────────────────────────
+const wasJustPaid = newStatus === 'Paid' && oldStatus !== 'Paid' && isSale;
+if (wasJustPaid && newAccountId) {
+  const arAccount   = await getSystemAccount(req.user._id, ACCOUNTS.ACCOUNTS_RECEIVABLE, 'Asset', session);
+  const bankAccount = await getSystemAccount(req.user._id, ACCOUNTS.BANK_DEFAULT, 'Asset', session);
+
+  await createJournalEntry({
+    userId: req.user._id,
+    debitAccountId:  bankAccount._id,
+    creditAccountId: arAccount._id,
+    amount: newAmount,
+    date: new Date(),
+    description: `Payment received: ${updatedInvoice.invoiceNumber || updatedInvoice._id}`,
+    narration: `Payment from ${updatedInvoice.clientName || 'Customer'}`,
+    sourceType: 'Invoice',
+    sourceId: updatedInvoice._id,
+    entrySequence: 2,
+    session,
+  });
+}
+
+// ── DOUBLE-ENTRY: Invoice Cancelled → reverse all entries ────────────────────
+const wasJustCancelled = newStatus === 'Cancelled' && oldStatus !== 'Cancelled';
+if (wasJustCancelled) {
+  await reverseJournalEntries({
+    userId: req.user._id,
+    sourceId: invoice._id,
+    sourceType: 'Invoice',
+    date: new Date(),
+    session,
+  });
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
     // Apply new stock adjustments
     for (const item of updatedInvoice.items) {

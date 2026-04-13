@@ -56,6 +56,7 @@ useEffect(() => {
     { icon: <Package />, label: 'Inventory', path: '/inventory' }, 
     { icon: <Landmark />, label: 'Accounts', path: '/accounts' }, 
     { icon: <BookOpen />, label: 'Ledger', path: '/ledger' },
+    { icon: <BookMarked />, label: 'Chart of Accounts', path: '/ledger-accounts' },
     { icon: <ScrollText />, label: 'Tax Reports', path: '/tax-reports' },
     { icon: <PieChart />, label: 'Reports', path: '/reports' }, 
     { icon: <Users />, label: 'Clients', path: '/clients' },

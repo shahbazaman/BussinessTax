@@ -1,26 +1,14 @@
-import Invoice from '../models/Invoice.js';
-import Expense from '../models/Expense.js';
-import Transaction from '../models/Transaction.js';
-import Account from '../models/Account.js';
-import mongoose from 'mongoose';
+import JournalEntry  from '../models/JournalEntry.js';
+import LedgerAccount from '../models/LedgerAccount.js';
+import Account       from '../models/Account.js';
+import mongoose      from 'mongoose';
 
-/**
- * GET /api/ledger
- * Returns a unified ledger: all invoices, expenses, and transfers for the user,
- * merged and sorted by date, with running balance per account (or overall).
- *
- * Query params:
- *   accountId  - filter by a specific account (optional)
- *   startDate  - ISO date string (optional)
- *   endDate    - ISO date string (optional)
- *   type       - 'all' | 'income' | 'expense' | 'transfer' (optional, default 'all')
- */
 export const getLedger = async (req, res) => {
   try {
     const userId = req.user._id;
     const { accountId, startDate, endDate, type } = req.query;
 
-    // --- Build date filter ---
+    // Build date filter
     const dateFilter = {};
     if (startDate) dateFilter.$gte = new Date(startDate);
     if (endDate) {
@@ -29,170 +17,84 @@ export const getLedger = async (req, res) => {
       dateFilter.$lte = end;
     }
 
-    // ---- 1. Fetch Invoices (Sales = Credit / Purchases = Debit) ----
-    const invoiceQuery = { user: userId };
-    if (Object.keys(dateFilter).length) invoiceQuery.invoiceDate = dateFilter;
+    const query = { userId };
+    if (Object.keys(dateFilter).length) query.date = dateFilter;
 
-    const invoices = await Invoice.find(invoiceQuery)
-      .populate('client', 'name')
-      .populate('paidIntoAccount', 'bankName')
+    // Fetch all journal entries, populated with account names
+    let entries = await JournalEntry.find(query)
+      .populate('debitAccount',  'name type')
+      .populate('creditAccount', 'name type')
+      .sort({ date: 1 })
       .lean();
 
-const invoiceEntries = invoices.map(inv => {
-  const isSale = inv.type !== 'Purchase';
-  return {
-    _id: inv._id,
-    date: inv.invoiceDate || inv.createdAt,
-    description: isSale
-      ? `Invoice: ${inv.clientName || inv.client?.name || 'Customer'}`
-      : `Purchase: ${inv.clientName || inv.client?.name || 'Vendor'}`,
-    reference: inv.invoiceNumber || inv.purchaseNumber || inv.referenceNumber || '',
-    category: isSale ? 'Sales' : 'Purchase',
-    entryType: isSale ? 'credit' : 'debit',
-    amount: Number(inv.totalAmount || inv.grandTotal || 0),
-    account: inv.paidIntoAccount?.bankName || '—',
-    accountId: inv.paidIntoAccount?._id || null,
-    status: inv.status || 'Pending',
-    source: 'invoice',
-    rawType: isSale ? 'income' : 'expense',
-    // ── Double-entry fields ──
-    debitAccount: isSale
-      ? (inv.paidIntoAccount?.bankName || 'Bank / Cash')   // Asset account increases
-      : 'Purchase / COGS',                                  // Expense account increases
-    creditAccount: isSale
-      ? 'Sales Revenue'                                     // Revenue account increases
-      : (inv.paidIntoAccount?.bankName || 'Bank / Cash'),  // Asset account decreases
-  };
-});
-
-    // ---- 2. Fetch Expenses (Debit) ----
-    const expenseQuery = { user: userId };
-    if (Object.keys(dateFilter).length) expenseQuery.date = dateFilter;
-
-    const expenses = await Expense.find(expenseQuery)
-      .populate('paidFromAccount', 'bankName')
-      .lean();
-
-const expenseEntries = expenses.map(exp => ({
-  _id: exp._id,
-  date: exp.date || exp.createdAt,
-  description: `Expense: ${exp.title}`,
-  reference: exp.category || '',
-  category: exp.category || 'Other',
-  entryType: 'debit',
-  amount: Number(exp.amount || 0),
-  account: exp.paidFromAccount?.bankName || '—',
-  accountId: exp.paidFromAccount?._id || null,
-  status: exp.status || 'Paid',
-  source: 'expense',
-  rawType: 'expense',
-  // ── Double-entry fields ──
-  debitAccount: exp.category || 'Expense Account',         // Expense account increases
-  creditAccount: exp.paidFromAccount?.bankName || 'Bank / Cash', // Asset decreases
-}));
-
-    // ---- 3. Fetch Internal Transfers ----
-    const transQuery = { userId };
-    if (Object.keys(dateFilter).length) transQuery.transferDate = dateFilter;
-
-    const transactions = await Transaction.find(transQuery)
-      .populate('fromAccount', 'bankName')
-      .populate('toAccount', 'bankName')
-      .lean();
-
-    // Each transfer creates two entries (debit from source, credit to dest)
-    const transferEntries = [];
-transactions.forEach(txn => {
-  transferEntries.push({
-    _id: `${txn._id}_debit`,
-    date: txn.transferDate || txn.createdAt,
-    description: `Transfer to ${txn.toAccount?.bankName || 'Account'}`,
-    reference: txn.description || '',
-    category: 'Transfer',
-    entryType: 'debit',
-    amount: Number(txn.amount || 0),
-    account: txn.fromAccount?.bankName || '—',
-    accountId: txn.fromAccount?._id || null,
-    status: txn.status || 'Completed',
-    source: 'transfer',
-    rawType: 'transfer',
-    // ── Double-entry fields ──
-    debitAccount: txn.toAccount?.bankName || 'Destination Account',  // Destination increases
-    creditAccount: txn.fromAccount?.bankName || 'Source Account',    // Source decreases
-  });
-  // The credit side row (optional — keep if you want both rows, or remove if you want compact view)
-  transferEntries.push({
-    _id: `${txn._id}_credit`,
-    date: txn.transferDate || txn.createdAt,
-    description: `Transfer from ${txn.fromAccount?.bankName || 'Account'}`,
-    reference: txn.description || '',
-    category: 'Transfer',
-    entryType: 'credit',
-    amount: Number(txn.amount || 0),
-    account: txn.toAccount?.bankName || '—',
-    accountId: txn.toAccount?._id || null,
-    status: txn.status || 'Completed',
-    source: 'transfer',
-    rawType: 'transfer',
-    // ── Double-entry fields ──
-    debitAccount: txn.toAccount?.bankName || 'Destination Account',
-    creditAccount: txn.fromAccount?.bankName || 'Source Account',
-  });
-});
-
-    // ---- 4. Merge and filter ----
-    let allEntries = [...invoiceEntries, ...expenseEntries, ...transferEntries];
-
-    // Filter by accountId if provided
+    // Filter by ledger account if accountId is provided
     if (accountId && accountId !== 'all') {
-      allEntries = allEntries.filter(e => e.accountId && String(e.accountId) === String(accountId));
+      entries = entries.filter(e =>
+        String(e.debitAccount?._id)  === accountId ||
+        String(e.creditAccount?._id) === accountId
+      );
     }
 
     // Filter by type
     if (type && type !== 'all') {
-      const typeMap = { income: 'income', expense: 'expense', transfer: 'transfer' };
-      if (typeMap[type]) {
-        allEntries = allEntries.filter(e => e.rawType === typeMap[type]);
-      }
+      const typeMap = {
+        income:   e => e.creditAccount?.type === 'Revenue',
+        expense:  e => e.debitAccount?.type  === 'Expense',
+        transfer: e => e.sourceType === 'Transfer',
+      };
+      if (typeMap[type]) entries = entries.filter(typeMap[type]);
     }
 
-    // ---- 5. Sort by date ascending (for running balance calc) ----
-    allEntries.sort((a, b) => new Date(a.date) - new Date(b.date));
-
-    // ---- 6. Compute running balance ----
+    // Compute running balance + format for UI
     let runningBalance = 0;
-    const withBalance = allEntries.map(entry => {
-      if (entry.entryType === 'credit') {
-        runningBalance += entry.amount;
-      } else {
-        runningBalance -= entry.amount;
-      }
-      return { ...entry, runningBalance: Number(runningBalance.toFixed(2)) };
+    const formatted = entries.map(e => {
+      const isCredit = e.creditAccount?.type === 'Revenue';
+      runningBalance += isCredit ? e.amount : -e.amount;
+
+      return {
+        _id:            e._id,
+        date:           e.date,
+        description:    e.description,
+        narration:      e.narration || '',
+        reference:      e.sourceId  || '',
+        debitAccount:   e.debitAccount?.name  || '—',
+        creditAccount:  e.creditAccount?.name || '—',
+        debitAccountId: e.debitAccount?._id   || null,
+        creditAccountId:e.creditAccount?._id  || null,
+        amount:         e.amount,
+        sourceType:     e.sourceType,
+        entrySequence:  e.entrySequence,
+        isReversed:     e.isReversed,
+        runningBalance: Number(runningBalance.toFixed(2)),
+        // Legacy fields so existing UI still works
+        entryType:  isCredit ? 'credit' : 'debit',
+        category:   e.sourceType || 'Manual',
+        account:    isCredit ? (e.creditAccount?.name || '—') : (e.debitAccount?.name || '—'),
+        accountId:  isCredit ? (e.creditAccount?._id  || null) : (e.debitAccount?._id  || null),
+        status:     e.isReversed ? 'Reversed' : 'Completed',
+        source:     (e.sourceType || 'Manual').toLowerCase(),
+      };
     });
 
-    // Return in reverse order for UI (newest first)
-    withBalance.reverse();
+    formatted.reverse(); // newest first for UI
 
-    // ---- 7. Summary stats ----
-    const totalCredits = allEntries
-      .filter(e => e.entryType === 'credit')
-      .reduce((s, e) => s + e.amount, 0);
-    const totalDebits = allEntries
-      .filter(e => e.entryType === 'debit')
-      .reduce((s, e) => s + e.amount, 0);
+    const totalCredits = entries.filter(e => e.creditAccount?.type === 'Revenue').reduce((s, e) => s + e.amount, 0);
+    const totalDebits  = entries.filter(e => e.debitAccount?.type  === 'Expense').reduce((s, e) => s + e.amount, 0);
 
-    // Get accounts for the filter dropdown
-    const accounts = await Account.find({ userId }).lean();
+    // Get ledger accounts for filter dropdown
+    const ledgerAccounts = await LedgerAccount.find({ userId, isActive: true }).lean();
+    const bankAccounts   = await Account.find({ userId }).lean();
 
     res.json({
-      entries: withBalance,
+      entries: formatted,
       summary: {
-        totalCredits: Number(totalCredits.toFixed(2)),
-        totalDebits: Number(totalDebits.toFixed(2)),
-        netBalance: Number((totalCredits - totalDebits).toFixed(2)),
-        totalEntries: withBalance.length,
+        totalCredits:  Number(totalCredits.toFixed(2)),
+        totalDebits:   Number(totalDebits.toFixed(2)),
+        netBalance:    Number((totalCredits - totalDebits).toFixed(2)),
+        totalEntries:  formatted.length,
       },
-      accounts: accounts.map(a => ({ _id: a._id, bankName: a.bankName, accountType: a.accountType })),
+      accounts:       bankAccounts.map(a => ({ _id: a._id, bankName: a.bankName, accountType: a.accountType })),
+      ledgerAccounts: ledgerAccounts.map(a => ({ _id: a._id, name: a.name, type: a.type })),
     });
   } catch (error) {
     console.error('Ledger Error:', error);

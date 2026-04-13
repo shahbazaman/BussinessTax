@@ -14,6 +14,7 @@ import productRoutes from './routes/productRoutes.js';
 import transactionRoutes from './routes/transactionRoutes.js';
 import analyticsRoutes from './routes/analyticsRoutes.js';
 import ledgerRoutes from './routes/ledgerRoutes.js';
+import ledgerAccountRoutes from './routes/ledgerAccountRoutes.js';
 
 dotenv.config();
 
@@ -39,7 +40,7 @@ app.use('/api/products', productRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ledger', ledgerRoutes);
 app.use('/api/transactions', transactionRoutes);
-
+app.use('/api/ledger-accounts', ledgerAccountRoutes);
 app.get('/', (req, res) => {
   res.send('BusinessTax API is running...');
 });

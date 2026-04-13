@@ -3,7 +3,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { v2 as cloudinary } from 'cloudinary';
 import streamifier from 'streamifier';
-
+import LedgerAccount from '../models/LedgerAccount.js';
+import Account from '../models/Account.js';
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -43,12 +44,42 @@ export const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (user && (await bcrypt.compare(password, user.password))) {
+      
+      // ── Seed system LedgerAccounts on login (idempotent) ──────────────────
+      try {
+        const systemAccounts = [
+          { name: 'Accounts Receivable',      type: 'Asset'   },
+          { name: 'Sales Revenue',            type: 'Revenue' },
+          { name: 'Purchase / Cost of Goods', type: 'Expense' },
+          { name: 'General Expense',          type: 'Expense' },
+        ];
+        for (const acc of systemAccounts) {
+          await LedgerAccount.findOneAndUpdate(
+            { userId: user._id, name: acc.name },
+            { $setOnInsert: { userId: user._id, ...acc, isSystem: true, isActive: true } },
+            { upsert: true }
+          );
+        }
+        const existingBanks = await Account.find({ userId: user._id });
+        for (const bank of existingBanks) {
+          await LedgerAccount.findOneAndUpdate(
+            { userId: user._id, name: bank.bankName },
+            { $setOnInsert: { userId: user._id, name: bank.bankName, type: 'Asset', isSystem: false, isActive: true } },
+            { upsert: true }
+          );
+        }
+      } catch (seedErr) {
+        console.warn('System account seeding failed:', seedErr.message);
+      }
+      // ────────────────────────────────────────────────────────────────────────
+
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
         token: generateToken(user._id),
       });
+
     } else {
       res.status(401).json({ message: 'Invalid email or password' });
     }

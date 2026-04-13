@@ -17,7 +17,7 @@ import ClientInvoices from './pages/ClientInvoices';
 import Profile from './pages/Profile';
 import Ledger from './pages/Ledger';
 import TaxReports from './pages/TaxReports';
-
+import LedgerAccounts from './pages/LedgerAccounts';
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
 
@@ -52,6 +52,7 @@ useEffect(() => {
             <Route path="/employees" element={isAuthenticated ? <Employees /> : <Navigate to="/login" />} />            
             <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} />} />
             <Route path="/clients/:clientId/invoices" element={isAuthenticated ? <ClientInvoices /> : <Navigate to="/login" />} />
+            <Route path="/ledger-accounts" element={isAuthenticated ? <LedgerAccounts /> : <Navigate to="/login" />} />
           </Routes>
         </main>
       </div>      
