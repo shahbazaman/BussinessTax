@@ -56,6 +56,7 @@ const Ledger = () => {
   // data
   const [entries, setEntries]   = useState([]);
   const [accounts, setAccounts] = useState([]);
+  const [ledgerAccounts, setLedgerAccounts] = useState([]);
   const [summary, setSummary]   = useState({ totalCredits: 0, totalDebits: 0, netBalance: 0, totalEntries: 0 });
   const [loading, setLoading]   = useState(true);
 
@@ -85,6 +86,7 @@ const Ledger = () => {
       setEntries(data.entries || []);
       setSummary(data.summary || {});
       setAccounts(data.accounts || []);
+      setLedgerAccounts(data.ledgerAccounts || []);
       setPage(1);
     } catch (err) {
       toast.error('Failed to load ledger.');
@@ -241,9 +243,9 @@ const Ledger = () => {
                   className="w-full appearance-none bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 >
                   <option value="all">All Accounts</option>
-                  {accounts.map(a => (
-                    <option key={a._id} value={a._id}>{a.bankName}</option>
-                  ))}
+                    {ledgerAccounts.map(a => (
+                      <option key={a._id} value={a._id}>{a.name}</option>
+                    ))}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-3.5 text-slate-400 pointer-events-none" />
               </div>
@@ -309,141 +311,102 @@ const Ledger = () => {
         )}
       </div>
 
-      {/* ── Ledger Table ── */}
-      <div className="bg-white rounded-4xl border border-slate-100 shadow-sm overflow-hidden">
-        {/* Table Header */}
-        <div className="hidden lg:grid grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_1.2fr_0.8fr] gap-4 px-6 py-3 bg-slate-50/80 border-b border-slate-100">
-         {['Description', 'Date', 'Category', 'Dr Account', 'Cr Account', 'Debit', 'Credit', 'Balance'].map(h => (
-            <span key={h} className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</span>
-          ))}
-        </div>
-
-        {/* Table Body */}
-        <div className="divide-y divide-slate-50">
-          {paginated.length === 0 ? (
-            <div className="py-20 text-center">
-              <div className="bg-slate-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <BookOpen className="text-slate-300" size={28} />
+{/* ── Ledger Table ── */}
+<div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-x-auto">
+  <table className="w-full text-xs min-w-[800px]">
+    <thead>
+      <tr className="bg-slate-50 border-b border-slate-100">
+        {['Description','Date','Category','Dr Account','Cr Account','Debit','Credit','Balance'].map(h => (
+          <th key={h} className="px-3 py-2.5 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+        ))}
+      </tr>
+    </thead>
+    <tbody className="divide-y divide-slate-50">
+      {paginated.length === 0 ? (
+        <tr>
+          <td colSpan={8} className="py-16 text-center">
+            <BookOpen className="text-slate-300 mx-auto mb-2" size={24} />
+            <p className="text-slate-400 font-bold text-sm">No ledger entries found.</p>
+          </td>
+        </tr>
+      ) : paginated.map((entry, idx) => (
+        <tr key={`${entry._id}-${idx}`} className="hover:bg-slate-50/60 transition-colors">
+          {/* Description */}
+          <td className="px-3 py-2.5 max-w-[200px]">
+            <div className="flex items-center gap-2">
+              <div className={`p-1.5 rounded-lg shrink-0 ${
+                entry.source === 'transfer' ? 'bg-blue-50' :
+                entry.entryType === 'credit' ? 'bg-emerald-50' : 'bg-rose-50'}`}>
+                {entryIcon(entry)}
               </div>
-              <p className="text-slate-400 font-bold text-sm">No ledger entries found.</p>
-              <p className="text-slate-300 text-xs mt-1">Try adjusting your filters.</p>
-            </div>
-          ) : paginated.map((entry, idx) => (
-            <div
-              key={`${entry._id}-${idx}`}
-              className="px-4 lg:px-6 py-4 hover:bg-slate-50/50 transition-colors lg:grid lg:grid-cols-[2fr_1fr_1fr_1fr_1fr_1fr_1.2fr_0.8fr] lg:gap-4 lg:items-center"
-            >
-              {/* Description (mobile: full row) */}
-              <div className="flex items-center gap-3 mb-2 lg:mb-0">
-                <div className={`p-2 rounded-xl shrink-0 ${
-                  entry.source === 'transfer' ? 'bg-blue-50' :
-                  entry.entryType === 'credit' ? 'bg-emerald-50' : 'bg-rose-50'
-                }`}>
-                  {entryIcon(entry)}
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-slate-800 truncate leading-tight">{entry.description}</p>
-                  {entry.reference && (
-                    <p className="text-[10px] text-slate-400 font-mono">{entry.reference}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Mobile: 2-col grid for the rest */}
-              <div className="lg:contents grid grid-cols-2 gap-x-4 gap-y-1 text-xs pl-11 lg:pl-0">
-                {/* Date */}
-                <span className="text-slate-500 font-medium">
-                  {new Date(entry.date).toLocaleDateString(undefined, { dateStyle: 'medium' })}
-                </span>
-
-                {/* Category */}
-                <span>
-                  <span className={`inline-block text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide ${sourceBadge[entry.source]}`}>
-                    {entry.category}
-                  </span>
-                </span>
-
-                {/* Account */}
-                {/* Debit Account */}
-                    <span className="text-slate-600 font-semibold text-xs truncate flex items-center gap-1">
-                      <span className="text-rose-400 font-black text-[10px]">Dr</span>
-                      {entry.debitAccount || '—'}
-                    </span>
-
-                    {/* Credit Account */}
-                    <span className="text-slate-600 font-semibold text-xs truncate flex items-center gap-1">
-                      <span className="text-emerald-500 font-black text-[10px]">Cr</span>
-                      {entry.creditAccount || '—'}
-                    </span>
-
-                {/* Debit */}
-                <span className={`font-black text-sm ${entry.entryType === 'debit' ? 'text-rose-600' : 'text-slate-200'}`}>
-                  {entry.entryType === 'debit'
-                    ? `${symbol}${Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-                    : '—'}
-                </span>
-
-                {/* Credit */}
-                <span className={`font-black text-sm ${entry.entryType === 'credit' ? 'text-emerald-600' : 'text-slate-200'}`}>
-                  {entry.entryType === 'credit'
-                    ? `${symbol}${Number(entry.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-                    : '—'}
-                </span>
-
-                {/* Running Balance */}
-                <span className={`font-black text-sm ${
-                  entry.runningBalance >= 0 ? 'text-slate-800' : 'text-orange-600'
-                }`}>
-                  {entry.runningBalance >= 0 ? '' : '-'}
-                  {symbol}{Math.abs(entry.runningBalance).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                </span>
+              <div className="min-w-0">
+                <p className="font-bold text-slate-800 truncate leading-tight text-[11px]">{entry.description}</p>
+                {entry.reference && <p className="text-[9px] text-slate-400 font-mono truncate">{String(entry.reference).slice(-12)}</p>}
               </div>
             </div>
-          ))}
-        </div>
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 flex items-center justify-between">
-            <span className="text-xs text-slate-400 font-bold">
-              Showing {(page - 1) * PER_PAGE + 1}–{Math.min(page * PER_PAGE, filtered.length)} of {filtered.length} entries
+          </td>
+          {/* Date */}
+          <td className="px-3 py-2.5 text-slate-500 whitespace-nowrap">
+            {new Date(entry.date).toLocaleDateString(undefined, { day:'2-digit', month:'short', year:'numeric' })}
+          </td>
+          {/* Category */}
+          <td className="px-3 py-2.5">
+            <span className={`inline-block text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wide ${sourceBadge[entry.source] || 'bg-slate-100 text-slate-500'}`}>
+              {entry.category}
             </span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-200 transition-colors"
-              >
-                Prev
-              </button>
-              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                const pageNum = page <= 3 ? i + 1 : page - 2 + i;
-                if (pageNum < 1 || pageNum > totalPages) return null;
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setPage(pageNum)}
-                    className={`w-9 h-9 rounded-xl text-xs font-black transition-colors ${
-                      page === pageNum
-                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-200 transition-colors"
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
+          </td>
+          {/* Dr Account */}
+          <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">
+            <span className="text-rose-400 font-black text-[9px] mr-1">Dr</span>
+            {entry.debitAccount || '—'}
+          </td>
+          {/* Cr Account */}
+          <td className="px-3 py-2.5 text-slate-700 whitespace-nowrap">
+            <span className="text-emerald-500 font-black text-[9px] mr-1">Cr</span>
+            {entry.creditAccount || '—'}
+          </td>
+          {/* Debit */}
+          <td className="px-3 py-2.5 text-right font-black">
+            {entry.entryType === 'debit'
+              ? <span className="text-rose-600">{symbol}{Number(entry.amount).toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+              : <span className="text-slate-200">—</span>}
+          </td>
+          {/* Credit */}
+          <td className="px-3 py-2.5 text-right font-black">
+            {entry.entryType === 'credit'
+              ? <span className="text-emerald-600">{symbol}{Number(entry.amount).toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+              : <span className="text-slate-200">—</span>}
+          </td>
+          {/* Balance */}
+          <td className={`px-3 py-2.5 text-right font-black whitespace-nowrap ${entry.runningBalance >= 0 ? 'text-slate-800' : 'text-orange-600'}`}>
+            {entry.runningBalance < 0 ? '-' : ''}{symbol}{Math.abs(entry.runningBalance).toLocaleString(undefined,{minimumFractionDigits:2})}
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+
+  {/* Pagination */}
+  {totalPages > 1 && (
+    <div className="p-4 border-t border-slate-100 flex items-center justify-between">
+      <span className="text-xs text-slate-400 font-bold">
+        Showing {(page-1)*PER_PAGE+1}–{Math.min(page*PER_PAGE, filtered.length)} of {filtered.length}
+      </span>
+      <div className="flex gap-2">
+        <button onClick={() => setPage(p => Math.max(1,p-1))} disabled={page===1}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-200">Prev</button>
+        {Array.from({length: Math.min(totalPages,5)}, (_,i) => {
+          const n = page<=3 ? i+1 : page-2+i;
+          if(n<1||n>totalPages) return null;
+          return <button key={n} onClick={()=>setPage(n)}
+            className={`w-8 h-8 rounded-lg text-xs font-black ${page===n?'bg-indigo-600 text-white':'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}>{n}</button>;
+        })}
+        <button onClick={() => setPage(p => Math.min(totalPages,p+1))} disabled={page===totalPages}
+          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600 disabled:opacity-40 hover:bg-slate-200">Next</button>
       </div>
+    </div>
+  )}
+</div>
 
       {/* Footer note */}
       <p className="text-center text-[10px] text-slate-300 font-bold uppercase tracking-widest pb-4">

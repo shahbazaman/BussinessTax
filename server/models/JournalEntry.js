@@ -14,7 +14,7 @@ const JournalEntrySchema = new mongoose.Schema({
   narration:   { type: String, trim: true }, // e.g. "Invoice #INV-001 created"
 
   // Link back to the source document
-  sourceType: { type: String, enum: ['Invoice', 'Expense', 'Transfer', 'Manual'] },
+  sourceType: { type: String, enum: ['Invoice', 'Expense', 'Transfer', 'Manual', 'Payment'] },
   sourceId:   { type: mongoose.Schema.Types.ObjectId },
 
   // Optional: track which "entry number" in a sequence for a given source
