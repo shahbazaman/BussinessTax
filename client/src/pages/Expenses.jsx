@@ -167,7 +167,7 @@ const handleReceiptUpload = async (e) => {
       const matchesCategory = filterCategory === 'All' || exp.category === filterCategory;
       return matchesSearch && matchesCategory && (start ? expDate >= start : true) && (end ? expDate <= end : true);
     });
-  }, [expenses, searchTerm, startDate, endDate]);
+}, [expenses, searchTerm, startDate, endDate, filterCategory]);
 
   const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
 
