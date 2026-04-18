@@ -16,7 +16,6 @@ import { CurrencyProvider } from './context/CurrencyContext';
 import ClientInvoices from './pages/ClientInvoices';
 import Profile from './pages/Profile';
 import Ledger from './pages/Ledger';
-import TaxReports from './pages/TaxReports';
 import LedgerAccounts from './pages/LedgerAccounts';
 
 function App() {
@@ -49,7 +48,6 @@ useEffect(() => {
             <Route path="/inventory" element={isAuthenticated ? <Inventory /> : <Navigate to="/login" />} />
             <Route path="/accounts" element={isAuthenticated ? <Accounts /> : <Navigate to="/login" />} />
             <Route path="/ledger" element={isAuthenticated ? <Ledger /> : <Navigate to="/login" />} />
-            <Route path="/tax-reports" element={isAuthenticated ? <TaxReports /> : <Navigate to="/login" />} />
             <Route path="/employees" element={isAuthenticated ? <Employees /> : <Navigate to="/login" />} />            
             <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} />} />
             <Route path="/clients/:clientId/invoices" element={isAuthenticated ? <ClientInvoices /> : <Navigate to="/login" />} />

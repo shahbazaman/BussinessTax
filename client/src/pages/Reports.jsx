@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import api from '../utils/api';
-import { Landmark, Calculator, Download, PieChart, ArrowUpRight, ArrowDownRight, Scale, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Landmark, Calculator, Download, PieChart, ArrowUpRight, ArrowDownRight, Scale, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, Loader2, Receipt } from 'lucide-react';
 import { CurrencyContext } from '../context/CurrencyContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -16,8 +16,9 @@ const Reports = () => {
   const [invoices, setInvoices] = useState([]);
   // 2. Define constants and derived values AFTER state
   const [activeTab, setActiveTab] = useState('overview');
-const [tbData, setTbData]       = useState(null);
-const [plData, setPlData]       = useState(null);
+const [tbData, setTbData] = useState(null);
+const [plData, setPlData] = useState(null);
+const [taxData, setTaxData] = useState({ collected: 0, deductible: 0, netOwed: 0, invoices: [] });
 const [tbLoading, setTbLoading] = useState(false);
 const { symbol } = useContext(CurrencyContext);
 const fmt = (n) => `${symbol}${Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2})}`;
@@ -82,6 +83,19 @@ setInvoices(invoicesRes.data || []);
         const totalRevenue  = rev.reduce((s,r) => s + r.totalCredit, 0);
         const totalExpenses = exp.reduce((s,r) => s + r.totalDebit,  0);
         setPlData({ revenue: rev, expenses: exp, totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses });
+        // Fetch tax data
+const [invRes, expRes] = await Promise.all([api.get('/invoices'), api.get('/expenses')]);
+const taxCollected = (invRes.data || [])
+  .filter(i => i.type === 'Sale')
+  .reduce((s, i) => s + Number(i.taxAmount || 0), 0);
+const taxDeductible = (expRes.data || [])
+  .reduce((s, e) => s + (Number(e.amount || 0) * 0.15), 0);
+setTaxData({
+  collected: taxCollected,
+  deductible: taxDeductible,
+  netOwed: taxCollected - taxDeductible,
+  invoices: (invRes.data || []).filter(i => i.type === 'Sale')
+});
       } catch { /* silent — TB is non-critical */ } 
       finally { setTbLoading(false); }
     };
@@ -172,10 +186,11 @@ setInvoices(invoicesRes.data || []);
         {/* ── Tabs ── */}
 <div className="flex gap-2 mb-8 bg-white border border-slate-100 rounded-2xl p-1.5 shadow-sm w-fit">
   {[
-    { id: 'overview',       label: 'Overview',       icon: <Landmark size={14}/> },
-    { id: 'trial-balance',  label: 'Trial Balance',  icon: <Scale size={14}/> },
-    { id: 'profit-loss',    label: 'Profit & Loss',  icon: <DollarSign size={14}/> },
-  ].map(tab => (
+  { id: 'overview',       label: 'Overview',       icon: <Landmark size={14}/> },
+  { id: 'trial-balance',  label: 'Trial Balance',  icon: <Scale size={14}/> },
+  { id: 'profit-loss',    label: 'Profit & Loss',  icon: <DollarSign size={14}/> },
+  { id: 'tax-summary',    label: 'Tax Summary',    icon: <Receipt size={14}/> },
+].map(tab => (
     <button
       key={tab.id}
       onClick={() => setActiveTab(tab.id)}
@@ -358,7 +373,69 @@ setInvoices(invoicesRes.data || []);
     </div>
   )
 )}
+{/* ── Tax Summary Tab ── */}
+{activeTab === 'tax-summary' && (
+  tbLoading ? (
+    <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" size={32}/></div>
+  ) : (
+    <div className="space-y-5">
+      {/* Summary cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="p-2 bg-blue-50 text-blue-600 w-fit rounded-xl mb-3"><ArrowUpRight size={18}/></div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tax Collected</p>
+          <p className="text-2xl font-black text-slate-900">{fmt(taxData.collected)}</p>
+          <p className="text-xs text-slate-400 mt-1">From GST/tax on sales</p>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+          <div className="p-2 bg-amber-50 text-amber-600 w-fit rounded-xl mb-3"><ArrowDownRight size={18}/></div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tax Deductible</p>
+          <p className="text-2xl font-black text-slate-900">{fmt(taxData.deductible)}</p>
+          <p className="text-xs text-slate-400 mt-1">15% on expenses</p>
+        </div>
+        <div className={`p-6 rounded-2xl border shadow-lg ${taxData.netOwed > 0 ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
+          <div className={`p-2 w-fit rounded-xl mb-3 ${taxData.netOwed > 0 ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-white'}`}>
+            <Landmark size={18}/>
+          </div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Tax Owed</p>
+          <p className={`text-2xl font-black ${taxData.netOwed > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+            {fmt(Math.abs(taxData.netOwed))}
+          </p>
+          <p className="text-xs text-slate-400 mt-1">{taxData.netOwed <= 0 ? 'Credit/Overpaid' : 'Payable'}</p>
+        </div>
+      </div>
 
+      {/* Invoice tax table */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+          <span className="text-xs font-black text-slate-700 uppercase tracking-widest">Invoice Tax Breakdown</span>
+        </div>
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 border-b border-slate-100">
+            <tr>
+              {['Client','Invoice #','Subtotal','Tax Rate','Tax Amount'].map(h => (
+                <th key={h} className="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {taxData.invoices.length === 0 ? (
+              <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-400 font-bold">No sale invoices found</td></tr>
+            ) : taxData.invoices.map(inv => (
+              <tr key={inv._id} className="hover:bg-slate-50">
+                <td className="px-5 py-3 font-bold text-slate-700">{inv.clientName || inv.client?.name || 'N/A'}</td>
+                <td className="px-5 py-3 text-slate-500 font-mono text-[10px]">{inv.invoiceNumber || '—'}</td>
+                <td className="px-5 py-3 text-slate-600">{fmt(inv.subtotal)}</td>
+                <td className="px-5 py-3 text-slate-600">{inv.globalTaxRate || 0}%</td>
+                <td className="px-5 py-3 font-black text-rose-600">+{fmt(inv.taxAmount)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+)}
         {/* Breakdown Section */}
         {activeTab === 'overview' && <>
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
