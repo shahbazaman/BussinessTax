@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import api from '../utils/api';
-import { Landmark, Calculator, Download, PieChart, ArrowUpRight, ArrowDownRight, Scale, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, Loader2, Receipt,Droplets, Activity, ArrowRight, BookCopy } from 'lucide-react';
+import { Landmark, Calculator, Download, PieChart, ArrowUpRight, ArrowDownRight, Scale, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, Loader2, Receipt,Droplets, Activity, ArrowRight, BookCopy, FileText } from 'lucide-react';
 import { CurrencyContext } from '../context/CurrencyContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -22,6 +22,31 @@ const [taxData, setTaxData] = useState({ collected: 0, deductible: 0, netOwed: 0
 const [tbLoading, setTbLoading] = useState(false);
 const { symbol } = useContext(CurrencyContext);
 const fmt = (n) => `${symbol}${Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2})}`;
+// ── Invoice derived metrics (computed from existing `invoices` state) ─────
+const salesInvoices    = invoices.filter(i => i.type === 'Sale');
+const purchaseInvoices = invoices.filter(i => i.type === 'Purchase');
+
+const salesMetrics = {
+  total:     salesInvoices.length,
+  paid:      salesInvoices.filter(i => i.status === 'Paid').length,
+  pending:   salesInvoices.filter(i => i.status === 'Pending').length,
+  cancelled: salesInvoices.filter(i => i.status === 'Cancelled').length,
+  totalValue: salesInvoices.reduce((s, i) => s + (i.totalAmount || 0), 0),
+  paidValue:  salesInvoices.filter(i => i.status === 'Paid').reduce((s, i) => s + (i.totalAmount || 0), 0),
+  pendingValue: salesInvoices.filter(i => i.status !== 'Paid' && i.status !== 'Cancelled').reduce((s, i) => s + (i.totalAmount || 0), 0),
+  totalTax:  salesInvoices.reduce((s, i) => s + (i.taxAmount || 0), 0),
+};
+
+const purchaseMetrics = {
+  total:     purchaseInvoices.length,
+  paid:      purchaseInvoices.filter(i => i.status === 'Paid').length,
+  pending:   purchaseInvoices.filter(i => i.status === 'Pending').length,
+  cancelled: purchaseInvoices.filter(i => i.status === 'Cancelled').length,
+  totalValue: purchaseInvoices.reduce((s, i) => s + (i.totalAmount || 0), 0),
+  paidValue:  purchaseInvoices.filter(i => i.status === 'Paid').reduce((s, i) => s + (i.totalAmount || 0), 0),
+  pendingValue: purchaseInvoices.filter(i => i.status !== 'Paid' && i.status !== 'Cancelled').reduce((s, i) => s + (i.totalAmount || 0), 0),
+  totalTax:  purchaseInvoices.reduce((s, i) => s + (i.taxAmount || 0), 0),
+};
   const CURRENCY_MAP = { USD: '$', INR: '₹', EUR: '€', GBP: '£' };
   const currencySymbol = CURRENCY_MAP[currency] || '$';
 
@@ -199,6 +224,7 @@ setBsData(bsRes.data);
   { id: 'tax-summary',    label: 'Tax Summary',    icon: <Receipt size={14}/> },
   { id: 'cash-flow', label: 'Cash Flow', icon: <Activity size={14}/> },
   { id: 'balance-sheet', label: 'Balance Sheet', icon: <BookCopy size={14}/> },
+  { id: 'invoices', label: 'Invoices', icon: <FileText size={14}/> },
 ].map(tab => (
     <button
       key={tab.id}
@@ -559,6 +585,234 @@ setBsData(bsRes.data);
         </div>
       </div>
     )}
+  </div>
+)}
+{/* ── Invoices Tab ── */}
+{activeTab === 'invoices' && (
+  <div className="space-y-8">
+
+    {/* ── Summary comparison cards ── */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+      {/* Sales card */}
+      <div className="bg-white rounded-2xl border border-emerald-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 bg-emerald-50 border-b border-emerald-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ArrowUpRight size={16} className="text-emerald-600" />
+            <h3 className="text-sm font-black text-emerald-700 uppercase tracking-wide">Sales Invoices</h3>
+          </div>
+          <span className="text-xs font-black bg-emerald-600 text-white px-2.5 py-1 rounded-full">
+            {salesMetrics.total} total
+          </span>
+        </div>
+        <div className="p-5 grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Value</p>
+            <p className="text-xl font-black text-slate-800">{fmt(salesMetrics.totalValue)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Collected</p>
+            <p className="text-xl font-black text-emerald-600">{fmt(salesMetrics.paidValue)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Outstanding</p>
+            <p className="text-xl font-black text-amber-600">{fmt(salesMetrics.pendingValue)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tax Collected</p>
+            <p className="text-xl font-black text-blue-600">{fmt(salesMetrics.totalTax)}</p>
+          </div>
+        </div>
+        {/* Status bar */}
+        <div className="px-5 pb-4 flex gap-3">
+          {[
+            { label: 'Paid',      val: salesMetrics.paid,      color: 'bg-emerald-100 text-emerald-700' },
+            { label: 'Pending',   val: salesMetrics.pending,   color: 'bg-amber-100 text-amber-700' },
+            { label: 'Cancelled', val: salesMetrics.cancelled, color: 'bg-slate-100 text-slate-500' },
+          ].map(s => (
+            <span key={s.label} className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${s.color}`}>
+              {s.label} · {s.val}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Purchase card */}
+      <div className="bg-white rounded-2xl border border-rose-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 bg-rose-50 border-b border-rose-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ArrowDownRight size={16} className="text-rose-600" />
+            <h3 className="text-sm font-black text-rose-700 uppercase tracking-wide">Purchase Invoices</h3>
+          </div>
+          <span className="text-xs font-black bg-rose-600 text-white px-2.5 py-1 rounded-full">
+            {purchaseMetrics.total} total
+          </span>
+        </div>
+        <div className="p-5 grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Value</p>
+            <p className="text-xl font-black text-slate-800">{fmt(purchaseMetrics.totalValue)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widests mb-1">Paid</p>
+            <p className="text-xl font-black text-rose-600">{fmt(purchaseMetrics.paidValue)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Outstanding</p>
+            <p className="text-xl font-black text-amber-600">{fmt(purchaseMetrics.pendingValue)}</p>
+          </div>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Input Tax</p>
+            <p className="text-xl font-black text-violet-600">{fmt(purchaseMetrics.totalTax)}</p>
+          </div>
+        </div>
+        <div className="px-5 pb-4 flex gap-3">
+          {[
+            { label: 'Paid',      val: purchaseMetrics.paid,      color: 'bg-emerald-100 text-emerald-700' },
+            { label: 'Pending',   val: purchaseMetrics.pending,   color: 'bg-amber-100 text-amber-700' },
+            { label: 'Cancelled', val: purchaseMetrics.cancelled, color: 'bg-slate-100 text-slate-500' },
+          ].map(s => (
+            <span key={s.label} className={`text-[10px] font-black px-2.5 py-1 rounded-full uppercase ${s.color}`}>
+              {s.label} · {s.val}
+            </span>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    {/* ── Net position ── */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Revenue (Sales − Purchases)</p>
+        <p className={`text-2xl font-black ${salesMetrics.totalValue - purchaseMetrics.totalValue >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+          {fmt(salesMetrics.totalValue - purchaseMetrics.totalValue)}
+        </p>
+      </div>
+      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Outstanding (Both)</p>
+        <p className="text-2xl font-black text-amber-600">
+          {fmt(salesMetrics.pendingValue + purchaseMetrics.pendingValue)}
+        </p>
+      </div>
+      <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net Tax Position</p>
+        <p className={`text-2xl font-black ${salesMetrics.totalTax - purchaseMetrics.totalTax >= 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+          {fmt(Math.abs(salesMetrics.totalTax - purchaseMetrics.totalTax))}
+          <span className="text-xs font-bold text-slate-400 ml-2">
+            {salesMetrics.totalTax - purchaseMetrics.totalTax >= 0 ? 'payable' : 'credit'}
+          </span>
+        </p>
+      </div>
+    </div>
+
+    {/* ── Sales invoice table ── */}
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <h3 className="text-sm font-black text-slate-700 uppercase tracking-wide">Sales Invoice Detail</h3>
+        <span className="text-xs text-slate-400 font-bold">{salesInvoices.length} records</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 border-b border-slate-100">
+            <tr>
+              {['Invoice #', 'Client', 'Date', 'Subtotal', 'Tax', 'Total', 'Status'].map(h => (
+                <th key={h} className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {salesInvoices.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No sales invoices yet</td></tr>
+            ) : salesInvoices.map(inv => (
+              <tr key={inv._id} className="hover:bg-slate-50">
+                <td className="px-4 py-3 font-mono text-[10px] text-slate-500">{inv.invoiceNumber || '—'}</td>
+                <td className="px-4 py-3 font-semibold text-slate-700">{inv.clientName || inv.client?.name || 'N/A'}</td>
+                <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                  {new Date(inv.invoiceDate).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                </td>
+                <td className="px-4 py-3 text-slate-600">{fmt(inv.subtotal)}</td>
+                <td className="px-4 py-3 text-blue-600 font-semibold">{fmt(inv.taxAmount)}</td>
+                <td className="px-4 py-3 font-black text-slate-800">{fmt(inv.totalAmount)}</td>
+                <td className="px-4 py-3">
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                    inv.status === 'Paid'      ? 'bg-emerald-50 text-emerald-600' :
+                    inv.status === 'Pending'   ? 'bg-amber-50 text-amber-600' :
+                    inv.status === 'Cancelled' ? 'bg-slate-100 text-slate-400' :
+                    'bg-blue-50 text-blue-600'
+                  }`}>{inv.status}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {salesInvoices.length > 0 && (
+            <tfoot className="bg-emerald-50 border-t-2 border-emerald-100">
+              <tr>
+                <td colSpan={3} className="px-4 py-3 font-black text-emerald-700 text-xs uppercase tracking-wide">Total</td>
+                <td className="px-4 py-3 font-black text-slate-700">{fmt(salesMetrics.totalValue - salesMetrics.totalTax)}</td>
+                <td className="px-4 py-3 font-black text-blue-700">{fmt(salesMetrics.totalTax)}</td>
+                <td className="px-4 py-3 font-black text-emerald-700">{fmt(salesMetrics.totalValue)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+
+    {/* ── Purchase invoice table ── */}
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+        <h3 className="text-sm font-black text-slate-700 uppercase tracking-wide">Purchase Invoice Detail</h3>
+        <span className="text-xs text-slate-400 font-bold">{purchaseInvoices.length} records</span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="bg-slate-50 border-b border-slate-100">
+            <tr>
+              {['Purchase #', 'Vendor/Ref', 'Date', 'Subtotal', 'Tax', 'Total', 'Status'].map(h => (
+                <th key={h} className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {purchaseInvoices.length === 0 ? (
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No purchase invoices yet</td></tr>
+            ) : purchaseInvoices.map(inv => (
+              <tr key={inv._id} className="hover:bg-slate-50">
+                <td className="px-4 py-3 font-mono text-[10px] text-slate-500">{inv.purchaseNumber || inv.referenceNumber || '—'}</td>
+                <td className="px-4 py-3 font-semibold text-slate-700">{inv.clientName || inv.client?.name || 'N/A'}</td>
+                <td className="px-4 py-3 text-slate-500 whitespace-nowrap">
+                  {new Date(inv.invoiceDate).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                </td>
+                <td className="px-4 py-3 text-slate-600">{fmt(inv.subtotal)}</td>
+                <td className="px-4 py-3 text-violet-600 font-semibold">{fmt(inv.taxAmount)}</td>
+                <td className="px-4 py-3 font-black text-slate-800">{fmt(inv.totalAmount)}</td>
+                <td className="px-4 py-3">
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                    inv.status === 'Paid'      ? 'bg-emerald-50 text-emerald-600' :
+                    inv.status === 'Pending'   ? 'bg-amber-50 text-amber-600' :
+                    inv.status === 'Cancelled' ? 'bg-slate-100 text-slate-400' :
+                    'bg-blue-50 text-blue-600'
+                  }`}>{inv.status}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+          {purchaseInvoices.length > 0 && (
+            <tfoot className="bg-rose-50 border-t-2 border-rose-100">
+              <tr>
+                <td colSpan={3} className="px-4 py-3 font-black text-rose-700 text-xs uppercase tracking-wide">Total</td>
+                <td className="px-4 py-3 font-black text-slate-700">{fmt(purchaseMetrics.totalValue - purchaseMetrics.totalTax)}</td>
+                <td className="px-4 py-3 font-black text-violet-700">{fmt(purchaseMetrics.totalTax)}</td>
+                <td className="px-4 py-3 font-black text-rose-700">{fmt(purchaseMetrics.totalValue)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+
   </div>
 )}
         {/* Breakdown Section */}
