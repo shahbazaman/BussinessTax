@@ -3,7 +3,7 @@ import api from '../utils/api';
 import { Landmark, Calculator, Download, PieChart, ArrowUpRight, ArrowDownRight, Scale, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, Loader2, Receipt,Droplets, Activity, ArrowRight, BookCopy, FileText } from 'lucide-react';
 import { CurrencyContext } from '../context/CurrencyContext';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -161,6 +161,36 @@ setBsData(bsRes.data);
   };
 const exportTabPDF = async (containerId, filename) => {
   const loadingToast = toast.loading('Generating PDF...');
+  
+  // Polyfill oklch colors for html2canvas compatibility (Tailwind v4 uses oklch)
+  const allElements = document.querySelectorAll('*');
+  const originalStyles = [];
+  allElements.forEach((el) => {
+    const computed = window.getComputedStyle(el);
+    const props = ['color', 'backgroundColor', 'borderColor', 'borderTopColor', 'borderBottomColor', 'borderLeftColor', 'borderRightColor'];
+    const overrides = {};
+    props.forEach((prop) => {
+      const val = computed.getPropertyValue(prop);
+      if (val && val.includes('oklch')) {
+        // Convert oklch to a safe fallback by re-reading as RGB via a temp element
+        const tmp = document.createElement('div');
+        tmp.style.color = val;
+        tmp.style.display = 'none';
+        document.body.appendChild(tmp);
+        const rgb = window.getComputedStyle(tmp).color;
+        document.body.removeChild(tmp);
+        overrides[prop] = rgb;
+      }
+    });
+    if (Object.keys(overrides).length > 0) {
+      originalStyles.push({ el, overrides: {} });
+      Object.entries(overrides).forEach(([prop, val]) => {
+        originalStyles[originalStyles.length - 1].overrides[prop] = el.style[prop];
+        el.style[prop] = val;
+      });
+    }
+  });
+
   try {
     const element = document.getElementById(containerId);
     if (!element) throw new Error('Content not found');
@@ -169,6 +199,23 @@ const exportTabPDF = async (containerId, filename) => {
       useCORS: true,
       backgroundColor: '#ffffff',
       logging: false,
+      onclone: (clonedDoc) => {
+        // Strip any oklch from the cloned document's stylesheets
+        Array.from(clonedDoc.styleSheets).forEach((sheet) => {
+          try {
+            Array.from(sheet.cssRules || []).forEach((rule) => {
+              if (rule.style) {
+                Array.from(rule.style).forEach((prop) => {
+                  const val = rule.style.getPropertyValue(prop);
+                  if (val.includes('oklch')) {
+                    rule.style.setProperty(prop, '#6b7280'); // safe gray fallback
+                  }
+                });
+              }
+            });
+          } catch (_) { /* cross-origin sheets — skip */ }
+        });
+      },
     });
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
@@ -179,6 +226,13 @@ const exportTabPDF = async (containerId, filename) => {
     toast.update(loadingToast, { render: 'Exported!', type: 'success', isLoading: false, autoClose: 2500 });
   } catch (err) {
     toast.update(loadingToast, { render: 'Export failed: ' + err.message, type: 'error', isLoading: false, autoClose: 3000 });
+  } finally {
+    // Restore original inline styles
+    originalStyles.forEach(({ el, overrides }) => {
+      Object.entries(overrides).forEach(([prop, val]) => {
+        el.style[prop] = val;
+      });
+    });
   }
 };
 

@@ -211,20 +211,19 @@ const handleReceiptUpload = async (e) => {
             <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold outline-none" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold outline-none" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
-          <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
-  {['All', ...categories].map(cat => (
-    <button
-      key={cat}
-      onClick={() => setFilterCategory(cat)}
-      className={`text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wide transition-all ${
-        filterCategory === cat
-          ? 'bg-slate-900 text-white'
-          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
-      }`}
-    >
-      {cat}
-    </button>
-  ))}
+          <div className="flex items-center gap-2">
+  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">
+    Category
+  </label>
+  <select
+    value={filterCategory}
+    onChange={(e) => setFilterCategory(e.target.value)}
+    className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-xl outline-none cursor-pointer hover:border-slate-400 transition-all"
+  >
+    {['All', ...categories].map(cat => (
+      <option key={cat} value={cat}>{cat}</option>
+    ))}
+  </select>
 </div>
         </div>
 
