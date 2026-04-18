@@ -1,9 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  BookMarked, Plus, Trash2, RefreshCw, Loader2,
-  ShieldCheck, ChevronDown, X, Info, Search,
-  Eye
-} from 'lucide-react';
+import {BookMarked, Plus, Trash2, RefreshCw, Loader2,ShieldCheck, ChevronDown, X, Info, Search,Eye, Pencil} from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
 
@@ -34,10 +30,28 @@ const LedgerAccounts = () => {
     const [search, setSearch]           = useState('');
     const [filterType, setFilterType]   = useState('all');
     const [deletingId, setDeletingId]   = useState(null);
+    const [editAccount, setEditAccount] = useState(null); 
+    const [editForm,    setEditForm]    = useState({ name: '', code: '', description: '' });
+    const [editSaving,  setEditSaving]  = useState(false);
     const [viewAccount,    setViewAccount]    = useState(null); 
     const [viewEntries,    setViewEntries]    = useState([]);
     const [viewSummary,    setViewSummary]    = useState(null);
     const [viewLoading,    setViewLoading]    = useState(false);
+    const [viewDateFrom,   setViewDateFrom]   = useState('');
+    const [viewDateTo,     setViewDateTo]     = useState('');
+    // Filtered entries based on date range
+const filteredViewEntries = viewEntries.filter(e => {
+  const d = new Date(e.date);
+  if (viewDateFrom && d < new Date(viewDateFrom)) return false;
+  if (viewDateTo   && d > new Date(viewDateTo + 'T23:59:59')) return false;
+  return true;
+});
+
+const filteredSummary = filteredViewEntries.length > 0 ? {
+  totalDebit:     Number(filteredViewEntries.reduce((s, e) => s + (e.debit  || 0), 0).toFixed(2)),
+  totalCredit:    Number(filteredViewEntries.reduce((s, e) => s + (e.credit || 0), 0).toFixed(2)),
+  closingBalance: Number(filteredViewEntries.reduce((s, e) => s + (e.debit  || 0) - (e.credit || 0), 0).toFixed(2)),
+} : viewSummary;
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchAccounts = useCallback(async () => {
     setLoading(true);
@@ -99,6 +113,26 @@ const LedgerAccounts = () => {
       setDeletingId(null);
     }
   };
+  // ── Edit ─────────────────────────────────────────────────────────────────
+const handleEditOpen = (account) => {
+  setEditAccount(account);
+  setEditForm({ name: account.name, code: account.code || '', description: account.description || '' });
+};
+
+const handleEditSave = async () => {
+  if (!editForm.name.trim()) return toast.error('Account name is required.');
+  setEditSaving(true);
+  try {
+    const { data } = await api.put(`/ledger-accounts/${editAccount._id}`, editForm);
+    setAccounts(prev => prev.map(a => String(a._id) === String(editAccount._id) ? { ...a, ...data } : a));
+    toast.success('Account updated.');
+    setEditAccount(null);
+  } catch (err) {
+    toast.error(err?.response?.data?.message || 'Failed to update account.');
+  } finally {
+    setEditSaving(false);
+  }
+};
 const handleView = async (account) => {
   setViewAccount(account);
   setViewEntries([]);
@@ -414,6 +448,15 @@ const handleView = async (account) => {
                                 >
                                 <Eye size={14} />
                                 </button>
+                                {!account.isSystem && (
+                                  <button
+                                    onClick={() => handleEditOpen(account)}
+                                    className="p-2 rounded-xl text-slate-400 hover:text-amber-600 hover:bg-amber-50 transition-colors"
+                                    title="Edit account"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                )}
                       {/* Delete button — only for non-system accounts */}
                       {!account.isSystem ? (
                         <button
@@ -443,6 +486,75 @@ const handleView = async (account) => {
       <p className="text-center text-[10px] text-slate-300 font-bold uppercase tracking-widest pb-4">
         Chart of accounts · Used in all journal entries and the general ledger
       </p>
+      {/* ── Edit Account Modal ── */}
+{editAccount && (
+  <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div>
+          <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Edit Account</p>
+          <h3 className="text-lg font-black text-slate-800">{editAccount.name}</h3>
+        </div>
+        <button onClick={() => setEditAccount(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
+          <X size={18} />
+        </button>
+      </div>
+      <div className="px-6 py-5 space-y-4">
+        <div>
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+            Account Name <span className="text-rose-500">*</span>
+          </label>
+          <input
+            type="text"
+            value={editForm.name}
+            onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))}
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+            Account Code <span className="text-slate-300">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={editForm.code}
+            onChange={e => setEditForm(f => ({ ...f, code: e.target.value }))}
+            placeholder="e.g. 1100"
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">
+            Description <span className="text-slate-300">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={editForm.description}
+            onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))}
+            placeholder="Brief description..."
+            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          />
+        </div>
+      </div>
+      <div className="flex justify-end gap-3 px-6 pb-5">
+        <button
+          onClick={() => setEditAccount(null)}
+          className="px-5 py-2.5 rounded-xl text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleEditSave}
+          disabled={editSaving}
+          className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors disabled:opacity-60"
+        >
+          {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
+          Save Changes
+        </button>
+      </div>
+    </div>
+  </div>
+)}
       {/* ── View Account Modal ── */}
 {viewAccount && (
   <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
@@ -454,25 +566,51 @@ const handleView = async (account) => {
           <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">{viewAccount.type} Account</p>
           <h3 className="text-lg font-black text-slate-800">{viewAccount.name}</h3>
         </div>
-        <button onClick={() => setViewAccount(null)} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
-          <X size={18} />
-        </button>
+        <div className="flex items-center gap-3">
+  <div className="flex items-center gap-2">
+    <input
+      type="date"
+      value={viewDateFrom}
+      onChange={e => setViewDateFrom(e.target.value)}
+      className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50"
+    />
+    <span className="text-slate-300 text-xs font-bold">to</span>
+    <input
+      type="date"
+      value={viewDateTo}
+      onChange={e => setViewDateTo(e.target.value)}
+      className="text-xs border border-slate-200 rounded-lg px-2 py-1.5 text-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50"
+    />
+    {(viewDateFrom || viewDateTo) && (
+      <button
+        onClick={() => { setViewDateFrom(''); setViewDateTo(''); }}
+        className="text-xs text-slate-400 hover:text-rose-500 font-bold"
+        title="Clear filter"
+      >
+        <X size={13} />
+      </button>
+    )}
+  </div>
+  <button onClick={() => { setViewAccount(null); setViewDateFrom(''); setViewDateTo(''); }} className="p-2 rounded-xl hover:bg-slate-100 text-slate-400">
+    <X size={18} />
+  </button>
+</div>
       </div>
 
       {/* Summary Bar */}
-      {viewSummary && (
+      {filteredSummary && (
         <div className="grid grid-cols-3 gap-4 px-6 py-3 bg-slate-50 border-b border-slate-100">
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Debit</p>
-            <p className="text-base font-black text-rose-600">₹{viewSummary.totalDebit.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+            <p className="text-base font-black text-rose-600">₹{filteredSummary.totalDebit.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Credit</p>
-            <p className="text-base font-black text-emerald-600">₹{viewSummary.totalCredit.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
+            <p className="text-base font-black text-emerald-600">₹{filteredSummary.totalCredit.toLocaleString(undefined,{minimumFractionDigits:2})}</p>
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Closing Balance</p>
-            <p className={`text-base font-black ${viewSummary.closingBalance >= 0 ? 'text-indigo-600' : 'text-orange-600'}`}>
+            <p className={`text-base font-black ${filteredSummary.closingBalance >= 0 ? 'text-indigo-600' : 'text-orange-600'}`}>
               ₹{Math.abs(viewSummary.closingBalance).toLocaleString(undefined,{minimumFractionDigits:2})}
             </p>
           </div>
@@ -485,7 +623,7 @@ const handleView = async (account) => {
           <div className="flex justify-center items-center py-16">
             <Loader2 className="animate-spin text-indigo-500" size={28} />
           </div>
-        ) : viewEntries.length === 0 ? (
+        ) : filteredViewEntries.length === 0 ? (
           <div className="py-16 text-center">
             <p className="text-slate-400 font-bold text-sm">No journal entries for this account yet.</p>
             <p className="text-slate-300 text-xs mt-1">Entries appear automatically when invoices or expenses are created.</p>
@@ -500,12 +638,12 @@ const handleView = async (account) => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {viewEntries.map((e, i) => (
+              {filteredViewEntries.map((e, i) => (
                 <tr key={i} className={`hover:bg-slate-50 ${e.isReversed ? 'opacity-50' : ''}`}>
                   <td className="px-4 py-2.5 whitespace-nowrap text-slate-500">
                     {new Date(e.date).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}
                   </td>
-                  <td className="px-4 py-2.5 max-w-[180px] truncate text-slate-700 font-medium">{e.description}</td>
+                  <td className="px-4 py-2.5 max-w-45 truncate text-slate-700 font-medium">{e.description}</td>
                   <td className="px-4 py-2.5 text-slate-600 whitespace-nowrap">
                     <span className="text-rose-400 font-black text-[9px] mr-1">Dr</span>{e.debitAccount || '—'}
                   </td>

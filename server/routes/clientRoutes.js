@@ -89,5 +89,32 @@ router.delete('/:id', protect, async (req, res) => {
     res.status(500).json({ message: "Error deleting client" });
   }
 });
+// GET /api/clients/ar-aging
+router.get('/ar-aging', protect, async (req, res) => {
+  try {
+    const Invoice = (await import('../models/Invoice.js')).default;
+    const Client  = (await import('../models/Client.js')).default;
+    const now = new Date();
 
+    const unpaid = await Invoice.find({
+      userId: req.user._id,
+      type: 'Sale',
+      status: { $in: ['Unpaid', 'Partial'] }
+    }).populate('clientId', 'name').lean();
+
+    const map = {};
+    for (const inv of unpaid) {
+      const name = inv.clientId?.name || 'Unknown';
+      if (!map[name]) map[name] = { client: name, '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0, total: 0 };
+      const days = Math.floor((now - new Date(inv.dueDate || inv.date)) / 86400000);
+      const bucket = days <= 30 ? '0-30' : days <= 60 ? '31-60' : days <= 90 ? '61-90' : '90+';
+      const due = inv.totalAmount - (inv.paidAmount || 0);
+      map[name][bucket] += due;
+      map[name].total   += due;
+    }
+    res.json(Object.values(map));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 export default router;

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import api from '../utils/api';
-import { Landmark, Calculator, Download, PieChart, ArrowUpRight, ArrowDownRight, Scale, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, Loader2, Receipt } from 'lucide-react';
+import { Landmark, Calculator, Download, PieChart, ArrowUpRight, ArrowDownRight, Scale, DollarSign, TrendingUp, TrendingDown, CheckCircle, XCircle, Loader2, Receipt,Droplets, Activity, ArrowRight, BookCopy } from 'lucide-react';
 import { CurrencyContext } from '../context/CurrencyContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
@@ -32,7 +32,9 @@ const fmt = (n) => `${symbol}${Number(n||0).toLocaleString(undefined,{minimumFra
 
   // The formula for your estimated tax
   const estimatedTax = profit > 0 ? (profit * (currentTaxRate / 100)) : 0;
-
+  const [cfData, setCfData] = useState(null);
+  const [arAging, setArAging] = useState([]);
+  const [bsData, setBsData] = useState(null);
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -64,7 +66,8 @@ const fmt = (n) => `${symbol}${Number(n||0).toLocaleString(undefined,{minimumFra
           setCurrency(profileRes.data.currency);
         }
 setInvoices(invoicesRes.data || []);
-
+const arRes = await api.get('/clients/ar-aging');
+setArAging(arRes.data || []);
       } catch (err) {
         console.error("Report Fetch Error:", err);
         toast.error("Failed to sync fiscal data");
@@ -96,6 +99,10 @@ setTaxData({
   netOwed: taxCollected - taxDeductible,
   invoices: (invRes.data || []).filter(i => i.type === 'Sale')
 });
+const cfRes = await api.get('/ledger-accounts/reports/cash-flow');
+setCfData(cfRes.data);
+const bsRes = await api.get('/ledger-accounts/reports/balance-sheet');
+setBsData(bsRes.data);
       } catch { /* silent — TB is non-critical */ } 
       finally { setTbLoading(false); }
     };
@@ -190,6 +197,8 @@ setTaxData({
   { id: 'trial-balance',  label: 'Trial Balance',  icon: <Scale size={14}/> },
   { id: 'profit-loss',    label: 'Profit & Loss',  icon: <DollarSign size={14}/> },
   { id: 'tax-summary',    label: 'Tax Summary',    icon: <Receipt size={14}/> },
+  { id: 'cash-flow', label: 'Cash Flow', icon: <Activity size={14}/> },
+  { id: 'balance-sheet', label: 'Balance Sheet', icon: <BookCopy size={14}/> },
 ].map(tab => (
     <button
       key={tab.id}
@@ -436,6 +445,122 @@ setTaxData({
     </div>
   )
 )}
+{/* ── Cash Flow Tab ── */}
+{activeTab === 'cash-flow' && (
+  <div className="space-y-6">
+    <h2 className="text-lg font-black text-slate-800">Cash Flow Statement</h2>
+    {!cfData ? (
+      <div className="text-slate-400 text-sm">Loading...</div>
+    ) : (
+      <>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { label: 'Operating Activities', value: cfData.operating, desc: 'Revenue minus Expenses', color: 'emerald' },
+            { label: 'Investing Activities', value: cfData.investing, desc: 'Asset purchases/sales', color: 'blue' },
+            { label: 'Financing Activities', value: cfData.financing, desc: 'Loans & equity', color: 'violet' },
+          ].map(card => (
+            <div key={card.label} className={`bg-white rounded-2xl p-5 border shadow-sm border-${card.color}-100`}>
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">{card.label}</p>
+              <p className={`text-2xl font-black ${card.value >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                {fmt(card.value)}
+              </p>
+              <p className="text-xs text-slate-400 mt-1">{card.desc}</p>
+            </div>
+          ))}
+        </div>
+        <div className={`rounded-2xl p-6 border shadow-sm ${cfData.netCash >= 0 ? 'bg-emerald-50 border-emerald-200' : 'bg-rose-50 border-rose-200'}`}>
+          <p className="text-sm font-bold text-slate-600 mb-1">Net Cash Change</p>
+          <p className={`text-4xl font-black ${cfData.netCash >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+            {fmt(cfData.netCash)}
+          </p>
+          <p className="text-xs text-slate-500 mt-2">Operating + Investing + Financing</p>
+        </div>
+      </>
+    )}
+  </div>
+)}
+{/* ── Balance Sheet Tab ── */}
+{activeTab === 'balance-sheet' && (
+  <div className="space-y-4">
+    <h2 className="text-lg font-black text-slate-800">Balance Sheet</h2>
+    {!bsData ? <div className="text-slate-400 text-sm">Loading...</div> : (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Assets Column */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 bg-blue-50 border-b border-blue-100">
+            <h3 className="text-sm font-black text-blue-700 uppercase tracking-wide">Assets</h3>
+          </div>
+          <table className="w-full text-xs">
+            <tbody>
+              {bsData.assets.map(a => (
+                <tr key={a.name} className="border-b border-slate-50 hover:bg-slate-50">
+                  <td className="px-4 py-3 text-slate-600">{a.name}</td>
+                  <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(a.balance)}</td>
+                </tr>
+              ))}
+              <tr className="bg-blue-50">
+                <td className="px-4 py-3 font-black text-blue-700">Total Assets</td>
+                <td className="px-4 py-3 text-right font-black text-blue-700">{fmt(bsData.totalAssets)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        {/* Liabilities + Equity Column */}
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 bg-rose-50 border-b border-rose-100">
+              <h3 className="text-sm font-black text-rose-700 uppercase tracking-wide">Liabilities</h3>
+            </div>
+            <table className="w-full text-xs">
+              <tbody>
+                {bsData.liabilities.length === 0
+                  ? <tr><td colSpan={2} className="px-4 py-4 text-slate-400 text-center">No liabilities recorded</td></tr>
+                  : bsData.liabilities.map(a => (
+                    <tr key={a.name} className="border-b border-slate-50 hover:bg-slate-50">
+                      <td className="px-4 py-3 text-slate-600">{a.name}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(a.balance)}</td>
+                    </tr>
+                  ))}
+                <tr className="bg-rose-50">
+                  <td className="px-4 py-3 font-black text-rose-700">Total Liabilities</td>
+                  <td className="px-4 py-3 text-right font-black text-rose-700">{fmt(bsData.totalLiabilities)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-3 bg-violet-50 border-b border-violet-100">
+              <h3 className="text-sm font-black text-violet-700 uppercase tracking-wide">Equity</h3>
+            </div>
+            <table className="w-full text-xs">
+              <tbody>
+                {bsData.equity.length === 0
+                  ? <tr><td colSpan={2} className="px-4 py-4 text-slate-400 text-center">No equity accounts recorded</td></tr>
+                  : bsData.equity.map(a => (
+                    <tr key={a.name} className="border-b border-slate-50 hover:bg-slate-50">
+                      <td className="px-4 py-3 text-slate-600">{a.name}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-slate-800">{fmt(a.balance)}</td>
+                    </tr>
+                  ))}
+                <tr className="bg-violet-50">
+                  <td className="px-4 py-3 font-black text-violet-700">Total Equity</td>
+                  <td className="px-4 py-3 text-right font-black text-violet-700">{fmt(bsData.totalEquity)}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          {/* Balance check */}
+          <div className={`rounded-2xl p-4 text-center border ${Math.abs(bsData.totalAssets - (bsData.totalLiabilities + bsData.totalEquity)) < 1 ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+            <p className="text-xs font-bold text-slate-500">Assets = Liabilities + Equity</p>
+            <p className={`text-lg font-black mt-1 ${Math.abs(bsData.totalAssets - (bsData.totalLiabilities + bsData.totalEquity)) < 1 ? 'text-emerald-600' : 'text-amber-600'}`}>
+              {fmt(bsData.totalAssets)} = {fmt(bsData.totalLiabilities + bsData.totalEquity)}
+            </p>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+)}
         {/* Breakdown Section */}
         {activeTab === 'overview' && <>
         <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden">
@@ -474,34 +599,39 @@ setTaxData({
         </div>
         </>}
 {/* Invoice Aging Report */}
-{activeTab === 'overview' && <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden mt-6">
-  <div className="p-8 border-b border-slate-50 flex justify-between items-center">
-    <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Invoice Aging</h3>
-    <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full uppercase">Overdue Tracker</span>
+{activeTab === 'overview' &&
+<div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden mt-6">
+  <div className="px-5 py-4 border-b border-slate-100">
+    <h3 className="text-sm font-black text-slate-700">AR Aging by Customer</h3>
   </div>
-  <div className="p-8 grid grid-cols-2 md:grid-cols-4 gap-4">
-    {(() => {
-      const today = new Date();
-      const aging = { '0–30 days': 0, '31–60 days': 0, '61–90 days': 0, '90+ days': 0 };
-      invoices.filter(i => i.status !== 'Paid').forEach(inv => {
-        const days = Math.floor((today - new Date(inv.dueDate)) / 86400000);
-        if (days <= 30) aging['0–30 days'] += inv.totalAmount || 0;
-        else if (days <= 60) aging['31–60 days'] += inv.totalAmount || 0;
-        else if (days <= 90) aging['61–90 days'] += inv.totalAmount || 0;
-        else aging['90+ days'] += inv.totalAmount || 0;
-      });
-      const colors = ['text-emerald-600', 'text-yellow-600', 'text-orange-500', 'text-rose-600'];
-      const bg = ['bg-emerald-50', 'bg-yellow-50', 'bg-orange-50', 'bg-rose-50'];
-      return Object.entries(aging).map(([label, val], i) => (
-        <div key={label} className={`${bg[i]} p-5 rounded-2xl`}>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{label}</p>
-          <p className={`text-xl font-black ${colors[i]}`}>{formatValue(val)}</p>
-        </div>
-      ));
-    })()}
+  <div className="overflow-x-auto">
+    <table className="w-full text-xs">
+      <thead className="bg-slate-50">
+        <tr>
+          {['Client', '0-30 days', '31-60 days', '61-90 days', '90+ days', 'Total'].map(h => (
+            <th key={h} className="px-4 py-3 text-left font-bold text-slate-500 uppercase tracking-wide">{h}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {arAging.length === 0 ? (
+          <tr><td colSpan={6} className="px-4 py-6 text-center text-slate-400">No outstanding receivables</td></tr>
+        ) : arAging.map(row => (
+          <tr key={row.client} className="border-t border-slate-50 hover:bg-slate-50">
+            <td className="px-4 py-3 font-semibold text-slate-700">{row.client}</td>
+            {['0-30','31-60','61-90','90+'].map(b => (
+              <td key={b} className={`px-4 py-3 ${row[b] > 0 ? (b === '90+' ? 'text-rose-600 font-bold' : 'text-amber-600') : 'text-slate-300'}`}>
+                {row[b] > 0 ? fmt(row[b]) : '—'}
+              </td>
+            ))}
+            <td className="px-4 py-3 font-black text-slate-800">{fmt(row.total)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   </div>
 </div>}
-      </div>
+</div>
 
       {/* Hidden Print Template */}
       <div style={{ position: 'absolute', left: '-9999px', top: '0' }}>
