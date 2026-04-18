@@ -65,6 +65,9 @@ const purchaseMetrics = {
 const [gstFrom, setGstFrom] = useState('');
 const [gstTo,   setGstTo]   = useState('');
 const [gstLoading, setGstLoading] = useState(false);
+const [gstPreset, setGstPreset] = useState(''); // 'monthly' | 'yearly' | ''
+const [gstExportType, setGstExportType] = useState('pdf'); // 'pdf' | 'csv'
+const [gstExportDropdownOpen, setGstExportDropdownOpen] = useState(false);
 const fetchGst = async () => {
   setGstLoading(true);
   try {
@@ -235,7 +238,60 @@ const exportTabPDF = async (containerId, filename) => {
     });
   }
 };
+const exportGstCSV = () => {
+  if (!gstData) return toast.error('No GST data to export');
+  const periodLabel = gstFrom && gstTo
+    ? `${gstFrom}_to_${gstTo}`
+    : gstPreset === 'monthly'
+    ? `monthly_${new Date().toISOString().slice(0, 7)}`
+    : gstPreset === 'yearly'
+    ? `yearly_${new Date().getFullYear()}`
+    : 'all';
 
+  // Summary section
+  const summaryRows = [
+    ['GST REPORT SUMMARY'],
+    ['Period', periodLabel],
+    [''],
+    ['Output GST (Sales)', gstData.outputTax],
+    ['Input GST (Purchases)', gstData.totalInputTax],
+    ['Net GST Payable', gstData.netGst],
+    ['From Purchase Invoices', gstData.inputTaxPurchases],
+    ['From Expenses', gstData.inputTaxExpenses],
+    [''],
+    ['GSTR-1 — Rate-wise Outward Supplies'],
+    ['Tax Rate', 'No. of Invoices', 'Taxable Value', 'Tax Amount'],
+    ...gstData.rateWise.map(r => [r.rate, r.count, r.taxableValue, r.taxAmount]),
+    [''],
+    ['GSTR-1 — Sales Invoices'],
+    ['Invoice #', 'Client', 'Date', 'GST No.', 'Taxable Amt', 'Tax Rate', 'Tax Amt', 'Total'],
+    ...gstData.salesInvoices.map(inv => [
+      inv.invoiceNumber || '', inv.clientName || '',
+      new Date(inv.invoiceDate).toLocaleDateString(),
+      inv.gstNumber || '', inv.subtotal, `${inv.globalTaxRate}%`, inv.taxAmount, inv.totalAmount
+    ]),
+    [''],
+    ['GSTR-3B — Purchase Invoices'],
+    ['Purchase #', 'Vendor', 'Date', 'Taxable Amt', 'Tax Rate', 'Input Tax'],
+    ...gstData.purchaseInvoices.map(inv => [
+      inv.purchaseNumber || inv.referenceNumber || '', inv.clientName || '',
+      new Date(inv.invoiceDate).toLocaleDateString(),
+      inv.subtotal, `${inv.globalTaxRate}%`, inv.taxAmount
+    ]),
+  ];
+
+  const csvContent = summaryRows
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `GST-Report-${periodLabel}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast.success('GST CSV exported!');
+};
   if (loading) return (
     <div className="flex justify-center items-center h-screen bg-slate-50">
       <div className="animate-pulse text-slate-400 font-black tracking-widest uppercase">Syncing Fiscal Data...</div>
@@ -953,26 +1009,70 @@ const exportTabPDF = async (containerId, filename) => {
 )}
 {activeTab === 'gst' && (
   <>
-    <div className="flex justify-end mb-4">
-      <button onClick={() => exportTabPDF('tab-gst', 'GST-Report')}
-        className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
-        <Download size={14}/> Export PDF
-      </button>
-    </div>
     <div id="tab-gst" className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
-        <span className="text-xs font-black text-slate-500 uppercase tracking-wide">Period</span>
-        <input type="date" value={gstFrom} onChange={e => setGstFrom(e.target.value)}
-          className="text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50" />
-        <span className="text-slate-300 text-xs font-bold">to</span>
-        <input type="date" value={gstTo} onChange={e => setGstTo(e.target.value)}
-          className="text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50" />
-        {(gstFrom || gstTo) && (
-          <button onClick={() => { setGstFrom(''); setGstTo(''); }}
-            className="text-xs text-slate-400 hover:text-rose-500 font-bold px-2 py-1 rounded-lg bg-slate-100">
-            Clear
+      {/* Period Filter + Export Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-xs font-black text-slate-500 uppercase tracking-wide">Period</span>
+          {/* Quick presets */}
+          {[
+            { label: 'This Month', value: 'monthly' },
+            { label: 'This Year',  value: 'yearly'  },
+          ].map(p => (
+            <button key={p.value}
+              onClick={() => {
+                const now = new Date();
+                if (p.value === 'monthly') {
+                  setGstFrom(new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]);
+                  setGstTo(new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0]);
+                } else {
+                  setGstFrom(`${now.getFullYear()}-01-01`);
+                  setGstTo(`${now.getFullYear()}-12-31`);
+                }
+                setGstPreset(p.value);
+              }}
+              className={`text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wide transition-all ${
+                gstPreset === p.value ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+              }`}>
+              {p.label}
+            </button>
+          ))}
+          <span className="text-slate-300 text-xs font-bold">or custom:</span>
+          <input type="date" value={gstFrom} onChange={e => { setGstFrom(e.target.value); setGstPreset(''); }}
+            className="text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50" />
+          <span className="text-slate-300 text-xs font-bold">to</span>
+          <input type="date" value={gstTo} onChange={e => { setGstTo(e.target.value); setGstPreset(''); }}
+            className="text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50" />
+          {(gstFrom || gstTo) && (
+            <button onClick={() => { setGstFrom(''); setGstTo(''); setGstPreset(''); }}
+              className="text-xs text-slate-400 hover:text-rose-500 font-bold px-2 py-1 rounded-lg bg-slate-100">
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Export Dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setGstExportDropdownOpen(o => !o)}
+            className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
+            <Download size={14}/> Export ▾
           </button>
-        )}
+          {gstExportDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-44 bg-white border border-slate-100 rounded-xl shadow-lg z-50 overflow-hidden">
+              <button
+                onClick={() => { setGstExportDropdownOpen(false); exportTabPDF('tab-gst', `GST-Report`); }}
+                className="w-full text-left px-4 py-3 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-600 flex items-center gap-2">
+                <Download size={12}/> Export as PDF
+              </button>
+              <button
+                onClick={() => { setGstExportDropdownOpen(false); exportGstCSV(); }}
+                className="w-full text-left px-4 py-3 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2">
+                <Download size={12}/> Export as CSV
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       {gstLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" size={32}/></div>
