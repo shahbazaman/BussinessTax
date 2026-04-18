@@ -13,4 +13,5 @@ export const ACCOUNT_TYPES = {
   'Sales Revenue':              'Revenue',
   'Purchase / Cost of Goods':   'Expense',
   'Bank Account':               'Asset',
+  'Accounts Payable':           'Liability',
 };

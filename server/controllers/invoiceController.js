@@ -92,8 +92,59 @@ const isSale    = invoiceType === 'Sale';
 const accountId = paidIntoAccount;
 
 // ── DOUBLE-ENTRY: Invoice Created ────
+// if (isSale) {
+//   // Always post Dr Accounts Receivable / Cr Sales Revenue on invoice creation
+//   const arAccount  = await getSystemAccount(req.user._id, ACCOUNTS.ACCOUNTS_RECEIVABLE, 'Asset', session);
+//   const revAccount = await getSystemAccount(req.user._id, ACCOUNTS.SALES_REVENUE, 'Revenue', session);
+
+//   await createJournalEntry({
+//     userId: req.user._id,
+//     debitAccountId:  arAccount._id,
+//     creditAccountId: revAccount._id,
+//     amount: invoiceAmount,
+//     date: savedInvoice.invoiceDate,
+//     description: `Invoice: ${savedInvoice.invoiceNumber || savedInvoice.referenceNumber || savedInvoice._id}`,
+//     narration: `Sale to ${savedInvoice.clientName || 'Customer'}`,
+//     sourceType: 'Invoice',
+//     sourceId: savedInvoice._id,
+//     entrySequence: 1,
+//     session,
+//   });
+
+//   // If invoice is immediately Paid, also post the payment entry
+// if (isPaid && accountId) {
+//   // Get the actual bank name from the Account record
+//   const bankAccountDoc = await Account.findById(accountId).session(session);
+//   const bankName = bankAccountDoc?.bankName || 'Bank Account';
+
+//   // Find or create a LedgerAccount with the same name
+//   let bankLedgerAccount = await LedgerAccount.findOne({
+//     userId: req.user._id, name: bankName
+//   }).session(session);
+//   if (!bankLedgerAccount) {
+//     [bankLedgerAccount] = await LedgerAccount.create([{
+//       userId: req.user._id, name: bankName, type: 'Asset', isSystem: false
+//     }], { session });
+//   }
+
+//   await createJournalEntry({
+//     userId: req.user._id,
+//     debitAccountId:  bankLedgerAccount._id,
+//     creditAccountId: arAccount._id,
+//     amount: invoiceAmount,
+//     date: savedInvoice.invoiceDate,
+//     description: `Payment received: ${savedInvoice.invoiceNumber || savedInvoice._id}`,
+//     narration: `Payment from ${savedInvoice.clientName || 'Customer'}`,
+//     sourceType: 'Invoice',
+//     sourceId: savedInvoice._id,
+//     entrySequence: 2,
+//     session,
+//   });
+// }
+// }
+// ── DOUBLE-ENTRY: Invoice Created ────
 if (isSale) {
-  // Always post Dr Accounts Receivable / Cr Sales Revenue on invoice creation
+  // Dr Accounts Receivable / Cr Sales Revenue
   const arAccount  = await getSystemAccount(req.user._id, ACCOUNTS.ACCOUNTS_RECEIVABLE, 'Asset', session);
   const revAccount = await getSystemAccount(req.user._id, ACCOUNTS.SALES_REVENUE, 'Revenue', session);
 
@@ -111,36 +162,75 @@ if (isSale) {
     session,
   });
 
-  // If invoice is immediately Paid, also post the payment entry
-if (isPaid && accountId) {
-  // Get the actual bank name from the Account record
-  const bankAccountDoc = await Account.findById(accountId).session(session);
-  const bankName = bankAccountDoc?.bankName || 'Bank Account';
-
-  // Find or create a LedgerAccount with the same name
-  let bankLedgerAccount = await LedgerAccount.findOne({
-    userId: req.user._id, name: bankName
-  }).session(session);
-  if (!bankLedgerAccount) {
-    [bankLedgerAccount] = await LedgerAccount.create([{
-      userId: req.user._id, name: bankName, type: 'Asset', isSystem: false
-    }], { session });
+  // If paid immediately → Dr Bank / Cr AR
+  if (isPaid && accountId) {
+    const bankAccountDoc = await Account.findById(accountId).session(session);
+    const bankName = bankAccountDoc?.bankName || 'Bank Account';
+    let bankLedgerAccount = await LedgerAccount.findOne({ userId: req.user._id, name: bankName }).session(session);
+    if (!bankLedgerAccount) {
+      [bankLedgerAccount] = await LedgerAccount.create([{
+        userId: req.user._id, name: bankName, type: 'Asset', isSystem: false
+      }], { session });
+    }
+    await createJournalEntry({
+      userId: req.user._id,
+      debitAccountId:  bankLedgerAccount._id,
+      creditAccountId: arAccount._id,
+      amount: invoiceAmount,
+      date: savedInvoice.invoiceDate,
+      description: `Payment received: ${savedInvoice.invoiceNumber || savedInvoice._id}`,
+      narration: `Payment from ${savedInvoice.clientName || 'Customer'}`,
+      sourceType: 'Invoice',
+      sourceId: savedInvoice._id,
+      entrySequence: 2,
+      session,
+    });
   }
+
+} else {
+  // ── PURCHASE INVOICE double-entry ──────────────────────────────────────
+  // Dr Purchase/COGS (Expense ↑) / Cr Accounts Payable (Liability ↑)
+  const purchaseAccount = await getSystemAccount(req.user._id, ACCOUNTS.PURCHASE_EXPENSE, 'Expense', session);
+  const apAccount       = await getSystemAccount(req.user._id, 'Accounts Payable', 'Liability', session);
 
   await createJournalEntry({
     userId: req.user._id,
-    debitAccountId:  bankLedgerAccount._id,
-    creditAccountId: arAccount._id,
+    debitAccountId:  purchaseAccount._id,
+    creditAccountId: apAccount._id,
     amount: invoiceAmount,
     date: savedInvoice.invoiceDate,
-    description: `Payment received: ${savedInvoice.invoiceNumber || savedInvoice._id}`,
-    narration: `Payment from ${savedInvoice.clientName || 'Customer'}`,
+    description: `Purchase: ${savedInvoice.purchaseNumber || savedInvoice.referenceNumber || savedInvoice._id}`,
+    narration: `Purchase from ${savedInvoice.clientName || 'Vendor'}`,
     sourceType: 'Invoice',
     sourceId: savedInvoice._id,
-    entrySequence: 2,
+    entrySequence: 1,
     session,
   });
-}
+
+  // If paid immediately → Dr Accounts Payable / Cr Bank (cash paid out)
+  if (isPaid && accountId) {
+    const bankAccountDoc = await Account.findById(accountId).session(session);
+    const bankName = bankAccountDoc?.bankName || 'Bank Account';
+    let bankLedgerAccount = await LedgerAccount.findOne({ userId: req.user._id, name: bankName }).session(session);
+    if (!bankLedgerAccount) {
+      [bankLedgerAccount] = await LedgerAccount.create([{
+        userId: req.user._id, name: bankName, type: 'Asset', isSystem: false
+      }], { session });
+    }
+    await createJournalEntry({
+      userId: req.user._id,
+      debitAccountId:  apAccount._id,
+      creditAccountId: bankLedgerAccount._id,
+      amount: invoiceAmount,
+      date: savedInvoice.invoiceDate,
+      description: `Payment made: ${savedInvoice.purchaseNumber || savedInvoice._id}`,
+      narration: `Payment to ${savedInvoice.clientName || 'Vendor'}`,
+      sourceType: 'Invoice',
+      sourceId: savedInvoice._id,
+      entrySequence: 2,
+      session,
+    });
+  }
 }
     if (accountId) {
       let result;
