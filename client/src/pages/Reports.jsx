@@ -22,19 +22,7 @@ const [taxData, setTaxData] = useState({ collected: 0, deductible: 0, netOwed: 0
 const [tbLoading, setTbLoading] = useState(false);
 const { symbol } = useContext(CurrencyContext);
 const fmt = (n) => `${symbol}${Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2})}`;
-const fetchGst = async () => {
-  setGstLoading(true);
-  try {
-    const params = new URLSearchParams();
-    if (gstFrom) params.append('from', gstFrom);
-    if (gstTo)   params.append('to', gstTo);
-    const res = await api.get(`/ledger-accounts/reports/gst?${params}`);
-    setGstData(res.data);
-  } catch { toast.error('Failed to load GST data'); }
-  finally { setGstLoading(false); }
-};
 
-useEffect(() => { if (activeTab === 'gst') fetchGst(); }, [activeTab, gstFrom, gstTo]);
 // ── Invoice derived metrics (computed from existing `invoices` state) ─────
 const salesInvoices    = invoices.filter(i => i.type === 'Sale');
 const purchaseInvoices = invoices.filter(i => i.type === 'Purchase');
@@ -77,6 +65,19 @@ const purchaseMetrics = {
 const [gstFrom, setGstFrom] = useState('');
 const [gstTo,   setGstTo]   = useState('');
 const [gstLoading, setGstLoading] = useState(false);
+const fetchGst = async () => {
+  setGstLoading(true);
+  try {
+    const params = new URLSearchParams();
+    if (gstFrom) params.append('from', gstFrom);
+    if (gstTo)   params.append('to', gstTo);
+    const res = await api.get(`/ledger-accounts/reports/gst?${params}`);
+    setGstData(res.data);
+  } catch { toast.error('Failed to load GST data'); }
+  finally { setGstLoading(false); }
+};
+
+useEffect(() => { if (activeTab === 'gst') fetchGst(); }, [activeTab, gstFrom, gstTo]);
   useEffect(() => {
     const fetchStats = async () => {
       try {
