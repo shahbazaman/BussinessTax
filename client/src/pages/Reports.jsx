@@ -22,6 +22,19 @@ const [taxData, setTaxData] = useState({ collected: 0, deductible: 0, netOwed: 0
 const [tbLoading, setTbLoading] = useState(false);
 const { symbol } = useContext(CurrencyContext);
 const fmt = (n) => `${symbol}${Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2})}`;
+const fetchGst = async () => {
+  setGstLoading(true);
+  try {
+    const params = new URLSearchParams();
+    if (gstFrom) params.append('from', gstFrom);
+    if (gstTo)   params.append('to', gstTo);
+    const res = await api.get(`/ledger-accounts/reports/gst?${params}`);
+    setGstData(res.data);
+  } catch { toast.error('Failed to load GST data'); }
+  finally { setGstLoading(false); }
+};
+
+useEffect(() => { if (activeTab === 'gst') fetchGst(); }, [activeTab, gstFrom, gstTo]);
 // ── Invoice derived metrics (computed from existing `invoices` state) ─────
 const salesInvoices    = invoices.filter(i => i.type === 'Sale');
 const purchaseInvoices = invoices.filter(i => i.type === 'Purchase');
@@ -60,6 +73,10 @@ const purchaseMetrics = {
   const [cfData, setCfData] = useState(null);
   const [arAging, setArAging] = useState([]);
   const [bsData, setBsData] = useState(null);
+  const [gstData, setGstData] = useState(null);
+const [gstFrom, setGstFrom] = useState('');
+const [gstTo,   setGstTo]   = useState('');
+const [gstLoading, setGstLoading] = useState(false);
   useEffect(() => {
     const fetchStats = async () => {
       try {
@@ -225,6 +242,7 @@ setBsData(bsRes.data);
   { id: 'cash-flow', label: 'Cash Flow', icon: <Activity size={14}/> },
   { id: 'balance-sheet', label: 'Balance Sheet', icon: <BookCopy size={14}/> },
   { id: 'invoices', label: 'Invoices', icon: <FileText size={14}/> },
+  { id: 'gst', label: 'GST Report', icon: <Receipt size={14}/> },
 ].map(tab => (
     <button
       key={tab.id}
@@ -813,6 +831,167 @@ setBsData(bsRes.data);
       </div>
     </div>
 
+  </div>
+)}
+{/* ── GST Report Tab ── */}
+{activeTab === 'gst' && (
+  <div className="space-y-6">
+
+    {/* Date filter */}
+    <div className="flex flex-wrap items-center gap-3 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+      <span className="text-xs font-black text-slate-500 uppercase tracking-wide">Period</span>
+      <input type="date" value={gstFrom} onChange={e => setGstFrom(e.target.value)}
+        className="text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50" />
+      <span className="text-slate-300 text-xs font-bold">to</span>
+      <input type="date" value={gstTo} onChange={e => setGstTo(e.target.value)}
+        className="text-xs border border-slate-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-slate-50" />
+      {(gstFrom || gstTo) && (
+        <button onClick={() => { setGstFrom(''); setGstTo(''); }}
+          className="text-xs text-slate-400 hover:text-rose-500 font-bold px-2 py-1 rounded-lg bg-slate-100">
+          Clear
+        </button>
+      )}
+    </div>
+
+    {gstLoading ? (
+      <div className="flex justify-center py-20"><Loader2 className="animate-spin text-indigo-500" size={32}/></div>
+    ) : !gstData ? null : (
+      <>
+        {/* Summary cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl p-5 border border-emerald-100 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Output GST (Sales)</p>
+            <p className="text-2xl font-black text-emerald-600">{fmt(gstData.outputTax)}</p>
+            <p className="text-xs text-slate-400 mt-1">Tax collected from customers</p>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-blue-100 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Input GST (Purchases)</p>
+            <p className="text-2xl font-black text-blue-600">{fmt(gstData.totalInputTax)}</p>
+            <p className="text-xs text-slate-400 mt-1">Tax paid on purchases & expenses</p>
+          </div>
+          <div className={`rounded-2xl p-5 border shadow-sm ${gstData.netGst > 0 ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Net GST Payable</p>
+            <p className={`text-2xl font-black ${gstData.netGst > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+              {fmt(Math.abs(gstData.netGst))}
+            </p>
+            <p className="text-xs text-slate-400 mt-1">{gstData.netGst > 0 ? 'Payable to government' : 'Input credit available'}</p>
+          </div>
+        </div>
+
+        {/* Input tax breakdown */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">From Purchase Invoices</p>
+            <p className="text-xl font-black text-slate-700">{fmt(gstData.inputTaxPurchases)}</p>
+          </div>
+          <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">From Expenses</p>
+            <p className="text-xl font-black text-slate-700">{fmt(gstData.inputTaxExpenses)}</p>
+          </div>
+        </div>
+
+        {/* GSTR-1 Rate-wise table */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+            <h3 className="text-sm font-black text-slate-700 uppercase tracking-wide">GSTR-1 — Rate-wise Outward Supplies</h3>
+          </div>
+          <table className="w-full text-xs">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr>
+                {['Tax Rate', 'No. of Invoices', 'Taxable Value', 'Tax Amount'].map(h => (
+                  <th key={h} className="px-5 py-3 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {gstData.rateWise.length === 0 ? (
+                <tr><td colSpan={4} className="px-5 py-8 text-center text-slate-400">No taxable sales found</td></tr>
+              ) : gstData.rateWise.map(row => (
+                <tr key={row.rate} className="hover:bg-slate-50">
+                  <td className="px-5 py-3 font-black text-indigo-600">{row.rate}</td>
+                  <td className="px-5 py-3 text-slate-600">{row.count}</td>
+                  <td className="px-5 py-3 text-slate-700 font-semibold">{fmt(row.taxableValue)}</td>
+                  <td className="px-5 py-3 font-black text-emerald-600">{fmt(row.taxAmount)}</td>
+                </tr>
+              ))}
+              {gstData.rateWise.length > 0 && (
+                <tr className="bg-slate-50 border-t-2 border-slate-200">
+                  <td className="px-5 py-3 font-black text-slate-800" colSpan={2}>Total</td>
+                  <td className="px-5 py-3 font-black text-slate-800">{fmt(gstData.rateWise.reduce((s,r)=>s+r.taxableValue,0))}</td>
+                  <td className="px-5 py-3 font-black text-emerald-700">{fmt(gstData.outputTax)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Sales invoice detail */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-black text-slate-700 uppercase tracking-wide">GSTR-1 — Invoice Detail (Outward)</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-emerald-50 border-b border-emerald-100">
+                <tr>
+                  {['Invoice #', 'Client', 'Date', 'GST No.', 'Taxable Amt', 'Tax Rate', 'Tax Amt', 'Total'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {gstData.salesInvoices.length === 0 ? (
+                  <tr><td colSpan={8} className="px-5 py-6 text-center text-slate-400">No taxable sales in this period</td></tr>
+                ) : gstData.salesInvoices.map(inv => (
+                  <tr key={inv._id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-mono text-[10px] text-slate-500">{inv.invoiceNumber || '—'}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-700">{inv.clientName || '—'}</td>
+                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{new Date(inv.invoiceDate).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}</td>
+                    <td className="px-4 py-3 font-mono text-[10px] text-slate-400">{inv.gstNumber || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{fmt(inv.subtotal)}</td>
+                    <td className="px-4 py-3 text-indigo-600 font-bold">{inv.globalTaxRate}%</td>
+                    <td className="px-4 py-3 font-black text-emerald-600">{fmt(inv.taxAmount)}</td>
+                    <td className="px-4 py-3 font-black text-slate-800">{fmt(inv.totalAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Purchase invoice input tax detail */}
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-black text-slate-700 uppercase tracking-wide">GSTR-3B — Input Tax Credit (Purchases)</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="bg-blue-50 border-b border-blue-100">
+                <tr>
+                  {['Purchase #', 'Vendor', 'Date', 'Taxable Amt', 'Tax Rate', 'Input Tax'].map(h => (
+                    <th key={h} className="px-4 py-3 text-left text-[10px] font-black text-slate-400 uppercase whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {gstData.purchaseInvoices.length === 0 ? (
+                  <tr><td colSpan={6} className="px-5 py-6 text-center text-slate-400">No taxable purchases in this period</td></tr>
+                ) : gstData.purchaseInvoices.map(inv => (
+                  <tr key={inv._id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-mono text-[10px] text-slate-500">{inv.purchaseNumber || inv.referenceNumber || '—'}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-700">{inv.clientName || '—'}</td>
+                    <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{new Date(inv.invoiceDate).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}</td>
+                    <td className="px-4 py-3 text-slate-600">{fmt(inv.subtotal)}</td>
+                    <td className="px-4 py-3 text-indigo-600 font-bold">{inv.globalTaxRate}%</td>
+                    <td className="px-4 py-3 font-black text-blue-600">{fmt(inv.taxAmount)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </>
+    )}
   </div>
 )}
         {/* Breakdown Section */}

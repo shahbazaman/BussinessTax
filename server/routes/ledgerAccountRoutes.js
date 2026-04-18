@@ -192,4 +192,62 @@ router.put('/:id', protect, async (req, res) => {
     res.status(400).json({ message: err.message });
   }
 });
+// GET /api/ledger-accounts/reports/gst
+router.get('/reports/gst', protect, async (req, res) => {
+  try {
+    const Invoice = (await import('../models/Invoice.js')).default;
+    const Expense = (await import('../models/Expense.js')).default;
+
+    const { from, to } = req.query;
+    const filter = { user: req.user._id };
+    if (from || to) {
+      filter.invoiceDate = {};
+      if (from) filter.invoiceDate.$gte = new Date(from);
+      if (to)   filter.invoiceDate.$lte = new Date(to + 'T23:59:59');
+    }
+
+    const invoices = await Invoice.find(filter).lean();
+
+    // GSTR-1: Output tax (sales)
+    const salesInvoices = invoices.filter(i => i.type === 'Sale' && i.taxAmount > 0);
+    const outputTax = salesInvoices.reduce((s, i) => s + i.taxAmount, 0);
+
+    // GSTR-3B: Input tax (purchases)
+    const purchaseInvoices = invoices.filter(i => i.type === 'Purchase' && i.taxAmount > 0);
+    const inputTaxPurchases = purchaseInvoices.reduce((s, i) => s + i.taxAmount, 0);
+
+    // Input tax from expenses (estimated at their tax rate if stored, else 0)
+    const expFilter = { user: req.user._id };
+    if (from) expFilter.date = { $gte: new Date(from) };
+    if (to)   expFilter.date = { ...expFilter.date, $lte: new Date(to + 'T23:59:59') };
+    const expenses = await Expense.find(expFilter).lean();
+    const inputTaxExpenses = expenses.reduce((s, e) => s + Number(e.taxAmount || 0), 0);
+
+    const totalInputTax = inputTaxPurchases + inputTaxExpenses;
+    const netGst = outputTax - totalInputTax;
+
+    // Rate-wise breakdown for GSTR-1
+    const rateWise = {};
+    for (const inv of salesInvoices) {
+      const rate = `${inv.globalTaxRate || 0}%`;
+      if (!rateWise[rate]) rateWise[rate] = { rate, taxableValue: 0, taxAmount: 0, count: 0 };
+      rateWise[rate].taxableValue += inv.subtotal;
+      rateWise[rate].taxAmount   += inv.taxAmount;
+      rateWise[rate].count       += 1;
+    }
+
+    res.json({
+      outputTax: Number(outputTax.toFixed(2)),
+      inputTaxPurchases: Number(inputTaxPurchases.toFixed(2)),
+      inputTaxExpenses: Number(inputTaxExpenses.toFixed(2)),
+      totalInputTax: Number(totalInputTax.toFixed(2)),
+      netGst: Number(netGst.toFixed(2)),
+      salesInvoices,
+      purchaseInvoices,
+      rateWise: Object.values(rateWise).sort((a, b) => parseFloat(a.rate) - parseFloat(b.rate)),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
 export default router;

@@ -36,7 +36,7 @@ const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-
+  const [filterCategory, setFilterCategory] = useState('All');
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -164,7 +164,8 @@ const handleReceiptUpload = async (e) => {
       const expDate = new Date(exp.date).setHours(0, 0, 0, 0);
       const start = startDate ? new Date(startDate).setHours(0, 0, 0, 0) : null;
       const end = endDate ? new Date(endDate).setHours(0, 0, 0, 0) : null;
-      return matchesSearch && (start ? expDate >= start : true) && (end ? expDate <= end : true);
+      const matchesCategory = filterCategory === 'All' || exp.category === filterCategory;
+      return matchesSearch && matchesCategory && (start ? expDate >= start : true) && (end ? expDate <= end : true);
     });
   }, [expenses, searchTerm, startDate, endDate]);
 
@@ -210,6 +211,21 @@ const handleReceiptUpload = async (e) => {
             <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold outline-none" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             <input type="date" className="bg-slate-50 p-2 rounded-xl text-xs font-bold outline-none" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
           </div>
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-slate-100">
+  {['All', ...categories].map(cat => (
+    <button
+      key={cat}
+      onClick={() => setFilterCategory(cat)}
+      className={`text-[10px] font-black px-3 py-1.5 rounded-lg uppercase tracking-wide transition-all ${
+        filterCategory === cat
+          ? 'bg-slate-900 text-white'
+          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+      }`}
+    >
+      {cat}
+    </button>
+  ))}
+</div>
         </div>
 
         {/* Expense List */}
