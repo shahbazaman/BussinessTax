@@ -10,23 +10,13 @@ import { CurrencyContext } from '../context/CurrencyContext';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { AuthContext } from '../context/AuthContext';
-// ─── Helpers ───────────────────────────────────────────────────────────────
 
-/**
- * Returns the cycle length in days for a given salaryType.
- * Monthly ≈ 30 days,  Weekly = 7 days,  Daily = 1 day.
- */
 const getCycleDays = (salaryType) => {
   if (salaryType === 'Weekly') return 7;
   if (salaryType === 'Daily') return 1;
   return 30; // Monthly
 };
 
-/**
- * Returns true if the employee's current pay cycle has completed.
- * Cycle start = lastPaymentDate ?? joiningDate
- * Cycle end   = cycleStart + getCycleDays(salaryType)
- */
 const isPaymentDue = (emp) => {
   const cycleStart = emp.lastPaymentDate
     ? new Date(emp.lastPaymentDate)
@@ -57,7 +47,6 @@ const computeSalary = (emp) => {
   if (emp.salaryType === 'Daily') return Number(emp.workingDays) * Number(emp.dailyRate);
   return Number(emp.dailyRate); // weekly / monthly rate is stored in dailyRate field
 };
-
 // ─── Payment Modal ──────────────────────────────────────────────────────────
 
 const PaymentModal = ({ employee, accounts, symbol, businessName, onClose, onPaid }) => {
@@ -216,6 +205,8 @@ const Employees = () => {
 
   const [formData, setFormData] = useState(initialState);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [roleFilter, setRoleFilter] = useState('All');
   const { symbol } = useContext(CurrencyContext);
   const { user } = useContext(AuthContext);
@@ -240,6 +231,10 @@ const Employees = () => {
   };
 
   useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+  setCurrentPage(1);
+}, [searchTerm, roleFilter]);
+
 
   const totalPayrollAmount = useMemo(() => {
   return employees
@@ -260,7 +255,17 @@ const totalAllEmployees = useMemo(() => {
       return matchesSearch && matchesRole;
     });
   }, [employees, searchTerm, roleFilter]);
+const paginatedEmployees = useMemo(() => {
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  return filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
+}, [filteredEmployees, currentPage]);
 
+const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
+useEffect(() => {
+  if (currentPage > totalPages && totalPages > 0) {
+    setCurrentPage(totalPages);
+  }
+}, [filteredEmployees, currentPage, itemsPerPage]);
   const roles = ['All', ...new Set(employees.map(e => e.role))];
 
   const fetchNextEmployeeId = async () => {
@@ -520,7 +525,7 @@ const printSlip = async () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50">
-              {filteredEmployees.map((emp) => {
+              {paginatedEmployees.map((emp) => {
                 const due = isPaymentDue(emp);
                 const dueDate = getDueDate(emp);
                 const salary = computeSalary(emp);
@@ -625,12 +630,61 @@ const printSlip = async () => {
               })}
             </tbody>
           </table>
-          {filteredEmployees.length === 0 && (
+          {filteredEmployees.length > itemsPerPage && filteredEmployees.length !== 0 && (
             <div className="text-center py-20 text-slate-400">
               <Users size={40} className="mx-auto mb-3 opacity-30" />
               <p className="font-bold">No employees found</p>
             </div>
           )}
+          {filteredEmployees.length > itemsPerPage && (
+  <div className="flex justify-center items-center gap-2 py-6 flex-wrap">
+
+    {/* Prev */}
+    <button
+      onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+      disabled={currentPage === 1}
+      className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+        currentPage === 1
+          ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+          : 'bg-slate-200 hover:bg-slate-300'
+      }`}
+    >
+      Prev
+    </button>
+
+    {/* Page Numbers */}
+    {[...Array(totalPages)].map((_, i) => {
+      const page = i + 1;
+      return (
+        <button
+          key={page}
+          onClick={() => setCurrentPage(page)}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+            currentPage === page
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-md'
+              : 'bg-slate-200 hover:bg-slate-300'
+          }`}
+        >
+          {page}
+        </button>
+      );
+    })}
+
+    {/* Next */}
+    <button
+      onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+      disabled={currentPage === totalPages}
+      className={`px-4 py-2 rounded-xl text-xs font-black transition-all ${
+        currentPage === totalPages
+          ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+          : 'bg-slate-200 hover:bg-slate-300'
+      }`}
+    >
+      Next
+    </button>
+
+  </div>
+)}
         </div>
       </div>
 

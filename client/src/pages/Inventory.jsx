@@ -12,7 +12,9 @@ const Inventory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
-  const [expiryFilter, setExpiryFilter] = useState('all'); // 'all' | 'expired' | 'soon'
+  const [expiryFilter, setExpiryFilter] = useState('all'); 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const { symbol } = useContext(CurrencyContext);
@@ -95,7 +97,37 @@ const filteredProducts = useMemo(() => {
       <p className="text-slate-400 font-bold animate-pulse uppercase tracking-widest text-xs">Syncing Inventory...</p>
     </div>
   );
+const paginatedProducts = useMemo(() => {
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  return filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+}, [filteredProducts, currentPage, itemsPerPage]);
 
+const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+useEffect(() => {
+  setCurrentPage(1);
+}, [searchTerm, selectedCategory, showLowStockOnly, expiryFilter]);
+useEffect(() => {
+  if (currentPage > totalPages && totalPages > 0) {
+    setCurrentPage(totalPages);
+  }
+}, [filteredProducts, totalPages]);
+const getPageNumbers = () => {
+  const pages = [];
+
+  if (totalPages <= 5) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    if (currentPage <= 3) {
+      pages.push(1, 2, 3, 4, '...', totalPages);
+    } else if (currentPage >= totalPages - 2) {
+      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+    } else {
+      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+    }
+  }
+
+  return pages;
+};
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
       {/* Expiry Alert Banner */}
@@ -212,7 +244,7 @@ const filteredProducts = useMemo(() => {
         </tr>
       </thead>
       <tbody className="divide-y divide-slate-50">
-        {filteredProducts.map(product => {
+        {paginatedProducts.map(product => {
           const totalStock = product.variants.reduce((sum, v) => sum + v.stock, 0);
           const hasLowStock = product.variants.some(v => v.stock <= (product.lowStockAlert || 10));
 
@@ -323,6 +355,56 @@ const filteredProducts = useMemo(() => {
     )}
   </div>
 </div>
+{filteredProducts.length > itemsPerPage && (
+  <div className="flex justify-center items-center gap-2 py-8 flex-wrap">
+    
+    {/* Prev */}
+    <button
+      onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+      disabled={currentPage === 1}
+      className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm ${
+        currentPage === 1
+          ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+          : 'bg-white border border-slate-200 hover:bg-slate-900 hover:text-white'
+      }`}
+    >
+      ← Prev
+    </button>
+
+    {/* Page Numbers */}
+    {getPageNumbers().map((page, index) => (
+      <button
+        key={index}
+        onClick={() => typeof page === 'number' && setCurrentPage(page)}
+        disabled={page === '...'}
+        className={`
+          min-w-[36px] h-9 rounded-xl text-xs font-black transition-all
+          ${page === currentPage
+            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105'
+            : page === '...'
+            ? 'bg-transparent text-slate-400 cursor-default'
+            : 'bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:border-blue-300'
+          }
+        `}
+      >
+        {page}
+      </button>
+    ))}
+
+    {/* Next */}
+    <button
+      onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+      disabled={currentPage === totalPages}
+      className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm ${
+        currentPage === totalPages
+          ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+          : 'bg-white border border-slate-200 hover:bg-slate-900 hover:text-white'
+      }`}
+    >
+      Next →
+    </button>
+  </div>
+)}
       <AddProductModal 
         isOpen={isModalOpen} 
         onClose={() => { setIsModalOpen(false); setEditingProduct(null); }} 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../utils/api';
 import { 
   Plus, Search, Mail, Phone, Trash2, X, User, ExternalLink, 
@@ -17,6 +17,8 @@ const Clients = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { symbol } = useContext(CurrencyContext);
   const [editingClient, setEditingClient] = useState(null);  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const navigate = useNavigate();
   const initialFormState = {
     name: '',
@@ -122,11 +124,47 @@ const Clients = () => {
     });
   };
 
-  const filteredClients = clients.filter(c => 
+
+const filteredClients = useMemo(() => {
+  return clients.filter(c => 
     c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.businessName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+}, [clients, searchTerm]);
+
+const paginatedClients = useMemo(() => {
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  return filteredClients.slice(startIndex, startIndex + itemsPerPage);
+}, [filteredClients, currentPage, itemsPerPage]);
+
+const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+useEffect(() => {
+  setCurrentPage(1);
+}, [searchTerm]);
+useEffect(() => {
+  if (currentPage > totalPages && totalPages > 0) {
+    setCurrentPage(totalPages);
+  }
+}, [filteredClients, totalPages]);
+
+const getPageNumbers = () => {
+  const pages = [];
+
+  if (totalPages <= 5) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    if (currentPage <= 3) {
+      pages.push(1, 2, 3, 4, '...', totalPages);
+    } else if (currentPage >= totalPages - 2) {
+      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+    } else {
+      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+    }
+  }
+
+  return pages;
+};
 
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
@@ -181,7 +219,7 @@ const Clients = () => {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
-          {filteredClients.length > 0 ? filteredClients.map((client) => (
+          {filteredClients.length > 0 ? paginatedClients.map((client) => (
             <tr key={client._id} className="hover:bg-slate-50/50 transition-colors group">
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -244,6 +282,56 @@ const Clients = () => {
         </tbody>
       </table>
     </div>
+    {filteredClients.length > itemsPerPage && (
+  <div className="flex justify-center items-center gap-2 py-8 flex-wrap">
+    
+    {/* Prev */}
+    <button
+      onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+      disabled={currentPage === 1}
+      className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm ${
+        currentPage === 1
+          ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+          : 'bg-white border border-slate-200 hover:bg-slate-900 hover:text-white'
+      }`}
+    >
+      ← Prev
+    </button>
+
+    {/* Pages */}
+    {getPageNumbers().map((page, index) => (
+      <button
+        key={index}
+        onClick={() => typeof page === 'number' && setCurrentPage(page)}
+        disabled={page === '...'}
+        className={`
+          min-w-9 h-9 rounded-xl text-xs font-black transition-all
+          ${page === currentPage
+            ? 'bg-linear-to-r from-green-500 to-emerald-600 text-white shadow-lg scale-105'
+            : page === '...'
+            ? 'bg-transparent text-slate-400 cursor-default'
+            : 'bg-white border border-slate-200 text-slate-600 hover:bg-green-50 hover:border-green-300'
+          }
+        `}
+      >
+        {page}
+      </button>
+    ))}
+
+    {/* Next */}
+    <button
+      onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages))}
+      disabled={currentPage === totalPages}
+      className={`px-4 py-2 rounded-xl text-xs font-black transition-all shadow-sm ${
+        currentPage === totalPages
+          ? 'bg-slate-100 text-slate-300 cursor-not-allowed'
+          : 'bg-white border border-slate-200 hover:bg-slate-900 hover:text-white'
+      }`}
+    >
+      Next →
+    </button>
+  </div>
+)}
   </div>
 )}
       </div>

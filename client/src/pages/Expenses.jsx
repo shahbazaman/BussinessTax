@@ -37,6 +37,8 @@ const [uploadingReceipt, setUploadingReceipt] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -169,6 +171,37 @@ const handleReceiptUpload = async (e) => {
     });
 }, [expenses, searchTerm, startDate, endDate, filterCategory]);
 
+const paginatedExpenses = useMemo(() => {
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  return filteredExpenses.slice(startIndex, startIndex + itemsPerPage);
+}, [filteredExpenses, currentPage, itemsPerPage]);
+
+const totalPages = Math.ceil(filteredExpenses.length / itemsPerPage);
+const getPageNumbers = () => {
+  const pages = [];
+
+  if (totalPages <= 5) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    if (currentPage <= 3) {
+      pages.push(1, 2, 3, 4, '...', totalPages);
+    } else if (currentPage >= totalPages - 2) {
+      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+    } else {
+      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+    }
+  }
+
+  return pages;
+};
+useEffect(() => {
+  setCurrentPage(1);
+}, [searchTerm, startDate, endDate, filterCategory]);
+useEffect(() => {
+  if (currentPage > totalPages && totalPages > 0) {
+    setCurrentPage(totalPages);
+  }
+}, [filteredExpenses, totalPages]);
   const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
 const handlePrint = () => {
   const style = document.createElement('style');
@@ -242,8 +275,16 @@ const handlePrint = () => {
         {/* Expense List */}
         <div id="expenses-list" className="grid gap-3">
           {loading ? (
-             <div className="text-center py-20 animate-pulse text-slate-400 font-medium">Fetching ledger...</div>
-          ) : filteredExpenses.map((exp) => (
+            <div className="text-center py-20 animate-pulse text-slate-400 font-medium">
+              Fetching ledger...
+            </div>
+          ) : paginatedExpenses.length === 0 ? (
+            <div className="text-center py-20 text-slate-400 font-bold">
+              No expenses found
+            </div>
+          ) : (
+            <>
+              {paginatedExpenses.map((exp) => (
             <div key={exp._id} className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center justify-between hover:shadow-md transition-all group">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-slate-50 text-slate-400 group-hover:bg-rose-50 group-hover:text-rose-500 rounded-2xl flex items-center justify-center transition-colors">
@@ -295,8 +336,58 @@ const handlePrint = () => {
 }} className="p-2 text-slate-300 hover:text-rose-500 transition-colors"><Trash2 size={16}/></button></div>
               </div>
             </div>
-          ))}
+              ))}
+  </>
+)}
         </div>
+        {filteredExpenses.length > itemsPerPage && (
+  <div className="flex justify-center items-center gap-2 py-6 flex-wrap">
+    
+    {/* Prev */}
+    <button
+      onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+      disabled={currentPage === 1}
+      className={`px-3 py-1 rounded-lg text-xs font-bold ${
+        currentPage === 1
+          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          : 'bg-slate-200 hover:bg-slate-300'
+      }`}
+    >
+      Prev
+    </button>
+
+    {/* Pages */}
+    {getPageNumbers().map((page, index) => (
+      <button
+        key={index}
+        onClick={() => typeof page === 'number' && setCurrentPage(page)}
+        disabled={page === '...'}
+        className={`px-3 py-1 rounded-lg text-xs font-bold ${
+          page === currentPage
+            ? 'bg-rose-600 text-white'
+            : page === '...'
+            ? 'bg-transparent cursor-default'
+            : 'bg-slate-200 hover:bg-slate-300'
+        }`}
+      >
+        {page}
+      </button>
+    ))}
+
+    {/* Next */}
+    <button
+      onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+      disabled={currentPage === totalPages}
+      className={`px-3 py-1 rounded-lg text-xs font-bold ${
+        currentPage === totalPages
+          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          : 'bg-slate-200 hover:bg-slate-300'
+      }`}
+    >
+      Next
+    </button>
+  </div>
+)}
       </div>
 {viewingExpense && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
