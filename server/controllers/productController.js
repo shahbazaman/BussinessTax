@@ -11,7 +11,7 @@ export const getProducts = async (req, res) => {
 
 export const addProduct = async (req, res) => {
   try {
-    const { title, category, variants, lowStockAlert, supplier, reorderQuantity } = req.body;
+    const { title, category, variants, lowStockAlert, supplier, reorderQuantity, expiryDate } = req.body;
     if (!variants || variants.length === 0) {
       return res.status(400).json({ message: 'At least one variant is required' });
     }
@@ -34,7 +34,8 @@ export const addProduct = async (req, res) => {
       supplier,
       variants: formattedVariants, 
       lowStockAlert,
-      reorderQuantity
+      reorderQuantity,
+      expiryDate: expiryDate || null
     });
     await product.save();
     res.status(201).json(product);
@@ -45,7 +46,7 @@ export const addProduct = async (req, res) => {
 
 export const updateProduct = async (req, res) => {
   try {
-    const { title, category, variants, lowStockAlert, supplier, reorderQuantity } = req.body;
+    const { title, category, variants, lowStockAlert, supplier, reorderQuantity, expiryDate } = req.body;
     const product = await Product.findById(req.params.id);
 
     if (!product) return res.status(404).json({ message: "Product not found" });
@@ -55,6 +56,7 @@ export const updateProduct = async (req, res) => {
     product.supplier = supplier || product.supplier;
     product.lowStockAlert = lowStockAlert ?? product.lowStockAlert;
     product.reorderQuantity = reorderQuantity ?? product.reorderQuantity;
+    if (expiryDate !== undefined) product.expiryDate = expiryDate || null;
     
     if (variants) {
       product.variants = variants;

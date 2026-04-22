@@ -31,6 +31,7 @@ const productSchema = new mongoose.Schema({
     type: String,
     trim: true 
   },
+  
   variants: [variantSchema],
   lowStockAlert: { 
     type: Number, 
@@ -39,8 +40,12 @@ const productSchema = new mongoose.Schema({
   reorderQuantity: { 
     type: Number, 
     default: 50 
-  } 
-}, { 
+  },
+  expiryDate: {
+    type: Date,
+    default: null
+  }
+}, {
   timestamps: true,
   toJSON: { virtuals: true }, 
   toObject: { virtuals: true } 

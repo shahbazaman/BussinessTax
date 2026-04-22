@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useContext } from 'react';
-import { Search, AlertTriangle, Plus, Loader2, Trash2, Package, Edit2, Download, Barcode } from 'lucide-react';
+import { Search, AlertTriangle, Clock,Plus, Loader2, Trash2, Package, Edit2, Download, Barcode } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
 import AddProductModal from '../components/AddProductModal';
@@ -89,6 +89,37 @@ const filteredProducts = useMemo(() => {
 
   return (
     <div className="p-4 lg:p-8 space-y-6 max-w-7xl mx-auto">
+      {/* Expiry Alert Banner */}
+      {(() => {
+        const now = new Date();
+        const expired = products.filter(p => p.expiryDate && new Date(p.expiryDate) < now);
+        const expiringSoon = products.filter(p => {
+          if (!p.expiryDate) return false;
+          const days = Math.ceil((new Date(p.expiryDate) - now) / (1000 * 60 * 60 * 24));
+          return days >= 0 && days <= 30;
+        });
+        if (expired.length === 0 && expiringSoon.length === 0) return null;
+        return (
+          <div className="mb-6 space-y-2">
+            {expired.length > 0 && (
+              <div className="flex items-center gap-3 bg-rose-50 border border-rose-200 rounded-2xl px-5 py-3">
+                <Clock size={16} className="text-rose-600 shrink-0" />
+                <p className="text-sm font-black text-rose-700">
+                  {expired.length} product{expired.length > 1 ? 's have' : ' has'} expired: {expired.map(p => p.title).join(', ')}
+                </p>
+              </div>
+            )}
+            {expiringSoon.length > 0 && (
+              <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3">
+                <Clock size={16} className="text-amber-600 shrink-0" />
+                <p className="text-sm font-black text-amber-700">
+                  {expiringSoon.length} product{expiringSoon.length > 1 ? 's are' : ' is'} expiring within 30 days: {expiringSoon.map(p => p.title).join(', ')}
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
       {/* Header Section */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -144,6 +175,7 @@ const filteredProducts = useMemo(() => {
           <th className="px-6 py-4">Supplier</th>
           <th className="px-6 py-4">Variants</th>
           <th className="px-6 py-4">Total Stock</th>
+          <th className="px-6 py-4">Expiry</th>
           <th className="px-6 py-4 text-right">Actions</th>
         </tr>
       </thead>
@@ -202,6 +234,35 @@ const filteredProducts = useMemo(() => {
                   {totalStock}
                   <span className="text-[10px] opacity-50 ml-1 uppercase">units</span>
                 </span>
+              </td>
+
+              {/* Expiry Date */}
+              <td className="px-6 py-5">
+                {product.expiryDate ? (() => {
+                  const exp = new Date(product.expiryDate);
+                  const now = new Date();
+                  const daysLeft = Math.ceil((exp - now) / (1000 * 60 * 60 * 24));
+                  const isExpired = daysLeft < 0;
+                  const isSoon = daysLeft >= 0 && daysLeft <= 30;
+                  return (
+                    <div className="space-y-1">
+                      <span className="text-xs font-bold text-slate-600">
+                        {exp.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </span>
+                      <div>
+                        {isExpired && (
+                          <span className="text-[9px] font-black bg-rose-100 text-rose-600 px-2 py-0.5 rounded-full uppercase">Expired</span>
+                        )}
+                        {isSoon && (
+                          <span className="text-[9px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full uppercase">Expires in {daysLeft}d</span>
+                        )}
+                        {!isExpired && !isSoon && (
+                          <span className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full uppercase">{daysLeft}d left</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })() : <span className="text-slate-300 text-xs">—</span>}
               </td>
 
               {/* Actions */}

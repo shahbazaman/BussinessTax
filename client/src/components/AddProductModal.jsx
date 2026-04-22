@@ -14,7 +14,8 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
     supplier: '',
     lowStockAlert: 10,
     reorderQuantity: 50,
-    variants: [{ 
+    expiryDate: '',
+    variants: [{
       name: '', weight: '', unit: 'pcs', costPrice: '', salePrice: '', stock: '', sku: '', barcode: undefined, taxRate: 0 
     }]
   };
@@ -263,7 +264,7 @@ const handleChange = (e) => {
                 <input name="customCategory" value={productData.customCategory} placeholder="Type category..." className="md:col-span-2 p-5 bg-blue-50 rounded-3xl border-2 border-blue-200 outline-none font-bold text-blue-700" onChange={handleChange} required />
             )}
           </section>
-          <section className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <section className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-1">
               <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1"><AlertCircle size={12} /> Low Stock Alert</label>
               <input name="lowStockAlert" type="number" value={productData.lowStockAlert} className="w-full p-4 bg-white rounded-2xl outline-none font-bold text-slate-700" onChange={handleChange} />
@@ -271,6 +272,21 @@ const handleChange = (e) => {
             <div className="space-y-1">
               <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1"><Warehouse size={12} /> Auto-Reorder Qty</label>
               <input name="reorderQuantity" type="number" value={productData.reorderQuantity} className="w-full p-4 bg-white rounded-2xl outline-none font-bold text-slate-700" onChange={handleChange} />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-1">
+                <AlertCircle size={12} /> Expiry Date
+              </label>
+              <input
+                name="expiryDate"
+                type="date"
+                value={productData.expiryDate ? productData.expiryDate.split('T')[0] : ''}
+                className="w-full p-4 bg-white rounded-2xl outline-none font-bold text-slate-700 border-2 border-transparent focus:border-rose-200"
+                onChange={handleChange}
+              />
+              {productData.expiryDate && new Date(productData.expiryDate) < new Date() && (
+                <p className="text-[10px] font-black text-rose-500 mt-1">⚠ This product is already expired!</p>
+              )}
             </div>
           </section>
           <section className="space-y-4">

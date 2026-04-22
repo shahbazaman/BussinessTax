@@ -80,21 +80,29 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
     );
   }
 
-  const productOptions = products.flatMap(p =>
-    (p.variants || []).map(v => ({
+  const now = new Date();
+  const productOptions = products.flatMap(p => {
+    const isExpired = p.expiryDate && new Date(p.expiryDate) < now;
+    return (p.variants || []).map(v => ({
       value: `${p._id}-${v._id}`,
-      label: `${p.title || 'Unknown Product'} (${v.name || 'Default'}) | SKU: ${v.sku || 'N/A'} | Price: ₹${v.price || '0'}`,
+      label: `${isExpired ? '⚠ EXPIRED — ' : ''}${p.title || 'Unknown Product'} (${v.name || 'Default'}) | SKU: ${v.sku || 'N/A'} | Price: ₹${v.price || '0'}`,
+      isDisabled: isExpired,
       data: {
         _id: p._id,
         name: p.title,
-        variant: v
+        variant: v,
+        isExpired
       }
-    }))
-  );
+    }));
+  });
 
   const handleProductSelect = (selectedOption) => {
     if (!selectedOption) return;
-    const { _id, name, variant } = selectedOption.data;
+    const { _id, name, variant, isExpired } = selectedOption.data;
+    if (isExpired) {
+      toast.error(`"${name}" is expired and cannot be added to an invoice.`);
+      return;
+    }
     if (formData.items.find(item => item.variantId === variant._id)) {
       toast.info("This specific variant is already added.");
       return;
