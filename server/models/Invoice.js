@@ -38,7 +38,9 @@ const invoiceSchema = new mongoose.Schema({
   },
 
   notes:           { type: String },
-  paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' }
+  paidIntoAccount: { type: mongoose.Schema.Types.ObjectId, ref: 'Account' },
+  partialAmount:   { type: Number, default: 0 },
+  paidDate:        { type: Date, default: null }
 }, { timestamps: true });
 invoiceSchema.pre('save', async function () {
   // 1. Cleanup Numbers

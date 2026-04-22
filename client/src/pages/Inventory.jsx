@@ -12,6 +12,7 @@ const Inventory = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
+  const [expiryFilter, setExpiryFilter] = useState('all'); // 'all' | 'expired' | 'soon'
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const { symbol } = useContext(CurrencyContext);
@@ -76,9 +77,17 @@ const filteredProducts = useMemo(() => {
     );
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
     const isLowStock = p.variants.some(v => v.stock <= (p.lowStockAlert || 10));
-    return (matchesTitle || matchesCode) && matchesCategory && (showLowStockOnly ? isLowStock : true);
+  const now = new Date();
+    const expDate = p.expiryDate ? new Date(p.expiryDate) : null;
+    const daysLeft = expDate ? Math.ceil((expDate - now) / (1000 * 60 * 60 * 24)) : null;
+    const matchesExpiry =
+      expiryFilter === 'all' ? true :
+      expiryFilter === 'expired' ? (daysLeft !== null && daysLeft < 0) :
+      expiryFilter === 'soon' ? (daysLeft !== null && daysLeft >= 0 && daysLeft <= 30) :
+      true;
+    return (matchesTitle || matchesCode) && matchesCategory && (showLowStockOnly ? isLowStock : true) && matchesExpiry;
   });
-}, [products, searchTerm, selectedCategory, showLowStockOnly]);
+}, [products, searchTerm, selectedCategory, showLowStockOnly, expiryFilter]);
 
   if (loading) return (
     <div className="flex flex-col justify-center items-center h-screen gap-4">
@@ -162,6 +171,16 @@ const filteredProducts = useMemo(() => {
         >
           <AlertTriangle size={16} /> Low Stock
         </button>
+        <select
+          value={expiryFilter}
+          onChange={(e) => setExpiryFilter(e.target.value)}
+          className={`px-4 py-3 rounded-xl text-xs font-black uppercase border outline-none transition-all cursor-pointer
+            ${expiryFilter !== 'all' ? 'bg-amber-50 border-amber-200 text-amber-600' : 'bg-white border-slate-200 text-slate-500'}`}
+        >
+          <option value="all">All Expiry</option>
+          <option value="expired">Expired</option>
+          <option value="soon">Expiring Soon (30d)</option>
+        </select>
       </div>
 
       {/* Inventory Table */}

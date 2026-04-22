@@ -386,7 +386,7 @@ const handleDelete = (id) => {
                       </td>
 
                       <td className="px-8 py-6">
-                        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex items-center justify-end gap-2">
                           {inv.status !== 'Paid' && (
                             activeTab === 'Sale' ? (
                               <button onClick={() => handlePayNow(inv)} disabled={paymentLoading} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Online Payment">

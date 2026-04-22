@@ -21,7 +21,9 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
     globalTaxRate: 0,
     discount: 0,
     paidIntoAccount: accounts?.[0]?._id || '',
-    status: 'Pending'
+    status: 'Pending',
+    partialAmount: '',
+    paidDate: ''
   });
 
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
         setFormData({
           ...editData,
           invoiceDate: new Date(editData.invoiceDate).toISOString().split('T')[0],
+          paidDate: editData.paidDate ? new Date(editData.paidDate).toISOString().split('T')[0] : '',
+          partialAmount: editData.partialAmount || '',
           client: editData.client?._id || editData.client,
           clientName: editData.clientName || '',
           useManualClient: !editData.client && !!editData.clientName,
@@ -55,7 +59,9 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           globalTaxRate: 0,
           discount: 0,
           paidIntoAccount: accounts?.[0]?._id || '',
-          status: 'Pending'
+          status: 'Pending',
+          partialAmount: '',
+          paidDate: ''
         });
         // Auto-fetch next number AFTER reset
         api.get(`/invoices/next-number?type=${type}`).then(res => {
@@ -107,6 +113,13 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
       toast.info("This specific variant is already added.");
       return;
     }
+    if (formData.type === 'Sale' && (variant.stock === 0 || variant.stock === undefined || variant.stock === null)) {
+      toast.error(`"${name} (${variant.name})" has no stock available. Please restock before invoicing.`);
+      return;
+    }
+    if (formData.type === 'Sale' && variant.stock <= (variant.lowStockAlert || 0)) {
+      toast.warning(`Low stock warning: Only ${variant.stock} unit(s) left for "${name} (${variant.name})".`);
+    }
     setFormData({
       ...formData,
       globalTaxRate: variant.taxRate || 0,
@@ -123,7 +136,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
         }
       ]
     });
-    toast.success(`Added ${name} - Tax set to ${variant.taxRate || 0}%`);
+    // toast.success(`Added ${name} - Tax set to ${variant.taxRate || 0}%`);
   };
 
   const handleItemChange = (index, field, value) => {
@@ -315,7 +328,7 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
         <input
           type="text"
           maxLength={10}
-          placeholder="0000000001"
+          placeholder="enter reference number..."
           className="flex-1 px-3 py-3 bg-transparent text-sm font-black outline-none text-slate-800 w-16"
           value={formData.referenceNumber.replace('REF-', '')}
           onChange={e => {
@@ -381,7 +394,7 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
                          <input type="number" min="1" className="w-full p-2 border rounded-lg text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" value={item.quantity} onChange={e => handleItemChange(idx, 'quantity', e.target.value)} />
                         </td>
                         <td className="px-4 py-3">
-                          <input type="number" step="0.01" placeholder={formData.type === 'Purchase' ? 'Enter rate...' : ''} className={`w-full p-2 border rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${formData.type === 'Purchase' ? 'border-amber-200 bg-amber-50 placeholder:text-amber-300' : ''}`} value={item.price} onChange={e => handleItemChange(idx, 'price', e.target.value)}/>
+                          <input type="number" step="0.01" placeholder={formData.type === 'Purchase' ? 'Enter rate...' : ''} className={`w-full p-2 border rounded-lg [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${formData.type === 'Purchase' ? 'border-amber-200 bg-amber-50 placeholder:text-amber-300' : ''}`} value={item.price} onChange={e => handleItemChange(idx, 'price', e.target.value)} onKeyDown={e => (e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.preventDefault()}/>
                         </td>
                         <td className="px-4 py-3">
                           <button type="button" onClick={() => removeItem(idx)} className="text-rose-400"><Trash2 size={16} /></button>
@@ -435,6 +448,56 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
                     <option value="Cancelled">Cancelled</option>
                   </select>
                 </div>
+
+                {/* ── Partially Paid Amount ── */}
+                {formData.status === 'Partially Paid' && (
+                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                      💰 Amount Paid
+                    </span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Enter amount paid..."
+                      className="w-full bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl text-sm font-bold outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      value={formData.partialAmount}
+                      onChange={e => setFormData({ ...formData, partialAmount: e.target.value })}
+                      onKeyDown={e => (e.key === 'ArrowUp' || e.key === 'ArrowDown') && e.preventDefault()}
+                    />
+                    {formData.partialAmount !== '' && Number(formData.partialAmount) >= 0 && (
+                      <div className="flex justify-between items-center bg-slate-50 border border-slate-100 rounded-xl px-4 py-2">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Balance Remaining</span>
+                        <span className={`text-sm font-black ${totals.total - Number(formData.partialAmount) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                          ₹{Math.max(0, totals.total - Number(formData.partialAmount)).toFixed(2)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* ── Paid Date (shown for Paid / Partially Paid) ── */}
+                {(formData.status === 'Paid' || formData.status === 'Partially Paid') && (
+                  <div className="pt-2 border-t border-slate-100 space-y-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                      📅 {formData.status === 'Paid' ? 'Payment Received Date' : 'Partial Payment Date'}
+                    </span>
+                    <input
+                      type="date"
+                      max={new Date().toISOString().split('T')[0]}
+                      className="w-full bg-emerald-50 border border-emerald-200 px-3 py-2.5 rounded-xl text-sm font-bold outline-none focus:border-emerald-400 transition-all cursor-pointer uppercase"
+                      value={formData.paidDate}
+                      onChange={e => setFormData({ ...formData, paidDate: e.target.value })}
+                    />
+                    {formData.paidDate && (
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-xl px-4 py-2 flex items-center justify-between">
+                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Payment on</span>
+                        <span className="text-xs font-black text-emerald-700">
+                          {new Date(formData.paidDate).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' })}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* ── Deposit / Pay-from Account ── */}
                 <div className="pt-2 border-t border-slate-100 space-y-2">
