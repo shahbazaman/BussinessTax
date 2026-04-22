@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import {
-  ArrowLeft, Loader2, FileText, ChevronDown,
+  ArrowLeft, Loader2, FileText, ChevronDown,Printer,
   Download, Trash2, Edit2, Search, TrendingUp, PieChart
 } from 'lucide-react';
 import { toast } from 'react-toastify';
@@ -110,7 +110,35 @@ const ClientInvoices = () => {
     });
     doc.save(`${invoice.type}_${invoice.invoiceNumber || invoice.purchaseNumber}.pdf`);
   };
-
+const printPDF = (invoice) => {
+    const doc = new jsPDF();
+    const isSale = invoice.type === 'Sale';
+    doc.setFontSize(22);
+    doc.setTextColor(isSale ? 79 : 225, isSale ? 70 : 29, isSale ? 229 : 72);
+    doc.text(`${invoice.type.toUpperCase()} INVOICE`, 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setTextColor(40);
+    doc.text(`Invoice No: ${invoice.invoiceNumber || invoice.purchaseNumber}`, 14, 30);
+    doc.text(`Date: ${new Date(invoice.invoiceDate || invoice.createdAt).toLocaleDateString()}`, 14, 35);
+    autoTable(doc, {
+      startY: 50,
+      head: [['Item Description', 'Qty', 'Unit Price', 'Total']],
+      body: invoice.items.map(i => [
+        i.name, i.quantity,
+        formatValue(i.price),
+        formatValue(i.quantity * i.price)
+      ]),
+      foot: [
+        ['', '', 'Subtotal', formatValue(invoice.subtotal)],
+        ['', '', 'Tax', formatValue(invoice.taxAmount)],
+        ['', '', 'Grand Total', formatValue(invoice.totalAmount)]
+      ],
+      headStyles: { fillColor: isSale ? [79, 70, 229] : [225, 29, 72] },
+      footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold' }
+    });
+    doc.autoPrint();
+    window.open(doc.output('bloburl'), '_blank');
+  };
   const filtered = useMemo(() => invoices.filter(inv =>
     inv.type === activeTab &&
     (filterStatus === 'All' || inv.status === filterStatus) &&
@@ -257,6 +285,9 @@ const ClientInvoices = () => {
                         <button onClick={() => downloadPDF(inv)}
                           className="p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white transition-all">
                           <Download size={16} />
+                        </button>
+                        <button onClick={() => printPDF(inv)} className="p-2 text-slate-400 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-all" title="Print Invoice">
+                          <Printer size={15} />
                         </button>
                         <button onClick={() => handleDelete(inv._id)}
                           className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all">

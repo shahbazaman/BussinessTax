@@ -5,7 +5,7 @@ import api from '../utils/api'; // Ensure this is imported
 import { toast } from 'react-toastify';
 import { 
   FileDown, Plus, Trash2, Receipt, Truck, Percent, 
-  Calendar, User, Hash, Info, Package 
+  Calendar, User, Hash, Info, Package, Printer
 } from 'lucide-react';
 import { CurrencyContext } from '../context/CurrencyContext';
 
@@ -107,7 +107,24 @@ const CreateInvoice = () => {
       toast.error(err.response?.data?.message || "Creation Failed");
     }
   };
-
+const printInvoice = async () => {
+    try {
+      const { pdf } = await import('@react-pdf/renderer');
+      const blob = await pdf(
+        <InvoicePDF data={{ ...invoice, ...totals, symbol }} />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (win) {
+        win.addEventListener('load', () => {
+          win.focus();
+          win.print();
+        });
+      }
+    } catch (err) {
+      toast.error('Print failed: ' + err.message);
+    }
+  };
   return (
     <div className="p-4 md:p-8 max-w-5xl mx-auto bg-slate-50 min-h-screen">
       {/* Header */}
@@ -128,6 +145,13 @@ const CreateInvoice = () => {
           >
             <FileDown size={18} />
           </PDFDownloadLink>
+          <button
+            onClick={printInvoice}
+            className="bg-white text-slate-900 px-6 py-4 rounded-2xl font-black text-xs uppercase border border-slate-200 flex items-center gap-2 hover:bg-violet-600 hover:text-white hover:border-violet-600 transition-all"
+            title="Print Invoice"
+          >
+            <Printer size={18} />
+          </button>
         </div>
       </div>
 

@@ -1,7 +1,41 @@
+import { X, Trash2, Printer } from 'lucide-react';
 import { generateInvoicePDF } from '../utils/generatePDF';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 const InvoiceDetail = ({ invoice, onClose }) => {
   if (!invoice) return null;
-
+const printInvoice = () => {
+    const doc = new jsPDF();
+    const isSale = invoice.type === 'Sale';
+    doc.setFontSize(22);
+    doc.setTextColor(isSale ? 79 : 225, isSale ? 70 : 29, isSale ? 229 : 72);
+    doc.text(`${invoice.type.toUpperCase()} INVOICE`, 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setTextColor(40);
+    doc.text(`Invoice No: ${invoice.invoiceNumber || invoice.purchaseNumber || 'N/A'}`, 14, 30);
+    doc.text(`Date: ${new Date(invoice.invoiceDate || invoice.createdAt).toLocaleDateString()}`, 14, 35);
+    doc.text(`GSTIN: ${invoice.gstNumber || 'N/A'}`, 14, 40);
+    doc.text(`Party: ${invoice.client?.name || invoice.clientName || 'N/A'}`, 14, 45);
+    doc.text(`Billing Address: ${invoice.billingAddress || 'N/A'}`, 14, 50, { maxWidth: 80 });
+    autoTable(doc, {
+      startY: 65,
+      head: [['Item', 'Qty', 'Price', 'Total']],
+      body: (invoice.items || []).map(i => [
+        i.name, i.quantity,
+        `${symbol}${Number(i.price).toFixed(2)}`,
+        `${symbol}${(i.quantity * i.price).toFixed(2)}`
+      ]),
+      foot: [
+        ['', '', 'Subtotal', `${symbol}${Number(invoice.subtotal || 0).toFixed(2)}`],
+        ['', '', 'Tax', `${symbol}${Number(invoice.taxAmount || 0).toFixed(2)}`],
+        ['', '', 'Grand Total', `${symbol}${Number(invoice.totalAmount || 0).toFixed(2)}`]
+      ],
+      headStyles: { fillColor: isSale ? [79, 70, 229] : [225, 29, 72] },
+      footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold' }
+    });
+    doc.autoPrint();
+    window.open(doc.output('bloburl'), '_blank');
+  };
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4">
       <div className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95">
@@ -70,8 +104,8 @@ const InvoiceDetail = ({ invoice, onClose }) => {
         <div className="p-6 bg-slate-50 border-t border-slate-100 flex gap-4">
           <button onClick={() => generateInvoicePDF(invoice)} className="flex-1 bg-blue-600 text-white font-bold py-3 rounded-xl hover:bg-blue-700 transition-all">
             Download PDF</button>
-          <button className="px-6 py-3 border border-slate-200 font-bold rounded-xl hover:bg-white transition-all">
-            Print
+          <button onClick={printInvoice} className="px-6 py-3 border border-slate-200 font-bold rounded-xl hover:bg-white transition-all flex items-center gap-2">
+            <Printer size={16} /> Print
           </button>
         </div>
       </div>

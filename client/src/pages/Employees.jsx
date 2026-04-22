@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useContext } from 'react';
 import api from '../utils/api';
 import { 
-  Users, UserPlus, CalendarCheck, DollarSign, Trash2, Edit2, 
+  Users, UserPlus, CalendarCheck, DollarSign, Trash2, Edit2, Printer,
   X, Search, Filter, Loader2, Receipt, Landmark, Phone, Briefcase, MapPin, Fingerprint, RefreshCcw, CheckCircle2,
   Calendar, Building2, Hash, Clock, AlertCircle, CreditCard, CheckCheck, BanknoteIcon
 } from 'lucide-react';
@@ -437,6 +437,20 @@ const downloadSlip = async () => {
   const month = lastSlip.paidDate.toLocaleString('default', { month: 'long', year: 'numeric' }).replace(' ', '_');
   pdf.save(`SalarySlip_${empName}_${month}.pdf`);
 };
+const printSlip = async () => {
+    const element = slipRef.current;
+    if (!element) return;
+    element.style.display = 'block';
+    const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+    element.style.display = 'none';
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = (canvas.height * pageWidth) / canvas.width;
+    pdf.addImage(imgData, 'PNG', 0, 0, pageWidth, pageHeight);
+    pdf.autoPrint();
+    window.open(pdf.output('bloburl'), '_blank');
+  };
   return (
     <div className="p-4 md:p-8 space-y-8 bg-slate-50 min-h-screen">
       {/* Header & Payroll Summary */}
@@ -813,6 +827,13 @@ const downloadSlip = async () => {
             className="flex items-center gap-2 bg-slate-900 text-white px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-2xl hover:bg-blue-600 transition-all"
           >
             <Receipt size={16} /> Download Salary Slip — {lastSlip.employee.name}
+          </button>
+          <button
+            onClick={printSlip}
+            className="flex items-center gap-2 bg-white text-slate-900 px-5 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-2xl hover:bg-violet-600 hover:text-white transition-all border border-slate-200"
+            title="Print Salary Slip"
+          >
+            <Printer size={16} /> Print Slip
           </button>
           <button
             onClick={() => setLastSlip(null)}

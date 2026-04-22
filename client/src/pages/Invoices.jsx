@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
 import { 
-  Plus, Search, Trash2, Download, Edit2, Loader2, 
+  Plus, Search, Trash2, Download, Edit2, Loader2,Printer, 
   ShoppingCart, ShoppingBag, CreditCard, CheckCircle,
   TrendingUp, PieChart, ChevronDown, FileText
 } from 'lucide-react';
@@ -246,7 +246,57 @@ const handleDelete = (id) => {
 
     doc.save(`${invoice.type}_${invoice.invoiceNumber || invoice.purchaseNumber}.pdf`);
   };
-
+const printPDF = (invoice) => {
+    const doc = new jsPDF();
+    const isSale = invoice.type === 'Sale';
+    doc.setFontSize(22);
+    doc.setTextColor(isSale ? 79 : 225, isSale ? 70 : 29, isSale ? 229 : 72);
+    doc.text(`${invoice.type.toUpperCase()} INVOICE`, 105, 20, { align: 'center' });
+    doc.setFontSize(10);
+    doc.setTextColor(40);
+    const identifier = isSale
+      ? `Invoice No: ${invoice.invoiceNumber}`
+      : `Purchase No: ${invoice.purchaseNumber} | Ref: ${invoice.referenceNumber || 'N/A'}`;
+    doc.text(identifier, 14, 30);
+    doc.text(`Date: ${new Date(invoice.invoiceDate || invoice.createdAt).toLocaleDateString()}`, 14, 35);
+    doc.text(`GSTIN: ${invoice.gstNumber || 'N/A'}`, 14, 40);
+    doc.text(`Party Details:`, 14, 50);
+    doc.setFontSize(9);
+    doc.text(`${invoice.client?.name || invoice.clientName || 'N/A'}`, 14, 55);
+    doc.text(`${invoice.billingAddress || 'N/A'}`, 14, 60, { maxWidth: 80 });
+    if (isSale && invoice.shippingAddress) {
+      doc.setFontSize(10);
+      doc.text(`Shipping Address:`, 110, 50);
+      doc.setFontSize(9);
+      doc.text(`${invoice.shippingAddress}`, 110, 55, { maxWidth: 80 });
+    }
+    autoTable(doc, {
+      startY: 75,
+      head: [['Item Description', 'Qty', 'Unit Price', 'Tax %', 'Total']],
+      body: invoice.items.map(i => [
+        i.name, i.quantity, formatValue(i.price),
+        `${i.taxRate || 0}%`,
+        formatValue(i.quantity * i.price * (1 + (i.taxRate || 0) / 100))
+      ]),
+      foot: [
+        ['', '', '', 'Subtotal', formatValue(invoice.subtotal)],
+        ['', '', '', 'Tax Amount', formatValue(invoice.taxAmount)],
+        ['', '', '', 'Discount', `- ${formatValue(invoice.discount)}`],
+        ['', '', '', 'Grand Total', formatValue(invoice.totalAmount)]
+      ],
+      headStyles: { fillColor: isSale ? [79, 70, 229] : [225, 29, 72] },
+      footStyles: { fillColor: [245, 245, 245], textColor: [0, 0, 0], fontStyle: 'bold' }
+    });
+    if (invoice.notes) {
+      const finalY = doc.lastAutoTable.finalY + 10;
+      doc.setFontSize(10);
+      doc.text('Notes/Terms:', 14, finalY);
+      doc.setFontSize(8);
+      doc.text(invoice.notes, 14, finalY + 5, { maxWidth: 180 });
+    }
+    doc.autoPrint();
+    window.open(doc.output('bloburl'), '_blank');
+  };
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-6xl mx-auto">
@@ -401,8 +451,8 @@ const handleDelete = (id) => {
                           <button onClick={() => { setSelectedInvoice(inv); setShowModal(true); }} className={`p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm`}>
                             <Edit2 size={16} />
                           </button>
-                          <button onClick={() => downloadPDF(inv)} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm">
-                            <Download size={16} />
+                          <button onClick={() => printPDF(inv)} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all shadow-sm" title="Print Invoice">
+                            <Printer size={16} />
                           </button>
                           <button onClick={() => handleDelete(inv._id)} className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm">
                             <Trash2 size={16} />

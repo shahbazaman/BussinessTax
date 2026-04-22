@@ -476,7 +476,7 @@ if (formData.items.length === 0) return toast.error("Add at least one item");
                   </div>
                 )}
                 {/* ── Paid Date (shown for Paid / Partially Paid) ── */}
-                {(formData.status === 'Paid' || formData.status === 'Partially Paid') && (
+                {(formData.status === 'Pending' || formData.status === 'Partially Paid') && (
                   <div className="pt-2 border-t border-slate-100 space-y-2">
                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
                       📅 {formData.status === 'Paid' ? 'Payment Received Date' : 'Partial Payment Date'}
