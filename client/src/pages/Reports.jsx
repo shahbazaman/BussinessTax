@@ -197,6 +197,9 @@ const exportTabPDF = async (containerId, filename) => {
   try {
     const element = document.getElementById(containerId);
     if (!element) throw new Error('Content not found');
+    // Show PDF-only header if present
+    const pdfHeader = element.querySelector('#gst-pdf-header');
+    if (pdfHeader) pdfHeader.classList.remove('hidden');
     const canvas = await html2canvas(element, {
       scale: 2,
       useCORS: true,
@@ -224,12 +227,42 @@ const exportTabPDF = async (containerId, filename) => {
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    // Handle multi-page if content is taller than A4
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    if (pdfHeight <= pageHeight) {
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    } else {
+      let yOffset = 0;
+      while (yOffset < pdfHeight) {
+        pdf.addImage(imgData, 'PNG', 0, -yOffset, pdfWidth, pdfHeight);
+        yOffset += pageHeight;
+        if (yOffset < pdfHeight) pdf.addPage();
+      }
+    }
+    // Footer on every page
+    const totalPages = pdf.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPages; i++) {
+      pdf.setPage(i);
+      pdf.setFontSize(8);
+      pdf.setTextColor(150);
+      pdf.text(
+        `Generated: ${new Date().toLocaleString()}`,
+        10,
+        pdf.internal.pageSize.getHeight() - 5
+      );
+      pdf.text(
+        `Page ${i} of ${totalPages}`,
+        pdf.internal.pageSize.getWidth() - 30,
+        pdf.internal.pageSize.getHeight() - 5
+      );
+    }
     pdf.save(`${filename}-${new Date().toISOString().split('T')[0]}.pdf`);
     toast.update(loadingToast, { render: 'Exported!', type: 'success', isLoading: false, autoClose: 2500 });
   } catch (err) {
     toast.update(loadingToast, { render: 'Export failed: ' + err.message, type: 'error', isLoading: false, autoClose: 3000 });
   } finally {
+    // Always hide the PDF header again
+    if (pdfHeader) pdfHeader.classList.add('hidden');
     // Restore original inline styles
     originalStyles.forEach(({ el, overrides }) => {
       Object.entries(overrides).forEach(([prop, val]) => {
@@ -1010,8 +1043,23 @@ const exportGstCSV = () => {
 {activeTab === 'gst' && (
   <>
     <div id="tab-gst" className="space-y-6">
-      {/* Period Filter + Export Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
+  {/* PDF-only header — hidden in UI, visible in export */}
+  <div id="gst-pdf-header" className="hidden print:block bg-white rounded-2xl p-6 border border-slate-100 shadow-sm">
+    <div className="flex justify-between items-start">
+      <div>
+        <h1 className="text-2xl font-black text-slate-800">GST Report</h1>
+        <p className="text-xs text-slate-400 mt-1 font-medium">
+          Period: {gstFrom && gstTo ? `${gstFrom} to ${gstTo}` : gstPreset === 'monthly' ? 'This Month' : gstPreset === 'yearly' ? 'This Year' : 'All Time'}
+        </p>
+      </div>
+      <div className="text-right">
+        <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Generated</p>
+        <p className="text-xs text-slate-600 font-bold">{new Date().toLocaleString()}</p>
+      </div>
+    </div>
+  </div>
+  {/* Period Filter + Export Bar */}
+  <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-2xl p-4 border border-slate-100 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs font-black text-slate-500 uppercase tracking-wide">Period</span>
           {/* Quick presets */}
@@ -1159,9 +1207,9 @@ const exportGstCSV = () => {
                   ) : gstData.salesInvoices.map(inv => (
                     <tr key={inv._id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 font-mono text-[10px] text-slate-500">{inv.invoiceNumber || '—'}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-700">{inv.clientName || '—'}</td>
+                     <td className="px-4 py-3 font-semibold text-slate-700">{inv.clientName || inv.client?.name || inv.customerName || '—'}</td>
                       <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{new Date(inv.invoiceDate).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}</td>
-                      <td className="px-4 py-3 font-mono text-[10px] text-slate-400">{inv.gstNumber || '—'}</td>
+                     <td className="px-4 py-3 font-mono text-[10px] text-slate-400">{inv.gstNumber || inv.gstin || inv.taxNumber || '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{fmt(inv.subtotal)}</td>
                       <td className="px-4 py-3 text-indigo-600 font-bold">{inv.globalTaxRate}%</td>
                       <td className="px-4 py-3 font-black text-emerald-600">{fmt(inv.taxAmount)}</td>
@@ -1169,13 +1217,30 @@ const exportGstCSV = () => {
                     </tr>
                   ))}
                 </tbody>
+                {gstData.salesInvoices.length > 0 && (
+                  <tfoot className="bg-emerald-50 border-t-2 border-emerald-100">
+                    <tr>
+                      <td colSpan={4} className="px-4 py-3 font-black text-emerald-700 text-xs uppercase tracking-wide">Total</td>
+                      <td className="px-4 py-3 font-black text-slate-700">
+                        {fmt(gstData.salesInvoices.reduce((s, i) => s + (i.subtotal || 0), 0))}
+                      </td>
+                      <td />
+                      <td className="px-4 py-3 font-black text-emerald-700">
+                        {fmt(gstData.salesInvoices.reduce((s, i) => s + (i.taxAmount || 0), 0))}
+                      </td>
+                      <td className="px-4 py-3 font-black text-slate-800">
+                        {fmt(gstData.salesInvoices.reduce((s, i) => s + (i.totalAmount || 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
           <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100">
               <h3 className="text-sm font-black text-slate-700 uppercase tracking-wide">GSTR-3B — Input Tax Credit (Purchases)</h3>
-            </div>
+               </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-blue-50 border-b border-blue-100">
@@ -1191,7 +1256,7 @@ const exportGstCSV = () => {
                   ) : gstData.purchaseInvoices.map(inv => (
                     <tr key={inv._id} className="hover:bg-slate-50">
                       <td className="px-4 py-3 font-mono text-[10px] text-slate-500">{inv.purchaseNumber || inv.referenceNumber || '—'}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-700">{inv.clientName || '—'}</td>
+                     <td className="px-4 py-3 font-semibold text-slate-700">{inv.clientName || inv.client?.name || inv.vendorName || '—'}</td>
                       <td className="px-4 py-3 text-slate-500 whitespace-nowrap">{new Date(inv.invoiceDate).toLocaleDateString(undefined,{day:'2-digit',month:'short',year:'numeric'})}</td>
                       <td className="px-4 py-3 text-slate-600">{fmt(inv.subtotal)}</td>
                       <td className="px-4 py-3 text-indigo-600 font-bold">{inv.globalTaxRate}%</td>
@@ -1199,6 +1264,20 @@ const exportGstCSV = () => {
                     </tr>
                   ))}
                 </tbody>
+                {gstData.purchaseInvoices.length > 0 && (
+                  <tfoot className="bg-blue-50 border-t-2 border-blue-100">
+                    <tr>
+                      <td colSpan={3} className="px-4 py-3 font-black text-blue-700 text-xs uppercase tracking-wide">Total</td>
+                      <td className="px-4 py-3 font-black text-slate-700">
+                        {fmt(gstData.purchaseInvoices.reduce((s, i) => s + (i.subtotal || 0), 0))}
+                      </td>
+                      <td />
+                      <td className="px-4 py-3 font-black text-blue-700">
+                        {fmt(gstData.purchaseInvoices.reduce((s, i) => s + (i.taxAmount || 0), 0))}
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
           </div>
