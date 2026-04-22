@@ -170,7 +170,13 @@ const handleReceiptUpload = async (e) => {
 }, [expenses, searchTerm, startDate, endDate, filterCategory]);
 
   const totalSpent = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
-
+const handlePrint = () => {
+  const style = document.createElement('style');
+  style.innerHTML = `@media print { body > * { display: none !important; } #expenses-list { display: block !important; } #expenses-list * { display: revert !important; } }`;
+  document.head.appendChild(style);
+  window.print();
+  document.head.removeChild(style);
+};
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-5xl mx-auto">
@@ -196,6 +202,12 @@ const handleReceiptUpload = async (e) => {
               className="bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-slate-50 transition-all font-bold text-sm"
             >
               Export CSV
+            </button>
+            <button
+              onClick={handlePrint}
+              className="bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-2xl flex items-center gap-2 hover:bg-slate-50 transition-all font-bold text-sm"
+            >
+              🖨️ Print
             </button>
           </div>
         </div>
@@ -228,7 +240,7 @@ const handleReceiptUpload = async (e) => {
         </div>
 
         {/* Expense List */}
-        <div className="grid gap-3">
+        <div id="expenses-list" className="grid gap-3">
           {loading ? (
              <div className="text-center py-20 animate-pulse text-slate-400 font-medium">Fetching ledger...</div>
           ) : filteredExpenses.map((exp) => (

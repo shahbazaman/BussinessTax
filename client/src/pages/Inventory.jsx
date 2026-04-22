@@ -142,6 +142,19 @@ const filteredProducts = useMemo(() => {
           <button onClick={() => exportToCSV(products, 'Inventory')} className="bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-2xl shadow-lg transition-all active:scale-95">
             <Download size={20} />
           </button>
+          <button
+            onClick={() => {
+              const style = document.createElement('style');
+              style.innerHTML = `@media print { body > * { display: none !important; } #inventory-table { display: block !important; } #inventory-table * { display: revert !important; } }`;
+              document.head.appendChild(style);
+              window.print();
+              document.head.removeChild(style);
+            }}
+            className="bg-white border border-slate-200 text-slate-700 p-3 rounded-2xl shadow-lg transition-all active:scale-95 font-bold text-sm"
+            title="Print Inventory"
+          >
+            🖨️
+          </button>
         </div>
       </div>
 
@@ -184,7 +197,7 @@ const filteredProducts = useMemo(() => {
       </div>
 
       {/* Inventory Table */}
-<div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+<div id="inventory-table" className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
   <div className="overflow-x-auto">
     <table className="w-full text-left border-collapse">
       <thead>

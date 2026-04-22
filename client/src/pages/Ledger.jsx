@@ -168,6 +168,18 @@ const Ledger = () => {
           >
             <Download size={16} /> Export CSV
           </button>
+          <button
+            onClick={() => {
+              const style = document.createElement('style');
+              style.innerHTML = `@media print { body > * { display: none !important; } #ledger-table { display: block !important; } #ledger-table * { display: revert !important; } }`;
+              document.head.appendChild(style);
+              window.print();
+              document.head.removeChild(style);
+            }}
+            className="flex-1 md:flex-none bg-white border border-slate-200 text-slate-700 px-5 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-50 transition-all text-sm"
+          >
+            🖨️ Print
+          </button>
         </div>
       </div>
 
@@ -313,7 +325,7 @@ const Ledger = () => {
 
 {/* ── Ledger Table ── */}
 <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-x-auto">
-  <table className="w-full text-xs min-w-[800px]">
+  <table id="ledger-table" className="w-full text-xs min-w-[800px]">
     <thead>
       <tr className="bg-slate-50 border-b border-slate-100">
         {['Description','Date','Category','Dr Account','Cr Account','Debit','Credit','Balance'].map(h => (

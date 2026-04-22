@@ -271,6 +271,13 @@ const exportTabPDF = async (containerId, filename) => {
     });
   }
 };
+const printTab = (tabId) => {
+  const style = document.createElement('style');
+  style.innerHTML = `@media print { body > * { display: none !important; } #${tabId} { display: block !important; } #${tabId} * { display: revert !important; } }`;
+  document.head.appendChild(style);
+  window.print();
+  document.head.removeChild(style);
+};
 const exportGstCSV = () => {
   if (!gstData) return toast.error('No GST data to export');
   const periodLabel = gstFrom && gstTo
@@ -375,6 +382,12 @@ const exportGstCSV = () => {
       className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
       <Download size={14}/> Export PDF
     </button>
+    <button
+  onClick={() => printTab('TAB_ID_HERE')}
+  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow active:scale-95"
+>
+  🖨️ Print
+</button>
   </div>
   <div id="tab-overview" className="space-y-6">
     {/* Tax Settings + Estimated Tax cards */}
@@ -492,6 +505,12 @@ const exportGstCSV = () => {
           className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
           <Download size={14}/> Export PDF
         </button>
+        <button
+  onClick={() => printTab('TAB_ID_HERE')}
+  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow active:scale-95"
+>
+  🖨️ Print
+</button>
       </div>
       <div id="tab-trial-balance" className="space-y-5">
       {/* Balanced indicator */}
@@ -563,6 +582,12 @@ const exportGstCSV = () => {
           className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
           <Download size={14}/> Export PDF
         </button>
+        <button
+  onClick={() => printTab('TAB_ID_HERE')}
+  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow active:scale-95"
+>
+  🖨️ Print
+</button>
       </div>
       <div id="tab-profit-loss" className="space-y-5">
         <div className={`rounded-2xl p-6 border ${(plData?.netProfit||0) >= 0 ? 'bg-emerald-50 border-emerald-100' : 'bg-rose-50 border-rose-100'}`}>
@@ -640,6 +665,12 @@ const exportGstCSV = () => {
           className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
           <Download size={14}/> Export PDF
         </button>
+        <button
+  onClick={() => printTab('TAB_ID_HERE')}
+  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow active:scale-95"
+>
+  🖨️ Print
+</button>
       </div>
       <div id="tab-tax-summary" className="space-y-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -705,6 +736,12 @@ const exportGstCSV = () => {
         className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
         <Download size={14}/> Export PDF
       </button>
+      <button
+  onClick={() => printTab('TAB_ID_HERE')}
+  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow active:scale-95"
+>
+  🖨️ Print
+</button>
     </div>
     <div id="tab-cash-flow" className="space-y-6">
       <h2 className="text-lg font-black text-slate-800">Cash Flow Statement</h2>
@@ -746,6 +783,12 @@ const exportGstCSV = () => {
         className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
         <Download size={14}/> Export PDF
       </button>
+      <button
+  onClick={() => printTab('TAB_ID_HERE')}
+  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow active:scale-95"
+>
+  🖨️ Print
+</button>
     </div>
     <div id="tab-balance-sheet" className="space-y-4">
       <h2 className="text-lg font-black text-slate-800">Balance Sheet</h2>
@@ -832,6 +875,12 @@ const exportGstCSV = () => {
         className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
         <Download size={14}/> Export PDF
       </button>
+      <button
+  onClick={() => printTab('TAB_ID_HERE')}
+  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow active:scale-95"
+>
+  🖨️ Print
+</button>
     </div>
     <div id="tab-invoices" className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -1101,6 +1150,12 @@ const exportGstCSV = () => {
 
         {/* Export Dropdown */}
         <div className="relative">
+          <button
+  onClick={() => printTab('TAB_ID_HERE')}
+  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow active:scale-95"
+>
+  🖨️ Print
+</button>
           <button
             onClick={() => setGstExportDropdownOpen(o => !o)}
             className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">

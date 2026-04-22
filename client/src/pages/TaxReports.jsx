@@ -123,8 +123,20 @@ const TaxReports = () => {
       >
         <Download size={18} /> Export for Accountant
       </button>
+      <button
+          onClick={() => {
+            const style = document.createElement('style');
+            style.innerHTML = `@media print { body > * { display: none !important; } #tax-report { display: block !important; } #tax-report * { display: revert !important; } }`;
+            document.head.appendChild(style);
+            window.print();
+            document.head.removeChild(style);
+          }}
+          className="bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:bg-slate-50 transition-all text-sm"
+        >
+          🖨️ Print
+        </button>
       </div>
-
+<div id="tax-report">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm">
@@ -200,6 +212,7 @@ const TaxReports = () => {
           </table>
         </div>
       </div>
+    </div>
     </div>
   );
 };
