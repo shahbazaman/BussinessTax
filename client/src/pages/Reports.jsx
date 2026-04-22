@@ -1151,12 +1151,6 @@ const exportGstCSV = () => {
         {/* Export Dropdown */}
         <div className="relative">
           <button
-  onClick={() => printTab('TAB_ID_HERE')}
-  className="flex items-center gap-2 bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-50 transition-all shadow active:scale-95"
->
-  🖨️ Print
-</button>
-          <button
             onClick={() => setGstExportDropdownOpen(o => !o)}
             className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all shadow active:scale-95">
             <Download size={14}/> Export ▾
@@ -1173,6 +1167,12 @@ const exportGstCSV = () => {
                 className="w-full text-left px-4 py-3 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 flex items-center gap-2">
                 <Download size={12}/> Export as CSV
               </button>
+              <button
+  onClick={() => { setGstExportDropdownOpen(false); printTab('tab-gst'); }}
+  className="w-full text-left px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-900 flex items-center gap-2"
+>
+  🖨️ Print
+</button>
             </div>
           )}
         </div>
