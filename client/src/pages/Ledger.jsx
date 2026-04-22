@@ -70,7 +70,7 @@ const Ledger = () => {
 
   // pagination
   const [page, setPage] = useState(1);
-  const PER_PAGE = 20;
+  const PER_PAGE = 15;
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchLedger = useCallback(async () => {

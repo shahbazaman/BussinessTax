@@ -23,7 +23,8 @@ const Invoices = () => {
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false); 
   const [activeStatusDropdown, setActiveStatusDropdown] = useState(null); 
-  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   // Tabs & Filters
   const [activeTab, setActiveTab] = useState('Sale'); 
   const [searchTerm, setSearchTerm] = useState('');
@@ -108,6 +109,32 @@ const Invoices = () => {
              (!start || invDate >= start) && (!end || invDate <= end);
     });
   }, [invoices, activeTab, searchTerm, filterStatus, startDate, endDate]);
+
+  const paginatedInvoices = useMemo(() => {
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  return filteredInvoices.slice(startIndex, startIndex + itemsPerPage);
+}, [filteredInvoices, currentPage]);
+const totalPages = Math.ceil(filteredInvoices.length / itemsPerPage);
+const getPageNumbers = () => {
+  const pages = [];
+
+  if (totalPages <= 5) {
+    for (let i = 1; i <= totalPages; i++) pages.push(i);
+  } else {
+    if (currentPage <= 3) {
+      pages.push(1, 2, 3, 4, '...', totalPages);
+    } else if (currentPage >= totalPages - 2) {
+      pages.push(1, '...', totalPages - 3, totalPages - 2, totalPages - 1, totalPages);
+    } else {
+      pages.push(1, '...', currentPage - 1, currentPage, currentPage + 1, '...', totalPages);
+    }
+  }
+
+  return pages;
+};
+useEffect(() => {
+  setCurrentPage(1);
+}, [searchTerm, filterStatus, startDate, endDate, activeTab]);
 
   const stats = useMemo(() => {
     return filteredInvoices.reduce((acc, inv) => {
@@ -382,7 +409,7 @@ const printPDF = (invoice) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {filteredInvoices.map((inv) => (
+                  {paginatedInvoices.map((inv) => (
                     <tr key={inv._id} className="hover:bg-slate-50/50 transition-colors group">
                       <td className="px-8 py-6">
                         <div className="flex items-center gap-3">
@@ -465,9 +492,57 @@ const printPDF = (invoice) => {
               </table>
             </div>
           </div>
+          
         )}
       </div>
+{filteredInvoices.length > itemsPerPage && (
+  <div className="flex justify-center items-center gap-2 py-6 flex-wrap">
+    
+    {/* Prev */}
+    <button
+      onClick={() => setCurrentPage((p) => Math.max(p - 1, 1))}
+      disabled={currentPage === 1}
+      className={`px-3 py-1 rounded-lg text-xs font-bold ${
+        currentPage === 1
+          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          : 'bg-slate-200 hover:bg-slate-300'
+      }`}
+    >
+      Prev
+    </button>
 
+    {/* Page Numbers */}
+    {getPageNumbers().map((page, index) => (
+      <button
+        key={index}
+        onClick={() => typeof page === 'number' && setCurrentPage(page)}
+        disabled={page === '...'}
+        className={`px-3 py-1 rounded-lg text-xs font-bold ${
+          page === currentPage
+            ? 'bg-indigo-600 text-white'
+            : page === '...'
+            ? 'bg-transparent cursor-default'
+            : 'bg-slate-200 hover:bg-slate-300'
+        }`}
+      >
+        {page}
+      </button>
+    ))}
+
+    {/* Next */}
+    <button
+      onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
+      disabled={currentPage === totalPages}
+      className={`px-3 py-1 rounded-lg text-xs font-bold ${
+        currentPage === totalPages
+          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          : 'bg-slate-200 hover:bg-slate-300'
+      }`}
+    >
+      Next
+    </button>
+  </div>
+)}
       <InvoiceModal 
         isOpen={showModal} 
         onClose={() => { setShowModal(false); setSelectedInvoice(null); }} 
