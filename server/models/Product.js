@@ -1,3 +1,72 @@
+// import mongoose from 'mongoose';
+
+// const variantSchema = new mongoose.Schema({
+//   name: { type: String, required: true },
+//   sku: { type: String },
+//   barcode: { type: String },
+//   price: { type: Number, required: true },
+//   costPrice: { type: Number, default: 0 },
+//   stock: { type: Number, default: 0 },
+//   taxRate: { type: Number, default: 0 },
+//   weight: Number,
+//   unit: { type: String, default: 'pcs' }
+// });
+
+// const productSchema = new mongoose.Schema({
+//   user: { 
+//     type: mongoose.Schema.Types.ObjectId, 
+//     ref: 'User', 
+//     required: true 
+//   },
+//   title: { 
+//     type: String, 
+//     required: true,
+//     trim: true 
+//   },
+//   category: { 
+//     type: String,
+//     required: true
+//   },
+//   supplier: { 
+//     type: String,
+//     trim: true 
+//   },
+  
+//   variants: [variantSchema],
+//   lowStockAlert: { 
+//     type: Number, 
+//     default: 10 
+//   }, 
+//   reorderQuantity: { 
+//     type: Number, 
+//     default: 50 
+//   },
+//   expiryDate: {
+//     type: Date,
+//     default: null
+//   }
+// }, {
+//   timestamps: true,
+//   toJSON: { virtuals: true }, 
+//   toObject: { virtuals: true } 
+// });
+
+// productSchema.virtual('margins').get(function() {
+//   if (!this.variants) return [];
+  
+//   return this.variants.map(v => {
+//     const profit = v.price - v.costPrice;
+//     const percentage = v.price > 0 ? (profit / v.price) * 100 : 0;
+//     return {
+//       variant: v.name,
+//       profit: profit.toFixed(2),
+//       marginPercentage: percentage.toFixed(2) + '%',
+//       taxRate: v.taxRate + '%'
+//     };
+//   });
+// });
+
+// export default mongoose.model('Product', productSchema);
 import mongoose from 'mongoose';
 
 const variantSchema = new mongoose.Schema({
@@ -40,6 +109,10 @@ const productSchema = new mongoose.Schema({
   reorderQuantity: { 
     type: Number, 
     default: 50 
+  },
+  hsnCode: {
+    type: String,
+    default: ''
   },
   expiryDate: {
     type: Date,

@@ -230,11 +230,6 @@ const Employees = () => {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
-  useEffect(() => {
-  setCurrentPage(1);
-}, [searchTerm, roleFilter]);
-
 
   const totalPayrollAmount = useMemo(() => {
   return employees
@@ -255,17 +250,23 @@ const totalAllEmployees = useMemo(() => {
       return matchesSearch && matchesRole;
     });
   }, [employees, searchTerm, roleFilter]);
+
 const paginatedEmployees = useMemo(() => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   return filteredEmployees.slice(startIndex, startIndex + itemsPerPage);
 }, [filteredEmployees, currentPage]);
 
 const totalPages = Math.ceil(filteredEmployees.length / itemsPerPage);
-useEffect(() => {
+  useEffect(() => {
   if (currentPage > totalPages && totalPages > 0) {
     setCurrentPage(totalPages);
   }
 }, [filteredEmployees, currentPage, itemsPerPage]);
+
+  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+  setCurrentPage(1);
+}, [searchTerm, roleFilter]);
   const roles = ['All', ...new Set(employees.map(e => e.role))];
 
   const fetchNextEmployeeId = async () => {

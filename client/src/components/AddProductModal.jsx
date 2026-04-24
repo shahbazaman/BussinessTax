@@ -1,8 +1,396 @@
+// import React, { useState, useEffect, useContext, useRef } from 'react';
+// import { X, Plus, Trash2, Save, Package, AlertCircle, Edit3, Warehouse, Barcode, Hash } from 'lucide-react';
+// import api from '../utils/api';
+// import { toast } from 'react-toastify';
+// import { CurrencyContext } from '../context/CurrencyContext';
+
+// const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
+//   const { symbol } = useContext(CurrencyContext);
+  
+//   const initialState = {
+//     title: '',
+//     category: '',
+//     customCategory: '',
+//     supplier: '',
+//     lowStockAlert: 10,
+//     reorderQuantity: 50,
+//     expiryDate: '',
+//     variants: [{
+//       name: '', weight: '', unit: 'pcs', costPrice: '', salePrice: '', stock: '', sku: '', barcode: undefined, taxRate: 0 
+//     }]
+//   };
+//   const [clients, setClients] = useState([]);
+//   const [supplierSuggestions, setSupplierSuggestions] = useState([]);
+//   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+//   const variantRefs = useRef([]);
+//   const [productData, setProductData] = useState(initialState);
+//   const [isOtherCategory, setIsOtherCategory] = useState(false);
+//   const isEditing = !!editingProduct;
+//   const [allUnits, setAllUnits] = useState(['pcs', 'kg', 'g', 'ml', 'L', 'box', 'mtr', 'set']);
+//   useEffect(() => {
+//     if (isOpen) {
+//       api.get('/clients').then(res => setClients(res.data.map(c => ({
+//         name: c.name,
+//         businessName: c.businessName || ''
+//       }))));
+//       api.get('/auth/custom-units').then(res => {
+//   const defaults = ['pcs', 'kg', 'g', 'ml', 'L', 'box', 'mtr', 'set'];
+//   const merged = [...new Set([...defaults, ...(res.data.customUnits || [])])];
+//   setAllUnits(merged);
+// });
+//       if (editingProduct) {
+//         const standardCategories = ["Groceries", "Electronics", "Home & Kitchen", "Liquids"];
+//         const isCustom = editingProduct.category && !standardCategories.includes(editingProduct.category);
+        
+//         setProductData({
+//           ...editingProduct,
+//           customCategory: isCustom ? editingProduct.category : '',
+//           variants: editingProduct.variants.map(v => ({ ...v, salePrice: v.price }))
+//         });
+//         setIsOtherCategory(isCustom);
+//       } else {
+//         setProductData(initialState);
+//         setIsOtherCategory(false);
+//       }
+//     }
+//   }, [isOpen, editingProduct]);
+// const generateUniqueSKU = (title, variant, index) => {
+//   const catPrefix = "PROD"; // Or use productData.category
+//   const namePrefix = title.substring(0, 3).toUpperCase();
+//   const weight = variant.weight ? `${variant.weight}${variant.unit.toUpperCase()}` : '00';
+//   return `${catPrefix}-${namePrefix}-${weight}-${index + 1}`;
+// };
+
+// const handleVariantChange = (index, e) => {
+//   const { name, value } = e.target;
+//   setProductData(prev => {
+//     const newVariants = [...prev.variants];
+//     newVariants[index][name] = value;
+//     return { ...prev, variants: newVariants };
+//   });
+// };
+
+// const handleChange = (e) => {
+//   const { name, value } = e.target;
+
+//   if (name === "category") {
+//     const isOther = value === "Other";
+//     setIsOtherCategory(isOther);
+//     setProductData(prev => ({ 
+//       ...prev, 
+//       category: value,
+//       customCategory: isOther ? prev.customCategory : '' 
+//     }));
+//   } else {
+//     let updatedProductData = { ...productData, [name]: value };
+//     setProductData(updatedProductData);
+//   }
+// };
+
+//  const handleSupplierInput = (value) => {
+//   setProductData(prev => ({ ...prev, supplier: value }));
+//   if (value.trim().length > 0) {
+//     const filtered = clients.filter(c =>
+//       c.name.toLowerCase().includes(value.toLowerCase()) ||
+//       c.businessName.toLowerCase().includes(value.toLowerCase())
+//     );
+//     setSupplierSuggestions(filtered);
+//     setShowSupplierDropdown(true);
+//   } else {
+//     setShowSupplierDropdown(false);
+//     setSupplierSuggestions(clients);
+//   }
+// };
+
+//   const addVariantField = () => {
+//   const newIndex = productData.variants.length;
+//   setProductData(prev => ({
+//     ...prev,
+//     variants: [...prev.variants, { ...initialState.variants[0] }]
+//   }));
+//   setTimeout(() => {
+//     variantRefs.current[newIndex]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+//   }, 100);
+// };
+
+//   const removeVariantField = (index) => {
+//     if (productData.variants.length > 1) {
+//       const newVariants = productData.variants.filter((_, i) => i !== index);
+//       setProductData({ ...productData, variants: newVariants });
+//     } else {
+//       toast.warning("At least one variant is required");
+//     }
+//   };
+
+//   const handleSubmit = async (e) => {
+//     e.preventDefault();
+//     const finalCategory = isOtherCategory ? productData.customCategory : productData.category;
+//     if (!finalCategory) return toast.error("Please specify a category");
+
+//     const validVariants = productData.variants
+//       .filter(v => v.name.trim() !== '') 
+//       .map((v, index) => ({
+//         ...v,
+//         weight: Number(v.weight) || 0,
+//         costPrice: Number(v.costPrice) || 0,
+//         price: Number(v.salePrice) || 0,
+//         taxRate: Number(v.taxRate) || 0,
+//         stock: Number(v.stock) || 0,
+//         barcode: v.barcode?.trim() || null,
+//         sku: v.sku?.trim() || generateUniqueSKU(productData.title, v, index)
+//       }));
+
+//     if (validVariants.length === 0) return toast.error("Please add at least one variant");
+//     const sanitizedData = {
+//     ...productData,
+//     category: finalCategory, 
+//     lowStockAlert: Number(productData.lowStockAlert) || 0,
+//     reorderQuantity: Number(productData.reorderQuantity) || 0,
+//     variants: validVariants
+//   };
+
+//     try {
+//       if (isEditing) {
+//         await api.put(`/products/${editingProduct._id}`, sanitizedData);
+//         toast.success("Inventory Synchronized");
+//       } else {
+//         await api.post('/products', sanitizedData);
+//         toast.success("Product Cataloged Successfully");
+//       }
+//       onRefresh();
+//       onClose();
+//     } catch (err) {
+//       toast.error(err.response?.data?.message || "Validation Failed");
+//     }
+//   };
+
+//   if (!isOpen) return null;
+
+//   return (
+//     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-100 flex items-center justify-center p-4">
+//       <div className="bg-white rounded-[3rem] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-white/20">        
+//         <div className="p-8 pb-4 flex justify-between items-center border-b border-slate-50">
+//           <div className="flex items-center gap-3">
+//             <div className={`p-3 ${isEditing ? 'bg-amber-500' : 'bg-blue-600'} rounded-2xl text-white shadow-lg`}>
+//               {isEditing ? <Edit3 size={24} /> : <Package size={24} />}
+//             </div>
+//             <div>
+//               <h2 className="text-2xl font-black text-slate-800 tracking-tight">
+//                 {isEditing ? 'Update Inventory' : 'Product Warehouse'}
+//               </h2>
+//               <p className="text-slate-400 text-[10px] font-black uppercase tracking-widest">SKU, Name & Barcode Management</p>
+//             </div>
+//           </div>
+//           <button onClick={onClose} className="p-3 hover:bg-slate-100 text-slate-400 rounded-2xl transition-all">
+//             <X size={24} />
+//           </button>
+//         </div>
+
+//         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-8 space-y-8 no-scrollbar">        
+//           <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
+//             <div className="md:col-span-2">
+//               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">General Information</label>
+//               <input
+//                 name="title" value={productData.title} placeholder="Product Name"
+//                 className="w-full p-5 bg-slate-50 rounded-3xl border-2 border-transparent focus:border-blue-500/20 focus:bg-white outline-none font-bold text-slate-700 shadow-inner"
+//                 onChange={handleChange} required
+//               />
+//             </div>            
+//             <div className="space-y-2">
+//   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Category</label>
+//   <select 
+//     name="category" 
+//     value={productData.category} 
+//    className="w-full p-5 bg-slate-50 rounded-3xl border-2 border-transparent focus:border-blue-200 outline-none font-bold text-slate-700 shadow-inner"
+//     onChange={handleChange} 
+//     required
+//   >
+//     <option value="">Select Category</option>
+//     <option value="Groceries">Groceries</option>
+//     <option value="Liquids">Liquids</option>
+//     <option value="Electronics">Electronics</option>
+//     <option value="Home & Kitchen">Home & Kitchen</option>
+//     <option value="Other">Other</option>
+//   </select>
+// </div>
+// <div className="space-y-2 relative">
+//   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supplier</label>
+//   <input
+//     name="supplier"
+//     value={productData.supplier || ''}
+//     placeholder="Type supplier name..."
+//     autoComplete="off"
+//     className="w-full p-5 bg-slate-50 rounded-3xl border-2 border-transparent focus:border-blue-200 outline-none font-bold text-slate-700 shadow-inner"
+//     onChange={(e) => handleSupplierInput(e.target.value)}
+//     onFocus={() => {
+//       setSupplierSuggestions(
+//         productData.supplier?.trim()
+//           ? clients.filter(c =>
+//               c.name.toLowerCase().includes(productData.supplier.toLowerCase()) ||
+//               c.businessName.toLowerCase().includes(productData.supplier.toLowerCase())
+//             )
+//           : clients
+//       );
+//       setShowSupplierDropdown(true);
+//     }}
+//     onBlur={() => setTimeout(() => setShowSupplierDropdown(false), 150)}
+//   />
+//   {showSupplierDropdown && supplierSuggestions.length > 0 && (
+//     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl overflow-hidden">
+//       {supplierSuggestions.map((c, i) => (
+//         <button
+//           key={i}
+//           type="button"
+//           onMouseDown={() => {
+//             setProductData(prev => ({ ...prev, supplier: c.name }));
+//             setShowSupplierDropdown(false);
+//           }}
+//           className="w-full text-left px-5 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0"
+//         >
+//           <p className="text-sm font-bold text-slate-700">{c.name}</p>
+//           {c.businessName && <p className="text-[10px] font-bold text-slate-400 uppercase">{c.businessName}</p>}
+//         </button>
+//       ))}
+//     </div>
+//   )}
+//   {showSupplierDropdown && supplierSuggestions.length === 0 && productData.supplier?.trim() && (
+//     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl px-5 py-3">
+//       <p className="text-xs font-bold text-slate-400">No match — <span className="text-blue-600">"{productData.supplier}"</span> will be saved as new supplier</p>
+//     </div>
+//   )}
+// </div>
+            
+//             {isOtherCategory && (
+//                 <input name="customCategory" value={productData.customCategory} placeholder="Type category..." className="md:col-span-2 p-5 bg-blue-50 rounded-3xl border-2 border-blue-200 outline-none font-bold text-blue-700" onChange={handleChange} required />
+//             )}
+//           </section>
+//           <section className="bg-slate-50 p-6 rounded-[2.5rem] border border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-4">
+//             <div className="space-y-1">
+//               <label className="text-[10px] font-black text-amber-600 uppercase tracking-widest flex items-center gap-1"><AlertCircle size={12} /> Low Stock Alert</label>
+//               <input name="lowStockAlert" type="number" value={productData.lowStockAlert} className="w-full p-4 bg-white rounded-2xl outline-none font-bold text-slate-700" onChange={handleChange} />
+//             </div>
+//             <div className="space-y-1">
+//               <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-1"><Warehouse size={12} /> Auto-Reorder Qty</label>
+//               <input name="reorderQuantity" type="number" value={productData.reorderQuantity} className="w-full p-4 bg-white rounded-2xl outline-none font-bold text-slate-700" onChange={handleChange} />
+//             </div>
+//             <div className="space-y-1">
+//               <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest flex items-center gap-1">
+//                 <AlertCircle size={12} /> Expiry Date
+//               </label>
+//               <input
+//                 name="expiryDate"
+//                 type="date"
+//                 value={productData.expiryDate ? productData.expiryDate.split('T')[0] : ''}
+//                 className="w-full p-4 bg-white rounded-2xl outline-none font-bold text-slate-700 border-2 border-transparent focus:border-rose-200"
+//                 onChange={handleChange}
+//               />
+//               {productData.expiryDate && new Date(productData.expiryDate) < new Date() && (
+//                 <p className="text-[10px] font-black text-rose-500 mt-1">⚠ This product is already expired!</p>
+//               )}
+//             </div>
+//           </section>
+//           <section className="space-y-4">
+//             <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+//               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pricing & Variants</span>
+//               <button type="button" onClick={addVariantField} className="bg-blue-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase flex items-center gap-2 hover:scale-105 transition-all">
+//                 <Plus size={14} /> Add Variant
+//               </button>
+//             </div>
+
+//             <div className="space-y-4">
+//               {productData.variants.map((variant, index) => (
+//                 <div key={index} ref={el => variantRefs.current[index] = el} className="p-6 bg-white rounded-4xl border border-slate-100 shadow-sm space-y-4">                 
+//                   <div className="grid grid-cols-12 gap-3 items-center">
+//                     <div className="col-span-12 md:col-span-4">
+//                       <input name="name" value={variant.name} placeholder="Variant Name (e.g. Red, XL)" className="w-full p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} required />
+//                     </div>
+//                     <div className="col-span-6 md:col-span-4 relative">
+//                       <Hash className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+//                       <input 
+//                         name="sku" 
+//                         value={variant.sku || ''} 
+//                         placeholder="SKU"
+//                         className="w-full pl-9 p-3 rounded-xl bg-blue-50/30 text-sm font-bold text-blue-600 outline-none border border-transparent focus:border-blue-200" 
+//                         onChange={(e) => handleVariantChange(index, e)} 
+//                       />
+//                       <button 
+//                         type="button"
+//                         onClick={() => {
+//                           const newSku = generateUniqueSKU(productData.title, variant, index);
+//                           const newVariants = [...productData.variants];
+//                           newVariants[index].sku = newSku;
+//                           setProductData({ ...productData, variants: newVariants });
+//                         }}
+//                         className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-400 hover:text-blue-600"
+//                       >
+//                         <Barcode size={14} />
+//                       </button>
+//                     </div>
+//                     <div className="col-span-6 md:col-span-4 relative">
+//                       <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+//                       <input name="barcode" value={variant.barcode || ''} placeholder="Barcode" className="w-full pl-9 p-3 rounded-xl bg-slate-100 text-sm font-bold outline-none border border-transparent focus:border-blue-200" onChange={(e) => handleVariantChange(index, e)} />
+//                     </div>
+//                   </div>
+
+//                   {/* Row 2: Physical Specs & Tax */}
+//                   <div className="grid grid-cols-12 gap-3">
+//                     <input name="weight" type="number" value={variant.weight} placeholder="Weight" className="col-span-4 md:col-span-3 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)} />
+//                     <select name="unit" value={variant.unit} className="col-span-4 md:col-span-3 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)}>
+//                       {allUnits.map(u => <option key={u} value={u}>{u}</option>)}
+//                     </select>
+//                     <div className="col-span-4 md:col-span-6 flex flex-col gap-1">
+//                       <label className="text-[9px] font-black text-indigo-400 uppercase ml-1">Default Tax %</label>
+//                       <input 
+//                         name="taxRate" 
+//                         type="number" 
+//                         value={variant.taxRate} 
+//                         placeholder="Tax %" 
+//                         className="w-full p-3 rounded-xl bg-indigo-50 text-indigo-600 text-sm font-black outline-none border border-indigo-100" 
+//                         onChange={(e) => handleVariantChange(index, e)} 
+//                       />
+//                     </div>
+//                   </div>
+
+//                   {/* Row 3: Financials & Stock */}
+//                   <div className="grid grid-cols-12 gap-3 items-center">
+//                     <div className="col-span-4 md:col-span-3 relative">
+//                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{symbol}</span>
+//                       <input name="costPrice" type="number" value={variant.costPrice} placeholder="Cost" className="w-full pl-7 p-3 rounded-xl bg-rose-50/50 text-sm font-black text-rose-600 outline-none border border-rose-100" onChange={(e) => handleVariantChange(index, e)} required />
+//                     </div>
+//                     <div className="col-span-4 md:col-span-3 relative">
+//                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">{symbol}</span>
+//                       <input name="salePrice" type="number" value={variant.salePrice} placeholder="Price" className="w-full pl-7 p-3 rounded-xl bg-emerald-50/50 text-sm font-black text-emerald-600 outline-none border border-emerald-100" onChange={(e) => handleVariantChange(index, e)} required />
+//                     </div>
+//                     <input name="stock" type="number" value={variant.stock} placeholder="Stock" className="col-span-2 md:col-span-4 p-3 rounded-xl bg-slate-50 text-sm font-bold outline-none" onChange={(e) => handleVariantChange(index, e)} required />
+//                     <div className="col-span-2 md:col-span-2 flex justify-end">
+//                       <button type="button" onClick={() => removeVariantField(index)} className="p-3 text-rose-400 hover:bg-rose-50 rounded-xl transition-all">
+//                         <Trash2 size={18} />
+//                       </button>
+//                     </div>
+//                   </div>
+//                 </div>
+//               ))}
+//             </div>
+//           </section>
+//         </form>
+
+//         <div className="p-8 bg-slate-50 border-t border-slate-100">
+//           <button type="submit" onClick={handleSubmit} className="w-full bg-slate-900 text-white py-5 rounded-3xl font-black uppercase tracking-widest flex items-center justify-center gap-3 hover:opacity-90 shadow-xl transition-all active:scale-95">
+//             <Save size={22} /> {isEditing ? 'Sync Warehouse' : 'Commit to Inventory'}
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default AddProductModal;
 import React, { useState, useEffect, useContext, useRef } from 'react';
 import { X, Plus, Trash2, Save, Package, AlertCircle, Edit3, Warehouse, Barcode, Hash } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from 'react-toastify';
 import { CurrencyContext } from '../context/CurrencyContext';
+import { searchHSN } from '../utils/hsnCodes';
 
 const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
   const { symbol } = useContext(CurrencyContext);
@@ -12,16 +400,18 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
     category: '',
     customCategory: '',
     supplier: '',
+    hsnCode: '',
     lowStockAlert: 10,
     reorderQuantity: 50,
     expiryDate: '',
-    variants: [{
-      name: '', weight: '', unit: 'pcs', costPrice: '', salePrice: '', stock: '', sku: '', barcode: undefined, taxRate: 0 
-    }]
+    variants: [{ name: '', weight: '', unit: 'pcs', costPrice: '', salePrice: '', stock: '', sku: '', barcode: undefined, taxRate: 0 }]
   };
   const [clients, setClients] = useState([]);
   const [supplierSuggestions, setSupplierSuggestions] = useState([]);
   const [showSupplierDropdown, setShowSupplierDropdown] = useState(false);
+  const [hsnQuery, setHsnQuery] = useState('');
+  const [hsnResults, setHsnResults] = useState([]);
+  const [showHsnDropdown, setShowHsnDropdown] = useState(false);
   const variantRefs = useRef([]);
   const [productData, setProductData] = useState(initialState);
   const [isOtherCategory, setIsOtherCategory] = useState(false);
@@ -45,12 +435,15 @@ const AddProductModal = ({ isOpen, onClose, onRefresh, editingProduct }) => {
         setProductData({
           ...editingProduct,
           customCategory: isCustom ? editingProduct.category : '',
+          hsnCode: editingProduct.hsnCode || '',
           variants: editingProduct.variants.map(v => ({ ...v, salePrice: v.price }))
         });
+        setHsnQuery(editingProduct.hsnCode || '');
         setIsOtherCategory(isCustom);
       } else {
         setProductData(initialState);
         setIsOtherCategory(false);
+        setHsnQuery('');
       }
     }
   }, [isOpen, editingProduct]);
@@ -100,6 +493,24 @@ const handleChange = (e) => {
     setShowSupplierDropdown(false);
     setSupplierSuggestions(clients);
   }
+};
+
+const handleHsnInput = (value) => {
+  setHsnQuery(value);
+  setProductData(prev => ({ ...prev, hsnCode: value }));
+  if (value.trim().length >= 2) {
+    setHsnResults(searchHSN(value));
+    setShowHsnDropdown(true);
+  } else {
+    setHsnResults([]);
+    setShowHsnDropdown(false);
+  }
+};
+
+const selectHsn = (item) => {
+  setHsnQuery(`${item.code} — ${item.description}`);
+  setProductData(prev => ({ ...prev, hsnCode: item.code }));
+  setShowHsnDropdown(false);
 };
 
   const addVariantField = () => {
@@ -256,6 +667,48 @@ const handleChange = (e) => {
   {showSupplierDropdown && supplierSuggestions.length === 0 && productData.supplier?.trim() && (
     <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl px-5 py-3">
       <p className="text-xs font-bold text-slate-400">No match — <span className="text-blue-600">"{productData.supplier}"</span> will be saved as new supplier</p>
+    </div>
+  )}
+</div>
+
+{/* HSN Code Search */}
+<div className="md:col-span-2 space-y-2 relative">
+  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1">
+    <Hash size={11} /> HSN / SAC Code <span className="text-slate-300 font-medium normal-case">(optional)</span>
+  </label>
+  <input
+    type="text"
+    value={hsnQuery}
+    onChange={(e) => handleHsnInput(e.target.value)}
+    onFocus={() => { if (hsnQuery.trim().length >= 2) setShowHsnDropdown(true); }}
+    onBlur={() => setTimeout(() => setShowHsnDropdown(false), 180)}
+    placeholder="Type code (e.g. 8471) or description (e.g. computer)..."
+    autoComplete="off"
+    className="w-full p-5 bg-slate-50 rounded-3xl border-2 border-transparent focus:border-indigo-500/20 focus:bg-white outline-none font-bold text-slate-700 shadow-inner text-sm"
+  />
+  {productData.hsnCode && (
+    <span className="absolute right-5 top-12 text-[10px] font-black text-indigo-500 bg-indigo-50 px-2 py-0.5 rounded-lg">
+      HSN: {productData.hsnCode}
+    </span>
+  )}
+  {showHsnDropdown && hsnResults.length > 0 && (
+    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto">
+      {hsnResults.map((item, i) => (
+        <button
+          key={i}
+          type="button"
+          onMouseDown={() => selectHsn(item)}
+          className="w-full text-left px-5 py-3 hover:bg-indigo-50 border-b border-slate-50 last:border-0 transition-colors"
+        >
+          <span className="text-xs font-black text-indigo-600 mr-2">{item.code}</span>
+          <span className="text-xs text-slate-600 font-medium">{item.description}</span>
+        </button>
+      ))}
+    </div>
+  )}
+  {showHsnDropdown && hsnResults.length === 0 && hsnQuery.length >= 2 && (
+    <div className="absolute z-50 w-full mt-1 bg-white border border-slate-100 rounded-2xl shadow-xl px-5 py-3">
+      <p className="text-xs font-bold text-slate-400">No HSN/SAC code found for "<span className="text-indigo-600">{hsnQuery}</span>"</p>
     </div>
   )}
 </div>
