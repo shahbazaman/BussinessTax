@@ -277,28 +277,18 @@ const printPDF = async (invoice) => {
   try {
     const { data: profile } = await api.get('/auth/profile');
 
-    const formatDate = (d) =>
-      d ? new Date(d).toLocaleDateString('en-IN') : '-';
-
     const formatMoney = (v) =>
-      `${currencySymbol}${Number(v || 0).toLocaleString('en-IN', {
+      `₹${Number(v || 0).toLocaleString('en-IN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`;
 
-    // ---- Amount in Words (Indian system) ----
+    // ---- Amount in Words ----
     const toWords = (num) => {
-      const a = [
-        '', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven',
-        'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen',
-        'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'
-      ];
-      const b = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
-
+      const a = ['', 'One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
+      const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
       if ((num = num.toString()).length > 9) return 'Overflow';
-
       const n = ('000000000' + num).substr(-9).match(/(\d{2})(\d{2})(\d{2})(\d{3})/);
-
       let str = '';
       str += (n[1] != 0) ? (toWords(parseInt(n[1])) + ' Crore ') : '';
       str += (n[2] != 0) ? (toWords(parseInt(n[2])) + ' Lakh ') : '';
@@ -308,183 +298,164 @@ const printPDF = async (invoice) => {
             ? a[parseInt(n[4])]
             : b[n[4][0]] + ' ' + a[n[4][1]]) + ' '
         : '';
-
       return str.trim();
     };
 
     const amountInWords = (amount) => {
       const rupees = Math.floor(amount);
-      const paise = Math.round((amount - rupees) * 100);
-
-      return `Rupees ${toWords(rupees)}${paise ? ` and ${toWords(paise)} Paise` : ''} Only`;
+      return `Rupees ${toWords(rupees)} Only`;
     };
 
-    const buyer = invoice.client || {};
-    const buyerName = buyer.name || invoice.clientName || '-';
+    // ---- HSN Description Fetch ----
+    const getHSNDesc = (code) => {
+      if (!code) return '';
+      const res = searchHSN(code);
+      return res?.[0]?.description || '';
+    };
 
-    const invoiceTitle = invoice.type === 'Sale' ? 'INVOICE' : 'PURCHASE';
+    // ---- GST GROUPING BY HSN ----
+    const hsnSummary = {};
 
-    const gstBanner =
-      invoice.gstType === 'intra'
-        ? { color: '#10b981', text: 'Intra-State Supply — CGST + SGST Applicable' }
-        : invoice.gstType === 'inter'
-        ? { color: '#f59e0b', text: 'Inter-State Supply — IGST Applicable' }
-        : { color: '#64748b', text: 'GST Supply Details' };
+    invoice.items.forEach(item => {
+      const hsn = item?.hsnCode || '';
+      const taxable = item.quantity * item.price;
+      const tax = taxable * ((item.taxRate || 0) / 100);
 
+      if (!hsnSummary[hsn]) {
+        hsnSummary[hsn] = {
+          hsn,
+          desc: getHSNDesc(hsn),
+          taxable: 0,
+          tax: 0
+        };
+      }
+
+      hsnSummary[hsn].taxable += taxable;
+      hsnSummary[hsn].tax += tax;
+    });
+
+    // ---- QR CODE (UPI / Invoice Data) ----
+    const qrData = `
+upi://pay?pa=${profile.upiId || ''}&pn=${encodeURIComponent(profile.businessName || '')}&am=${invoice.totalAmount}&cu=INR
+Invoice:${invoice.invoiceNumber || invoice.purchaseNumber}
+`;
+
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
+
+    // ---- HTML ----
     const html = `
 <html>
 <head>
-<title>Invoice</title>
 <style>
-body { font-family: 'Helvetica Neue', Arial; margin:0; padding:20px; color:#1e293b; }
-.container { max-width:800px; margin:auto; }
-.header { display:flex; justify-content:space-between; }
-.logo { max-height:60px; }
-.title { font-size:28px; font-weight:800; }
-.badge { background:#e2e8f0; padding:4px 10px; font-size:10px; border-radius:20px; }
-.section { margin-top:20px; }
-.card { width:48%; padding:12px; border:1px solid #e2e8f0; border-radius:10px; }
-.flex { display:flex; justify-content:space-between; }
-.table { width:100%; border-collapse:collapse; margin-top:15px; }
-.table th, .table td { padding:8px; border-bottom:1px solid #e5e7eb; font-size:12px; }
-.table th { background:#f8fafc; }
-.right { text-align:right; }
-.total-box { margin-top:20px; width:300px; margin-left:auto; }
-.total-row { display:flex; justify-content:space-between; margin:4px 0; }
-.grand { background:#0f172a; color:white; padding:8px; font-weight:700; }
-.watermark {
-  position:fixed; top:40%; left:20%;
-  font-size:80px; opacity:0.1; transform:rotate(-30deg);
+body { font-family: Arial; padding:20px; }
+.table { width:100%; border-collapse:collapse; margin-top:20px; }
+.table th, .table td { padding:10px; border-bottom:1px solid #ddd; font-size:12px; }
+.badge {
+  background:#e0e7ff;
+  color:#3730a3;
+  padding:3px 8px;
+  border-radius:6px;
+  font-weight:600;
+  font-size:11px;
 }
-@media print {
-  body { margin:0 }
+.hsn-desc {
+  font-size:10px;
+  color:#64748b;
+}
+.summary-table td {
+  padding:6px;
+  font-size:12px;
 }
 </style>
 </head>
 
 <body>
-<div class="container">
 
-${invoice.status === 'Paid' ? `<div class="watermark" style="color:green;">PAID</div>` : ''}
-${invoice.status === 'Cancelled' ? `<div class="watermark" style="color:red;">CANCELLED</div>` : ''}
+<h2>${profile.businessName}</h2>
+<p>${profile.businessAddress}</p>
 
-<div class="header">
+<div style="display:flex;justify-content:space-between;align-items:center;">
   <div>
-    ${profile.logo ? `<img src="${profile.logo}" class="logo"/>` : ''}
-    <div style="font-size:18px;font-weight:700;">${profile.businessName}</div>
-    <div>${profile.businessAddress || ''}</div>
-    <div>${profile.state || ''}</div>
-    <div>GSTIN: ${profile.gstNumber || '-'}</div>
-    <div>${profile.phone || ''} | ${profile.email || ''}</div>
+    <b>Invoice:</b> ${invoice.invoiceNumber || invoice.purchaseNumber}<br/>
+    <b>Date:</b> ${new Date(invoice.invoiceDate).toLocaleDateString()}
   </div>
-  <div class="right">
-    <div class="title">${invoiceTitle}</div>
-    <div>${invoice.invoiceNumber || invoice.purchaseNumber}</div>
-    <div>Date: ${formatDate(invoice.invoiceDate)}</div>
-    <div>Due: ${formatDate(invoice.dueDate)}</div>
-    <div class="badge">Original for Recipient</div>
+  <div>
+    <img src="${qrUrl}" />
   </div>
 </div>
 
-<div class="section flex">
-  <div class="card">
-    <strong>Bill From</strong><br/>
-    ${profile.businessName}<br/>
-    ${profile.businessAddress}<br/>
-    ${profile.state}<br/>
-    GSTIN: ${profile.gstNumber}
-  </div>
-  <div class="card">
-    <strong>Bill To</strong><br/>
-    ${buyerName}<br/>
-    ${buyer.email || ''}<br/>
-    ${buyer.phone || ''}<br/>
-    ${buyer.billingAddress?.street || invoice.billingAddress || ''}<br/>
-    ${invoice.buyerState || ''}<br/>
-    GSTIN: ${buyer.taxId || invoice.gstNumber || '-'}
-  </div>
-</div>
-
-<div class="section" style="background:${gstBanner.color};color:white;padding:8px;border-radius:6px;">
-${gstBanner.text} | ${invoice.sellerState || ''} → ${invoice.buyerState || ''}
-</div>
+<hr/>
 
 <table class="table">
 <thead>
 <tr>
-<th>#</th><th>Description</th><th>HSN</th><th>Qty</th><th>Rate</th><th>Tax%</th><th class="right">Amount</th>
+<th>#</th>
+<th>Description</th>
+<th>HSN/SAC</th>
+<th>Qty</th>
+<th>Rate</th>
+<th>Tax %</th>
+<th>Amount</th>
 </tr>
 </thead>
+
 <tbody>
-${invoice.items.map((item, i) => `
+${invoice.items.map((item, i) => {
+  const hsn = item?.hsnCode || '';
+  const desc = getHSNDesc(hsn);
+
+  return `
 <tr>
 <td>${i + 1}</td>
-<td>${item.name}<br/><small>${item.sku || ''}</small></td>
-<td>${item.hsnCode || ''}</td>
+
+<td>
+${item.name || ''}
+<br/>
+<small>${item.sku || ''}</small>
+${desc ? `<div class="hsn-desc">${desc}</div>` : ''}
+</td>
+
+<td>
+${hsn ? `<span class="badge">${hsn}</span>` : '—'}
+</td>
+
 <td>${item.quantity}</td>
 <td>${formatMoney(item.price)}</td>
 <td>${item.taxRate || 0}%</td>
-<td class="right">${formatMoney(item.quantity * item.price)}</td>
+<td>${formatMoney(item.quantity * item.price)}</td>
 </tr>
-`).join('')}
+`;
+}).join('')}
 </tbody>
 </table>
 
-<div class="total-box">
-<div class="total-row"><span>Subtotal</span><span>${formatMoney(invoice.subtotal)}</span></div>
+<br/>
 
-${invoice.gstType === 'intra' ? `
-<div class="total-row"><span>CGST</span><span>${formatMoney(invoice.cgst)}</span></div>
-<div class="total-row"><span>SGST</span><span>${formatMoney(invoice.sgst)}</span></div>
-` : ''}
+<h4>GST Summary (HSN-wise)</h4>
+<table class="table summary-table">
+<tr>
+<th>HSN</th>
+<th>Description</th>
+<th>Taxable</th>
+<th>Tax</th>
+</tr>
 
-${invoice.gstType === 'inter' ? `
-<div class="total-row"><span>IGST</span><span>${formatMoney(invoice.igst)}</span></div>
-` : ''}
+${Object.values(hsnSummary).map(h => `
+<tr>
+<td>${h.hsn || '—'}</td>
+<td>${h.desc || ''}</td>
+<td>${formatMoney(h.taxable)}</td>
+<td>${formatMoney(h.tax)}</td>
+</tr>
+`).join('')}
 
-<div class="total-row"><span>Discount</span><span>-${formatMoney(invoice.discount)}</span></div>
+</table>
 
-<div class="total-row grand"><span>Total</span><span>${formatMoney(invoice.totalAmount)}</span></div>
-</div>
+<br/>
 
-<div class="section">
-<strong>Amount in Words:</strong><br/>
-${amountInWords(invoice.totalAmount)}
-</div>
+<h3>Total: ${formatMoney(invoice.totalAmount)}</h3>
+<p>${amountInWords(invoice.totalAmount)}</p>
 
-${profile.bankName || profile.upiId ? `
-<div class="section">
-<strong>Bank Details</strong><br/>
-Bank: ${profile.bankName || ''}<br/>
-A/C: ${profile.bankAccount || ''}<br/>
-IFSC: ${profile.bankIfsc || ''}<br/>
-Branch: ${profile.bankBranch || ''}<br/>
-UPI: ${profile.upiId || ''}
-</div>
-` : ''}
-
-${invoice.notes ? `
-<div class="section">
-<strong>Notes</strong><br/>
-${invoice.notes}
-</div>
-` : ''}
-
-<div class="section flex">
-  <div>
-    Thank you for your business!<br/>
-    ${profile.email} | ${profile.phone}<br/>
-    <small>This is a computer-generated invoice.</small>
-  </div>
-  <div class="right">
-    <br/><br/>
-    ___________________<br/>
-    Authorised Signatory<br/>
-    ${profile.businessName}
-  </div>
-</div>
-
-</div>
 </body>
 </html>
 `;
@@ -495,7 +466,7 @@ ${invoice.notes}
     newWin.print();
 
   } catch (err) {
-    toast.error("Failed to generate print invoice");
+    toast.error("Print failed");
   }
 };
   return (
