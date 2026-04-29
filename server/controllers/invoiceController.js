@@ -184,7 +184,13 @@ if (isSale) {
   // If paid immediately → Dr Bank / Cr AR
   if (isPaid && accountId) {
     const bankAccountDoc = await Account.findById(accountId).session(session);
-    const bankName = bankAccountDoc?.bankName || 'Bank Account';
+    if (!bankAccountDoc) {
+  throw new Error('Bank account not found');
+}
+
+const bankName = bankAccountDoc.bankName && bankAccountDoc.bankName.trim() !== ''
+  ? bankAccountDoc.bankName
+  : 'Bank Account';
     let bankLedgerAccount = await LedgerAccount.findOne({ userId: req.user._id, name: bankName }).session(session);
     if (!bankLedgerAccount) {
       [bankLedgerAccount] = await LedgerAccount.create([{
@@ -229,13 +235,28 @@ if (isSale) {
   // If paid immediately → Dr Accounts Payable / Cr Bank (cash paid out)
   if (isPaid && accountId) {
     const bankAccountDoc = await Account.findById(accountId).session(session);
-    const bankName = bankAccountDoc?.bankName || 'Bank Account';
-    let bankLedgerAccount = await LedgerAccount.findOne({ userId: req.user._id, name: bankName }).session(session);
-    if (!bankLedgerAccount) {
-      [bankLedgerAccount] = await LedgerAccount.create([{
-        userId: req.user._id, name: bankName, type: 'Asset', isSystem: false
-      }], { session });
-    }
+
+if (!bankAccountDoc) {
+  throw new Error('Bank account not found');
+}
+
+const bankName = bankAccountDoc.bankName && bankAccountDoc.bankName.trim() !== ''
+  ? bankAccountDoc.bankName
+  : 'Bank Account';
+
+let bankLedgerAccount = await LedgerAccount.findOne({
+  userId: req.user._id,
+  name: bankName
+}).session(session);
+
+if (!bankLedgerAccount) {
+  [bankLedgerAccount] = await LedgerAccount.create([{
+    userId: req.user._id,
+    name: bankName,
+    type: 'Asset',
+    isSystem: false
+  }], { session });
+}
     await createJournalEntry({
       userId: req.user._id,
       debitAccountId:  apAccount._id,
