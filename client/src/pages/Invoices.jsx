@@ -10,7 +10,8 @@ import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import InvoiceModal from '../components/InvoiceModal'; 
-
+import HSN_CODES from '../utils/hsnCodes';
+import QRCode from 'qrcode';
 const Invoices = () => {
   const location = useLocation();
   
@@ -277,11 +278,21 @@ const printPDF = async (invoice) => {
   try {
     const { data: profile } = await api.get('/auth/profile');
 
+    const formatDate = (d) =>
+      d ? new Date(d).toLocaleDateString('en-IN') : '-';
+
     const formatMoney = (v) =>
       `₹${Number(v || 0).toLocaleString('en-IN', {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       })}`;
+
+    // ---- HSN Description Lookup ----
+    const getHsnDescription = (code) => {
+      if (!code) return '';
+      const found = HSN_CODES.find(h => h.code === String(code));
+      return found ? found.description : '';
+    };
 
     // ---- Amount in Words ----
     const toWords = (num) => {
@@ -306,92 +317,85 @@ const printPDF = async (invoice) => {
       return `Rupees ${toWords(rupees)} Only`;
     };
 
-    // ---- HSN Description Fetch ----
-    const getHSNDesc = (code) => {
-      if (!code) return '';
-      const res = searchHSN(code);
-      return res?.[0]?.description || '';
-    };
-
     // ---- GST GROUPING BY HSN ----
     const hsnSummary = {};
 
     invoice.items.forEach(item => {
-      const hsn = item?.hsnCode || '';
-      const taxable = item.quantity * item.price;
-      const tax = taxable * ((item.taxRate || 0) / 100);
+      const hsn = item.hsnCode || 'N/A';
+      const amount = item.quantity * item.price;
 
       if (!hsnSummary[hsn]) {
         hsnSummary[hsn] = {
-          hsn,
-          desc: getHSNDesc(hsn),
           taxable: 0,
-          tax: 0
+          cgst: 0,
+          sgst: 0,
+          igst: 0,
+          rate: item.taxRate || invoice.globalTaxRate || 0
         };
       }
 
-      hsnSummary[hsn].taxable += taxable;
-      hsnSummary[hsn].tax += tax;
+      const taxRate = hsnSummary[hsn].rate;
+      const taxAmount = amount * (taxRate / 100);
+
+      if (invoice.gstType === 'intra') {
+        hsnSummary[hsn].cgst += taxAmount / 2;
+        hsnSummary[hsn].sgst += taxAmount / 2;
+      } else {
+        hsnSummary[hsn].igst += taxAmount;
+      }
+
+      hsnSummary[hsn].taxable += amount;
     });
 
-    // ---- QR CODE (UPI / Invoice Data) ----
+    // ---- QR CODE ----
     const qrData = `
-upi://pay?pa=${profile.upiId || ''}&pn=${encodeURIComponent(profile.businessName || '')}&am=${invoice.totalAmount}&cu=INR
-Invoice:${invoice.invoiceNumber || invoice.purchaseNumber}
-`;
+Invoice: ${invoice.invoiceNumber || invoice.purchaseNumber}
+Date: ${formatDate(invoice.invoiceDate)}
+Amount: ${invoice.totalAmount}
+GSTIN: ${profile.gstNumber || ''}
+    `;
 
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrData)}`;
+    const qrCode = await QRCode.toDataURL(qrData);
 
-    // ---- HTML ----
     const html = `
 <html>
 <head>
 <style>
-body { font-family: Arial; padding:20px; }
-.table { width:100%; border-collapse:collapse; margin-top:20px; }
-.table th, .table td { padding:10px; border-bottom:1px solid #ddd; font-size:12px; }
-.badge {
-  background:#e0e7ff;
-  color:#3730a3;
-  padding:3px 8px;
-  border-radius:6px;
-  font-weight:600;
-  font-size:11px;
-}
-.hsn-desc {
-  font-size:10px;
-  color:#64748b;
-}
-.summary-table td {
-  padding:6px;
-  font-size:12px;
-}
+body { font-family: Arial; padding:20px; font-size:12px; }
+.table { width:100%; border-collapse:collapse; margin-top:15px; }
+.table th, .table td { padding:8px; border:1px solid #ddd; }
+.badge { background:#eef2ff; padding:3px 6px; border-radius:4px; }
+.section { margin-top:20px; }
 </style>
 </head>
 
 <body>
 
-<h2>${profile.businessName}</h2>
-<p>${profile.businessAddress}</p>
-
-<div style="display:flex;justify-content:space-between;align-items:center;">
-  <div>
-    <b>Invoice:</b> ${invoice.invoiceNumber || invoice.purchaseNumber}<br/>
-    <b>Date:</b> ${new Date(invoice.invoiceDate).toLocaleDateString()}
-  </div>
-  <div>
-    <img src="${qrUrl}" />
-  </div>
-</div>
+<h2>${profile.businessName || ''}</h2>
+<p>${profile.businessAddress || ''}</p>
+<p><b>GSTIN:</b> ${profile.gstNumber || '-'}</p>
 
 <hr/>
+
+<div class="section">
+<b>Bill To:</b><br/>
+${invoice.clientName || invoice.client?.name || ''}<br/>
+${invoice.billingAddress || ''}<br/>
+GST: ${invoice.gstNumber || '-'}
+</div>
+
+<div class="section">
+<b>Invoice No:</b> ${invoice.invoiceNumber || invoice.purchaseNumber}<br/>
+<b>Date:</b> ${formatDate(invoice.invoiceDate)}
+</div>
 
 <table class="table">
 <thead>
 <tr>
 <th>#</th>
 <th>Description</th>
-<th>HSN/SAC</th>
+<th>HSN</th>
+<th>HSN Description</th>
 <th>Qty</th>
 <th>Rate</th>
 <th>Tax %</th>
@@ -401,27 +405,16 @@ body { font-family: Arial; padding:20px; }
 
 <tbody>
 ${invoice.items.map((item, i) => {
-  const hsn = item?.hsnCode || '';
-  const desc = getHSNDesc(hsn);
-
+  const hsn = item.hsnCode || '';
   return `
 <tr>
 <td>${i + 1}</td>
-
-<td>
-${item.name || ''}
-<br/>
-<small>${item.sku || ''}</small>
-${desc ? `<div class="hsn-desc">${desc}</div>` : ''}
-</td>
-
-<td>
-${hsn ? `<span class="badge">${hsn}</span>` : '—'}
-</td>
-
+<td>${item.name}<br/><small>${item.sku || ''}</small></td>
+<td>${hsn}</td>
+<td>${getHsnDescription(hsn)}</td>
 <td>${item.quantity}</td>
 <td>${formatMoney(item.price)}</td>
-<td>${item.taxRate || 0}%</td>
+<td>${item.taxRate || invoice.globalTaxRate || 0}%</td>
 <td>${formatMoney(item.quantity * item.price)}</td>
 </tr>
 `;
@@ -429,43 +422,49 @@ ${hsn ? `<span class="badge">${hsn}</span>` : '—'}
 </tbody>
 </table>
 
-<br/>
-
-<h4>GST Summary (HSN-wise)</h4>
-<table class="table summary-table">
+<div class="section">
+<h4>HSN Summary</h4>
+<table class="table">
 <tr>
 <th>HSN</th>
-<th>Description</th>
 <th>Taxable</th>
-<th>Tax</th>
+<th>CGST</th>
+<th>SGST</th>
+<th>IGST</th>
 </tr>
 
-${Object.values(hsnSummary).map(h => `
+${Object.entries(hsnSummary).map(([hsn, val]) => `
 <tr>
-<td>${h.hsn || '—'}</td>
-<td>${h.desc || ''}</td>
-<td>${formatMoney(h.taxable)}</td>
-<td>${formatMoney(h.tax)}</td>
+<td>${hsn}</td>
+<td>${formatMoney(val.taxable)}</td>
+<td>${formatMoney(val.cgst)}</td>
+<td>${formatMoney(val.sgst)}</td>
+<td>${formatMoney(val.igst)}</td>
 </tr>
 `).join('')}
-
 </table>
+</div>
 
-<br/>
+<div class="section">
+<b>Total: ${formatMoney(invoice.totalAmount)}</b><br/>
+${amountInWords(invoice.totalAmount)}
+</div>
 
-<h3>Total: ${formatMoney(invoice.totalAmount)}</h3>
-<p>${amountInWords(invoice.totalAmount)}</p>
+<div class="section">
+<img src="${qrCode}" width="120"/>
+</div>
 
 </body>
 </html>
 `;
 
-    const newWin = window.open('', '_blank');
-    newWin.document.write(html);
-    newWin.document.close();
-    newWin.print();
+    const win = window.open('', '_blank');
+    win.document.write(html);
+    win.document.close();
+    win.print();
 
   } catch (err) {
+    console.error(err);
     toast.error("Print failed");
   }
 };
