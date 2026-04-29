@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import ReactDOM from 'react-dom';
 import { X, Trash2, Hash } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../utils/api';
@@ -145,6 +146,39 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
     setFormData({ ...formData, items: newItems });
     setHsnQuery(p => ({ ...p, [idx]: hsn.code }));
     setShowHsnDrop(p => ({ ...p, [idx]: false }));
+  };
+
+  const hsnInputRefs = useRef({});
+
+  const HsnDropdown = ({ idx }) => {
+    const el = hsnInputRefs.current[idx];
+    if (!el || !showHsnDrop[idx] || !(hsnResults[idx] || []).length) return null;
+    const rect = el.getBoundingClientRect();
+    return ReactDOM.createPortal(
+      <div
+        style={{ position: 'fixed', top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 420), maxWidth: 'calc(100vw - 32px)', zIndex: 99999 }}
+        className="bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden"
+        onMouseDown={e => e.preventDefault()}
+      >
+        <div className="flex items-center px-4 py-2 bg-indigo-50 border-b border-slate-100">
+          <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">
+            {(hsnResults[idx] || []).length} matches for &quot;{hsnQuery[idx] || ''}&quot;
+          </span>
+          <button type="button" onClick={() => setShowHsnDrop(p => ({...p, [idx]: false}))}
+            className="ml-auto text-slate-400 hover:text-slate-700 text-xs font-black px-1">✕</button>
+        </div>
+        <div className="max-h-56 overflow-y-auto divide-y divide-slate-50">
+          {(hsnResults[idx] || []).map((h, i) => (
+            <button key={i} type="button" onMouseDown={() => selectHsn(idx, h)}
+              className="w-full text-left px-4 py-3 hover:bg-indigo-50 flex items-start gap-3 transition-colors">
+              <span className="text-[11px] font-black text-white bg-indigo-500 px-2 py-1 rounded-lg shrink-0 min-w-14 text-center">{h.code}</span>
+              <span className="text-[11px] text-slate-700 font-medium leading-snug mt-0.5">{h.description}</span>
+            </button>
+          ))}
+        </div>
+      </div>,
+      document.body
+    );
   };
 
   const handleProductSelect = (selectedOption) => {
@@ -450,27 +484,18 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
                         <td className="px-4 py-3">
                           <div className="relative">
                             <input
+                              ref={el => hsnInputRefs.current[idx] = el}
                               type="text"
                               value={hsnQuery[idx] ?? (item.hsnCode || '')}
                               onChange={e => handleHsnInput(idx, e.target.value)}
                               onFocus={() => { if ((hsnQuery[idx] || item.hsnCode || '').length >= 2) setShowHsnDrop(p => ({...p, [idx]: true})); }}
-                              onBlur={() => setTimeout(() => setShowHsnDrop(p => ({...p, [idx]: false})), 180)}
-                              placeholder="HSN..."
+                              onBlur={() => setTimeout(() => setShowHsnDrop(p => ({...p, [idx]: false})), 200)}
+                              placeholder="Search HSN..."
                               autoComplete="off"
-                              className={`w-full p-2 border rounded-lg text-xs font-bold outline-none ${item.hsnCode ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200'}`}
+                              className={`w-full p-2 border rounded-lg text-xs font-bold outline-none transition-all
+                                ${item.hsnCode ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200'}`}
                             />
-                            {showHsnDrop[idx] && (hsnResults[idx] || []).length > 0 && (
-                              <div className="absolute left-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl max-h-48 overflow-y-auto" style={{zIndex: 9999, position: 'fixed', width: '380px', maxWidth: '90vw'}}>
-                                {(hsnResults[idx] || []).map((h, i) => (
-                                  <button key={i} type="button"
-                                    onMouseDown={() => selectHsn(idx, h)}
-                                    className="w-full text-left px-3 py-2 hover:bg-indigo-50 flex gap-2 items-start border-b border-slate-50 last:border-0">
-                                    <span className="text-[10px] font-black text-indigo-600 w-12 shrink-0 mt-0.5">{h.code}</span>
-                                    <span className="text-[10px] text-slate-600 font-medium leading-tight">{h.description}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            )}
+                            <HsnDropdown idx={idx} />
                           </div>
                         </td>
                         <td className="px-4 py-3">
