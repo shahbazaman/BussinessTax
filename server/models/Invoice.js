@@ -16,14 +16,16 @@ const invoiceSchema = new mongoose.Schema({
   shippingAddress:{ type: String },
 
   items: [{
-    productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-    variantId:  { type: mongoose.Schema.Types.ObjectId, required: true },
-    name:       String,
-    quantity:   { type: Number, default: 0 },
-    price:      { type: Number, default: 0 },
-    sku:        String,
-    barcode:    String,
-  }],
+  productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  variantId: { type: mongoose.Schema.Types.ObjectId, required: true },
+  name: String,
+  quantity: { type: Number, default: 0 },
+  price: { type: Number, default: 0 },
+  sku: String,
+  barcode: String,
+  hsnCode: String,        // ✅ ADD THIS
+  taxRate: Number         // ✅ ADD THIS (you already use it in UI)
+}],
 
   subtotal:      { type: Number, default: 0 },
   globalTaxRate: { type: Number, default: 0 },
@@ -63,7 +65,10 @@ invoiceSchema.pre('save', async function () {
   }, 0);
 
   const calculatedTax = calculatedSubtotal * (Number(this.globalTaxRate || 0) / 100);
-
+// const calculatedTax = items.reduce((acc, item) => {
+//   const tax = (item.price * item.quantity) * (item.taxRate || 0) / 100;
+//   return acc + tax;
+// }, 0);
   this.subtotal = Number(calculatedSubtotal.toFixed(2));
   this.taxAmount = Number(calculatedTax.toFixed(2));
 

@@ -72,7 +72,8 @@ const CreateInvoice = () => {
     const totalAmount = (subtotal + taxAmount + Number(invoice.shipping || 0)) - Number(invoice.discount || 0);
 
     const client    = dbClients.find(c => c._id === invoice.client);
-    const buyerState = client?.billingAddress?.state || '';
+   const client = dbClients.find(c => c._id === invoice.client);
+const buyerState = client?.billingAddress?.state || '';
 
     let gstType = 'none', cgst = 0, sgst = 0, igst = 0;
     if (sellerState && buyerState) {
@@ -101,15 +102,16 @@ const CreateInvoice = () => {
     const items = [...invoice.items];
     if (field === 'productId') {
       const prod = dbProducts.find(p => p._id === value);
-      items[idx] = {
-        ...items[idx],
-        productId: value,
-        name: prod?.title || '',
-        hsnCode: prod?.hsnCode || '',
-        taxRate: prod?.variants?.[0]?.taxRate || 0,
-        price: prod?.variants?.[0]?.price || 0,
-        variantId: prod?.variants?.[0]?._id || '',
-      };
+      const firstVariant = prod?.variants?.[0] || {};
+items[idx] = {
+  ...items[idx],
+  productId: value,
+  name: prod?.title || '',
+  hsnCode: prod?.hsnCode || '',
+  taxRate: firstVariant.taxRate || 0,
+  price: firstVariant.price || 0,
+  variantId: firstVariant._id || '',
+};
       // Sync HSN query display
       if (prod?.hsnCode) {
         setHsnQuery(prev => ({ ...prev, [idx]: prod.hsnCode }));
@@ -148,6 +150,7 @@ const CreateInvoice = () => {
     if (!invoice.dueDate) return toast.error('Please select a due date');
     try {
       const client    = dbClients.find(c => c._id === invoice.client);
+      const client = dbClients.find(c => c._id === invoice.client);
       const buyerState = client?.billingAddress?.state || '';
       await api.post('/invoices', {
         ...invoice,
@@ -543,7 +546,7 @@ const CreateInvoice = () => {
                 );
               })}
 
-              <button onClick={addItem}
+              <button type="button" onClick={addItem}
                 className="w-full py-4 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center gap-2 text-slate-400 font-black text-xs uppercase hover:border-indigo-400 hover:text-indigo-500 transition-all">
                 <Plus size={14}/> Add Line Item
               </button>

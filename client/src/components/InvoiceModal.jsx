@@ -27,7 +27,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
     paidIntoAccount: accounts?.[0]?._id || '',
     status: 'Pending',
     partialAmount: '',
-    paidDate: ''
+    paidDate: '',
+    buyerState: ''
   });
 
   const [loading, setLoading]         = useState(false);
@@ -48,6 +49,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
       if (editData) {
         setFormData({
           ...editData,
+          buyerState: editData.buyerState || '',
           invoiceDate: new Date(editData.invoiceDate).toISOString().split('T')[0],
           paidDate: editData.paidDate ? new Date(editData.paidDate).toISOString().split('T')[0] : '',
           partialAmount: editData.partialAmount || '',
@@ -75,7 +77,8 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           paidIntoAccount: accounts?.[0]?._id || '',
           status: 'Pending',
           partialAmount: '',
-          paidDate: ''
+          paidDate: '',
+          buyerState: '',
         });
         api.get(`/invoices/next-number?type=${type}`).then(res => {
           setFormData(prev => ({
@@ -161,7 +164,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
   });
 
   const selectedClientObj = (clients || []).find(c => c._id === formData.client);
-  const buyerState        = selectedClientObj?.billingAddress?.state || '';
+  const buyerState = formData.buyerState || selectedClientObj?.billingAddress?.state || '';
   const subtotalVal = formData.items.reduce((a, i) => a + (i.price * i.quantity), 0);
   const taxVal      = subtotalVal * (formData.globalTaxRate / 100);
   let gstType = 'none', cgst = 0, sgst = 0, igst = 0;
@@ -395,7 +398,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
                   </select>
                 )}
               </div>
-
+                
               {formData.type === 'Purchase' && (
                 <div>
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Bill Ref No. (Optional)</label>
@@ -430,7 +433,54 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
                   onChange={e => setFormData(p => ({ ...p, billingAddress: e.target.value }))} />
               </div>
             </div>
-
+              <div>
+  <label className="text-xs font-bold">Buyer State</label>
+  <select
+    value={formData.buyerState}
+    onChange={(e) =>
+      setFormData({ ...formData, buyerState: e.target.value })
+    }
+    className="w-full p-2 rounded border"
+  >
+    <option value="">Select State</option>
+                  <option value="Andhra Pradesh">Andhra Pradesh</option>
+                  <option value="Arunachal Pradesh">Arunachal Pradesh</option>
+                  <option value="Assam">Assam</option>
+                  <option value="Bihar">Bihar</option>
+                  <option value="Chhattisgarh">Chhattisgarh</option>
+                  <option value="Goa">Goa</option>
+                  <option value="Gujarat">Gujarat</option>
+                  <option value="Haryana">Haryana</option>
+                  <option value="Himachal Pradesh">Himachal Pradesh</option>
+                  <option value="Jharkhand">Jharkhand</option>
+                  <option value="Karnataka">Karnataka</option>
+                  <option value="Kerala">Kerala</option>
+                  <option value="Madhya Pradesh">Madhya Pradesh</option>
+                  <option value="Maharashtra">Maharashtra</option>
+                  <option value="Manipur">Manipur</option>
+                  <option value="Meghalaya">Meghalaya</option>
+                  <option value="Mizoram">Mizoram</option>
+                  <option value="Nagaland">Nagaland</option>
+                  <option value="Odisha">Odisha</option>
+                  <option value="Punjab">Punjab</option>
+                  <option value="Rajasthan">Rajasthan</option>
+                  <option value="Sikkim">Sikkim</option>
+                  <option value="Tamil Nadu">Tamil Nadu</option>
+                  <option value="Telangana">Telangana</option>
+                  <option value="Tripura">Tripura</option>
+                  <option value="Uttar Pradesh">Uttar Pradesh</option>
+                  <option value="Uttarakhand">Uttarakhand</option>
+                  <option value="West Bengal">West Bengal</option>
+                  <option value="Andaman and Nicobar Islands">Andaman and Nicobar Islands</option>
+                  <option value="Chandigarh">Chandigarh</option>
+                  <option value="Dadra and Nagar Haveli and Daman and Diu">Dadra and Nagar Haveli and Daman and Diu</option>
+                  <option value="Delhi">Delhi</option>
+                  <option value="Jammu and Kashmir">Jammu and Kashmir</option>
+                  <option value="Ladakh">Ladakh</option>
+                  <option value="Lakshadweep">Lakshadweep</option>
+                  <option value="Puducherry">Puducherry</option>
+  </select>
+</div>
             {/* GST State indicator */}
             {sellerState && buyerState && (
               <div className={`flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold border

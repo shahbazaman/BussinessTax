@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import api from '../utils/api';
 import { 
-  Plus, Search, Trash2, Download, Edit2, Loader2,Printer, 
+  Plus, Search, Trash2, Edit2, Loader2,Printer, 
   ShoppingCart, ShoppingBag, CreditCard, CheckCircle,
   TrendingUp, PieChart, ChevronDown, FileText
 } from 'lucide-react';
@@ -289,10 +289,10 @@ const printPDF = async (invoice) => {
 
     // ---- HSN Description Lookup ----
     const getHsnDescription = (code) => {
-      if (!code) return '';
-      const found = HSN_CODES.find(h => h.code === String(code));
-      return found ? found.description : '';
-    };
+  if (!code) return '';
+  const found = HSN_CODES.find(h => String(h.code) === String(code));
+  return found ? found.description : '';
+};
 
     // ---- Amount in Words ----
     const toWords = (num) => {
@@ -334,7 +334,7 @@ const printPDF = async (invoice) => {
         };
       }
 
-      const taxRate = hsnSummary[hsn].rate;
+      const taxRate = item.taxRate || invoice.globalTaxRate || 0;
       const taxAmount = amount * (taxRate / 100);
 
       if (invoice.gstType === 'intra') {
@@ -353,6 +353,7 @@ Invoice: ${invoice.invoiceNumber || invoice.purchaseNumber}
 Date: ${formatDate(invoice.invoiceDate)}
 Amount: ${invoice.totalAmount}
 GSTIN: ${profile.gstNumber || ''}
+Buyer GST: ${invoice.gstNumber || ''}
     `;
 
     const qrCode = await QRCode.toDataURL(qrData);
@@ -576,7 +577,9 @@ ${amountInWords(invoice.totalAmount)}
                       </td>
                       <td className="px-8 py-6">
                         <div className="font-black text-slate-900 text-sm">{formatValue(inv.totalAmount)}</div>
-                        <div className="text-[9px] text-slate-400 font-bold uppercase italic">Incl. Tax</div>
+                        <div className="text-[9px] text-slate-400 font-bold uppercase">
+                          {inv.gstType === 'intra' ? 'CGST+SGST' : inv.gstType === 'inter' ? 'IGST' : ''}
+                        </div>
                       </td>
                       
                       <td className="px-8 py-6 relative">
@@ -596,7 +599,7 @@ ${amountInWords(invoice.totalAmount)}
                             {['Paid', 'Pending', 'Partially Paid', 'Cancelled'].map((st) => (
                                 <button 
                                     key={st}
-                                    onClick={() => handleUpdateStatus(inv._id, st)}
+                                    onClick={() => handleUpdateStatus(inv._id, st, inv.paidIntoAccount)}
                                     className="w-full text-left px-5 py-3 text-[10px] font-black uppercase hover:bg-slate-50 transition-colors text-slate-600"
                                 >
                                     Mark as {st}

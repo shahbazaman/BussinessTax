@@ -29,11 +29,24 @@ export const createInvoice = async (req, res) => {
   session.startTransaction();
   try {
     const {
-      client: rawClient, clientName, items, discount, type, invoiceDate, status,
-      notes, globalTaxRate, gstNumber, billingAddress,
-      shippingAddress, referenceNumber, invoiceNumber, purchaseNumber,
-      paidIntoAccount
-    } = req.body;
+  client: rawClient, clientName, items, discount, type, invoiceDate, status,
+  notes, globalTaxRate, gstNumber, billingAddress,
+  shippingAddress, referenceNumber, invoiceNumber, purchaseNumber,
+  paidIntoAccount,
+  buyerState
+} = req.body;
+const sellerState = req.user.state || '';
+const finalBuyerState = req.body.buyerState || '';
+
+let gstType = 'none';
+if (sellerState && finalBuyerState) {
+  gstType = sellerState === finalBuyerState ? 'intra' : 'inter';
+}
+let gstType = 'none';
+
+if (sellerState && finalBuyerState) {
+  gstType = sellerState === finalBuyerState ? 'intra' : 'inter';
+}
 
     if (!req.user?._id) return res.status(401).json({ message: 'Auth failed' });
 
@@ -51,7 +64,11 @@ export const createInvoice = async (req, res) => {
         });
       }
     }
-
+// ❗ FIX: Validate items before loop
+if (!items || !Array.isArray(items) || items.length === 0) {
+  await session.abortTransaction();
+  return res.status(400).json({ message: 'Items are required' });
+}
     // Validate items
     const validatedItems = [];
     for (const item of items) {
@@ -60,14 +77,21 @@ export const createInvoice = async (req, res) => {
       const variant = product.variants.id(item.variantId);
       if (!variant) { await session.abortTransaction(); return res.status(404).json({ message: 'Variant not found' }); }
       validatedItems.push({
-        productId: item.productId, variantId: item.variantId,
-        name: item.name, sku: variant.sku || '', barcode: variant.barcode || '',
-        quantity: Number(item.quantity || 0), price: Number(item.price || 0)
-      });
+  productId: item.productId,
+  variantId: item.variantId,
+  name: item.name,
+  sku: variant.sku || '',
+  barcode: variant.barcode || '',
+  quantity: Number(item.quantity || 0),
+  price: Number(item.price || 0),
+  hsnCode: item.hsnCode || '',
+  taxRate: item.taxRate || 0
+});
     }
 
     const invoice = new Invoice({
-      user: req.user._id, client,
+      user: req.user._id,client,sellerState,
+      buyerState: finalBuyerState,gstType,
       clientName: clientName?.trim() || undefined,
       invoiceDate: invoiceDate || new Date(),
       type: invoiceType,
@@ -191,7 +215,7 @@ if (isSale) {
   // ── PURCHASE INVOICE double-entry ──────────────────────────────────────
   // Dr Purchase/COGS (Expense ↑) / Cr Accounts Payable (Liability ↑)
   const purchaseAccount = await getSystemAccount(req.user._id, ACCOUNTS.PURCHASE_EXPENSE, 'Expense', session);
-  const apAccount       = await getSystemAccount(req.user._id, 'Accounts Payable', 'Liability', session);
+  const apAccount = await getSystemAccount(req.user._id, ACCOUNTS.ACCOUNTS_PAYABLE, 'Liability', session);
 
   await createJournalEntry({
     userId: req.user._id,
@@ -233,23 +257,19 @@ if (isSale) {
   }
 }
     if (accountId) {
-      let result;
-      if (isSale && isPaid) {
-        // Sale paid → credit the account
-        result = await adjustAccount(accountId, req.user._id, invoiceAmount, 'credit', session);
-      } else if (!isSale) {
-        // Purchase → always deduct from the account
-        result = await adjustAccount(accountId, req.user._id, invoiceAmount, 'debit', session);
-        if (!result.ok) {
-          await session.abortTransaction();
-          return res.status(400).json({ message: result.message });
-        }
-      }
-      if (result && !result.ok && isSale) {
-        // Credit can't really fail but log it
-        console.warn('Credit adjust warning:', result.message);
-      }
-    }
+  let result = { ok: true };
+
+  if (isSale && isPaid) {
+    result = await adjustAccount(accountId, req.user._id, invoiceAmount, 'credit', session);
+  } else if (!isSale && isPaid) {
+    result = await adjustAccount(accountId, req.user._id, invoiceAmount, 'debit', session);
+  }
+
+  if (!result.ok) {
+    await session.abortTransaction();
+    return res.status(400).json({ message: result.message });
+  }
+}
 
     // Adjust stock
     for (const item of validatedItems) {
@@ -312,6 +332,17 @@ export const updateInvoice = async (req, res) => {
       purchaseNumber: invoice.purchaseNumber
     });
 
+const sellerState = req.user.state || '';
+const finalBuyerState = req.body.buyerState || '';
+
+invoice.sellerState = sellerState;
+invoice.buyerState = finalBuyerState;
+
+if (sellerState && finalBuyerState) {
+  invoice.gstType = sellerState === finalBuyerState ? 'intra' : 'inter';
+} else {
+  invoice.gstType = 'none';
+}
     const updatedInvoice = await invoice.save({ session });
     const newAmount    = updatedInvoice.totalAmount;
     const newStatus    = updatedInvoice.status;
