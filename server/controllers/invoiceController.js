@@ -42,11 +42,6 @@ let gstType = 'none';
 if (sellerState && finalBuyerState) {
   gstType = sellerState === finalBuyerState ? 'intra' : 'inter';
 }
-let gstType = 'none';
-
-if (sellerState && finalBuyerState) {
-  gstType = sellerState === finalBuyerState ? 'intra' : 'inter';
-}
 
     if (!req.user?._id) return res.status(401).json({ message: 'Auth failed' });
 
@@ -350,17 +345,19 @@ if (sellerState && finalBuyerState) {
 
     // ── Apply new account effect ──────────────────────────────────────────
     if (newAccountId) {
-      let result;
-      if (isSale && newStatus === 'Paid') {
-        result = await adjustAccount(newAccountId, req.user._id, newAmount, 'credit', session);
-      } else if (!isSale) {
-        result = await adjustAccount(newAccountId, req.user._id, newAmount, 'debit', session);
-        if (!result.ok) {
-          await session.abortTransaction();
-          return res.status(400).json({ message: result.message });
-        }
-      }
-    }
+  let result;
+
+  if (isSale && newStatus === 'Paid') {
+    result = await adjustAccount(newAccountId, req.user._id, newAmount, 'credit', session);
+  } else if (!isSale) {
+    result = await adjustAccount(newAccountId, req.user._id, newAmount, 'debit', session);
+  }
+
+  if (result && !result.ok) {
+    await session.abortTransaction();
+    return res.status(400).json({ message: result.message });
+  }
+}
     // ── DOUBLE-ENTRY: Status changed to Paid ─────────────────────────────────────
 const wasJustPaid = newStatus === 'Paid' && oldStatus !== 'Paid' && isSale;
 if (wasJustPaid && newAccountId) {
