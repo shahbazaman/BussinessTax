@@ -7,6 +7,9 @@ import JournalEntry  from '../models/JournalEntry.js';
  * System accounts: Accounts Receivable, Sales Revenue, etc.
  */
 export const getSystemAccount = async (userId, name, type, session) => {
+  if (!name || name.trim() === '') {
+    throw new Error(`getSystemAccount called with empty name (type: ${type}). Check ACCOUNTS constants in systemAccounts.js`);
+  }
   let acc = await LedgerAccount.findOne({ userId, name }).session(session);
   if (!acc) {
     [acc] = await LedgerAccount.create([{
@@ -66,6 +69,9 @@ export const reverseJournalEntries = async ({ userId, sourceId, sourceType, date
  * @param {ClientSession|null} session - Mongoose session for transactions
  */
 export const getOrCreateAccount = async (userId, name, type, subType = null, session = null) => {
+  if (!name || name.trim() === '') {
+    throw new Error(`getOrCreateAccount called with empty name (type: ${type})`);
+  }
   const query = LedgerAccount.findOne({ userId, name });
   if (session) query.session(session);
   let acc = await query;
