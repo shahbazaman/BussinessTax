@@ -289,184 +289,279 @@ const printPDF = async (invoice) => {
 
     // ---- HSN Description Lookup ----
     const getHsnDescription = (code) => {
-  if (!code) return '';
-  const found = HSN_CODES.find(h => String(h.code) === String(code));
-  return found ? found.description : '';
-};
+      if (!code) return '';
+      const found = HSN_CODES.find(h => String(h.code) === String(code));
+      return found ? found.description : '';
+    };
 
-    // ---- Amount in Words ----
-    const toWords = (num) => {
-      const a = ['', 'One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
-      const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
-      if ((num = num.toString()).length > 9) return 'Overflow';
-      const n = ('000000000' + num).substr(-9).match(/(\d{2})(\d{2})(\d{2})(\d{3})/);
-      let str = '';
-      str += (n[1] != 0) ? (toWords(parseInt(n[1])) + ' Crore ') : '';
-      str += (n[2] != 0) ? (toWords(parseInt(n[2])) + ' Lakh ') : '';
-      str += (n[3] != 0) ? (toWords(parseInt(n[3])) + ' Thousand ') : '';
-      str += (n[4] != 0)
-        ? ((parseInt(n[4]) < 20)
-            ? a[parseInt(n[4])]
-            : b[n[4][0]] + ' ' + a[n[4][1]]) + ' '
-        : '';
-      return str.trim();
+    // ---- Amount in Words (fixed Indian number system) ----
+    const ones = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven',
+      'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen',
+      'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty',
+      'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+
+    const toWords = (n) => {
+      n = Math.floor(Number(n));
+      if (n === 0) return 'Zero';
+      if (n < 20) return ones[n];
+      if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 ? ' ' + ones[n % 10] : '');
+      if (n < 1000) return ones[Math.floor(n / 100)] + ' Hundred' + (n % 100 ? ' ' + toWords(n % 100) : '');
+      if (n < 100000) return toWords(Math.floor(n / 1000)) + ' Thousand' + (n % 1000 ? ' ' + toWords(n % 1000) : '');
+      if (n < 10000000) return toWords(Math.floor(n / 100000)) + ' Lakh' + (n % 100000 ? ' ' + toWords(n % 100000) : '');
+      return toWords(Math.floor(n / 10000000)) + ' Crore' + (n % 10000000 ? ' ' + toWords(n % 10000000) : '');
     };
 
     const amountInWords = (amount) => {
-      const rupees = Math.floor(amount);
-      return `Rupees ${toWords(rupees)} Only`;
+      const total = Number(amount || 0);
+      const rupees = Math.floor(total);
+      const paise  = Math.round((total - rupees) * 100);
+      let words = 'Rupees ' + toWords(rupees);
+      if (paise > 0) words += ' and ' + toWords(paise) + ' Paise';
+      return words + ' Only';
     };
+
+    // ---- GST Type resolution ----
+    const resolvedGstType = invoice.gstType ||
+      (invoice.sellerState && invoice.buyerState
+        ? (invoice.sellerState.trim().toLowerCase() === invoice.buyerState.trim().toLowerCase() ? 'intra' : 'inter')
+        : 'none');
 
     // ---- GST GROUPING BY HSN ----
     const hsnSummary = {};
-
     invoice.items.forEach(item => {
       const hsn = item.hsnCode || 'N/A';
-      const amount = item.quantity * item.price;
+      const taxableAmt = (item.quantity || 0) * (item.price || 0);
+      const taxRate = Number(item.taxRate || invoice.globalTaxRate || 0);
+      const taxAmt = taxableAmt * (taxRate / 100);
 
       if (!hsnSummary[hsn]) {
-        hsnSummary[hsn] = {
-          taxable: 0,
-          cgst: 0,
-          sgst: 0,
-          igst: 0,
-          rate: item.taxRate || invoice.globalTaxRate || 0
-        };
+        hsnSummary[hsn] = { taxable: 0, cgst: 0, sgst: 0, igst: 0, rate: taxRate };
       }
+      hsnSummary[hsn].taxable += taxableAmt;
 
-      const taxRate = item.taxRate || invoice.globalTaxRate || 0;
-      const taxAmount = amount * (taxRate / 100);
-
-      if (invoice.gstType === 'intra') {
-        hsnSummary[hsn].cgst += taxAmount / 2;
-        hsnSummary[hsn].sgst += taxAmount / 2;
+      if (resolvedGstType === 'intra') {
+        hsnSummary[hsn].cgst += taxAmt / 2;
+        hsnSummary[hsn].sgst += taxAmt / 2;
+      } else if (resolvedGstType === 'inter') {
+        hsnSummary[hsn].igst += taxAmt;
       } else {
-        hsnSummary[hsn].igst += taxAmount;
+        hsnSummary[hsn].cgst += taxAmt / 2;
+        hsnSummary[hsn].sgst += taxAmt / 2;
       }
-
-      hsnSummary[hsn].taxable += amount;
     });
 
-    // ---- QR CODE ----
-    const qrData = `
-Invoice: ${invoice.invoiceNumber || invoice.purchaseNumber}
-Date: ${formatDate(invoice.invoiceDate)}
-Amount: ${invoice.totalAmount}
-GSTIN: ${profile.gstNumber || ''}
-Buyer GST: ${invoice.gstNumber || ''}
-    `;
+    // ---- Totals ----
+    const subtotal   = invoice.items.reduce((a, i) => a + (i.quantity || 0) * (i.price || 0), 0);
+    const taxTotal   = Object.values(hsnSummary).reduce((a, v) => a + v.cgst + v.sgst + v.igst, 0);
+    const grandTotal = Number(invoice.totalAmount || (subtotal + taxTotal - Number(invoice.discount || 0)));
 
+    // ---- QR CODE ----
+    const qrData = `Invoice: ${invoice.invoiceNumber || invoice.purchaseNumber || '-'}\nDate: ${formatDate(invoice.invoiceDate)}\nAmount: ${grandTotal}\nGSTIN: ${profile.gstNumber || ''}\nBuyer GST: ${invoice.gstNumber || ''}`;
     const qrCode = await QRCode.toDataURL(qrData);
 
     const html = `
 <html>
 <head>
 <style>
-body { font-family: Arial; padding:20px; font-size:12px; }
-.table { width:100%; border-collapse:collapse; margin-top:15px; }
-.table th, .table td { padding:8px; border:1px solid #ddd; }
-.badge { background:#eef2ff; padding:3px 6px; border-radius:4px; }
-.section { margin-top:20px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; padding: 24px; font-size: 12px; color: #1e293b; }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #1e293b; padding-bottom: 14px; margin-bottom: 14px; }
+  .invoice-title { font-size: 26px; font-weight: 900; color: #4f46e5; }
+  .invoice-number { font-size: 13px; font-weight: 900; color: #475569; margin-top: 4px; }
+  .meta-line { font-size: 11px; color: #64748b; margin-top: 2px; }
+  .copy-badge { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 3px 8px; font-size: 9px; font-weight: 900; color: #475569; text-transform: uppercase; letter-spacing: 1px; display: inline-block; margin-top: 8px; }
+  .parties { display: flex; gap: 16px; margin-bottom: 14px; }
+  .party-box { flex: 1; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; }
+  .party-label { font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+  .party-name { font-size: 14px; font-weight: 900; color: #1e293b; margin-bottom: 3px; }
+  .party-line { font-size: 11px; color: #475569; line-height: 1.5; }
+  .gstin-badge { display: inline-block; background: #ede9fe; color: #4f46e5; font-size: 10px; font-weight: 900; padding: 2px 8px; border-radius: 4px; margin-top: 4px; }
+  .supply-banner { padding: 7px 14px; border-radius: 6px; margin-bottom: 12px; font-size: 11px; font-weight: 700; }
+  .supply-intra { background: #f0fdf4; border: 1px solid #bbf7d0; color: #16a34a; }
+  .supply-inter { background: #fffbeb; border: 1px solid #fde68a; color: #b45309; }
+  .supply-none  { background: #f8fafc; border: 1px solid #e2e8f0; color: #64748b; }
+  table.items { width: 100%; border-collapse: collapse; }
+  table.items th { background: #1e293b; color: #fff; padding: 7px 8px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; text-align: left; }
+  table.items td { padding: 7px 8px; border-bottom: 1px solid #e2e8f0; font-size: 11px; vertical-align: top; }
+  table.items tr:nth-child(even) td { background: #f8fafc; }
+  .hsn-badge { display: inline-block; background: #4f46e5; color: #fff; font-size: 10px; font-weight: 900; padding: 2px 7px; border-radius: 4px; }
+  .totals-wrap { display: flex; justify-content: flex-end; margin-top: 14px; }
+  .totals-box { width: 300px; }
+  .gst-box { border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-bottom: 8px; }
+  .gst-box-title { font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  table.gst-table { width: 100%; border-collapse: collapse; }
+  table.gst-table th { background: #1e293b; color: #fff; padding: 5px 7px; font-size: 9px; text-align: left; }
+  table.gst-table td { padding: 5px 7px; border-bottom: 1px solid #f1f5f9; font-size: 11px; }
+  .t-row { display: flex; justify-content: space-between; padding: 5px 8px; font-size: 12px; font-weight: 700; border-top: 1px solid #e2e8f0; }
+  .grand-row { display: flex; justify-content: space-between; background: #1e293b; color: #fff; padding: 10px; border-radius: 6px; margin-top: 4px; font-size: 14px; font-weight: 900; }
+  .amount-words { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 10px; margin-top: 12px; }
+  .words-label { font-size: 9px; color: #94a3b8; font-weight: 900; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
+  .words-text { font-size: 12px; font-weight: 900; color: #1e293b; }
+  .notes-box { margin-top: 14px; border-top: 1px solid #e2e8f0; padding-top: 10px; }
+  .notes-label { font-size: 9px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .footer { margin-top: 20px; padding-top: 14px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: flex-end; }
+  .footer-text { font-size: 10px; color: #94a3b8; line-height: 1.7; }
+  .sig-area { text-align: right; }
+  .sig-line { width: 120px; border-top: 1px solid #475569; margin-bottom: 4px; margin-left: auto; }
+  .sig-label { font-size: 10px; font-weight: 900; color: #475569; }
+  .sig-sub { font-size: 9px; color: #94a3b8; }
+  @media print { body { padding: 10px; } }
 </style>
 </head>
-
 <body>
 
-<h2>${profile.businessName || ''}</h2>
-<p>${profile.businessAddress || ''}</p>
-<p><b>GSTIN:</b> ${profile.gstNumber || '-'}</p>
-
-<hr/>
-
-<div class="section">
-<b>Bill To:</b><br/>
-${invoice.clientName || invoice.client?.name || ''}<br/>
-${invoice.billingAddress || ''}<br/>
-GST: ${invoice.gstNumber || '-'}
+<div class="header">
+  <div>
+    <div style="font-size:20px;font-weight:900;color:#1e293b;">${profile.businessName || 'Your Business'}</div>
+    ${profile.businessAddress ? `<div class="party-line" style="margin-top:3px;">${profile.businessAddress}</div>` : ''}
+    ${profile.state ? `<div class="party-line">${profile.state}</div>` : ''}
+    ${profile.gstNumber ? `<div style="margin-top:4px;font-size:11px;font-weight:700;color:#4f46e5;">GSTIN: ${profile.gstNumber}</div>` : ''}
+    ${profile.email ? `<div class="party-line">${profile.email}</div>` : ''}
+    ${profile.phone ? `<div class="party-line">Ph: ${profile.phone}</div>` : ''}
+  </div>
+  <div style="text-align:right;">
+    <div class="invoice-title">INVOICE</div>
+    <div class="invoice-number">#${invoice.invoiceNumber || invoice.purchaseNumber || '-'}</div>
+    ${invoice.poNumber ? `<div class="meta-line">PO: ${invoice.poNumber}</div>` : ''}
+    <div class="meta-line" style="margin-top:5px;">Date: ${formatDate(invoice.invoiceDate)}</div>
+    ${invoice.dueDate ? `<div class="meta-line">Due: ${formatDate(invoice.dueDate)}</div>` : ''}
+    <div class="copy-badge">Original for Recipient</div>
+  </div>
 </div>
 
-<div class="section">
-<b>Invoice No:</b> ${invoice.invoiceNumber || invoice.purchaseNumber}<br/>
-<b>Date:</b> ${formatDate(invoice.invoiceDate)}
+<div class="parties">
+  <div class="party-box">
+    <div class="party-label">Bill From</div>
+    <div class="party-name">${profile.businessName || '-'}</div>
+    ${profile.businessAddress ? `<div class="party-line">${profile.businessAddress}</div>` : ''}
+    ${profile.state ? `<div class="party-line">${profile.state}</div>` : ''}
+    ${profile.gstNumber ? `<span class="gstin-badge">GSTIN: ${profile.gstNumber}</span>` : ''}
+  </div>
+  <div class="party-box">
+    <div class="party-label">Bill To</div>
+    <div class="party-name">${invoice.client?.name || invoice.clientName || '-'}</div>
+    ${invoice.client?.email ? `<div class="party-line">${invoice.client.email}</div>` : ''}
+    ${invoice.client?.phone ? `<div class="party-line">Ph: ${invoice.client.phone}</div>` : ''}
+    ${invoice.billingAddress ? `<div class="party-line">${invoice.billingAddress}</div>` : ''}
+    ${invoice.buyerState ? `<div class="party-line">${invoice.buyerState}</div>` : ''}
+    ${(invoice.client?.taxId || invoice.gstNumber) ? `<span class="gstin-badge">GSTIN: ${invoice.client?.taxId || invoice.gstNumber}</span>` : ''}
+  </div>
 </div>
 
-<table class="table">
+<div class="supply-banner ${resolvedGstType === 'intra' ? 'supply-intra' : resolvedGstType === 'inter' ? 'supply-inter' : 'supply-none'}">
+  ${resolvedGstType === 'intra' ? '✓ Intra-State Supply — CGST + SGST Applicable' : resolvedGstType === 'inter' ? '⚡ Inter-State Supply — IGST Applicable' : 'GST Supply Details'}
+  ${invoice.sellerState && invoice.buyerState ? ` | ${invoice.sellerState} → ${invoice.buyerState}` : ''}
+</div>
+
+<table class="items">
 <thead>
 <tr>
-<th>#</th>
-<th>Description</th>
-<th>HSN</th>
-<th>HSN Description</th>
-<th>Qty</th>
-<th>Rate</th>
-<th>Tax %</th>
-<th>Amount</th>
+  <th style="width:24px;">#</th>
+  <th>Description</th>
+  <th style="width:72px;">HSN/SAC</th>
+  <th>HSN Description</th>
+  <th style="width:36px;text-align:right;">Qty</th>
+  <th style="width:80px;text-align:right;">Rate</th>
+  <th style="width:46px;text-align:center;">Tax%</th>
+  <th style="width:88px;text-align:right;">Amount</th>
 </tr>
 </thead>
-
 <tbody>
 ${invoice.items.map((item, i) => {
   const hsn = item.hsnCode || '';
-  return `
-<tr>
-<td>${i + 1}</td>
-<td>${item.name}<br/><small>${item.sku || ''}</small></td>
-<td>${hsn}</td>
-<td>${getHsnDescription(hsn)}</td>
-<td>${item.quantity}</td>
-<td>${formatMoney(item.price)}</td>
-<td>${item.taxRate || invoice.globalTaxRate || 0}%</td>
-<td>${formatMoney(item.quantity * item.price)}</td>
-</tr>
-`;
+  const hsnDesc = getHsnDescription(hsn);
+  const amt = (item.quantity || 0) * (item.price || 0);
+  return `<tr>
+    <td style="color:#94a3b8;">${i + 1}</td>
+    <td><strong>${item.name || '-'}</strong>${item.sku ? `<br/><span style="font-size:10px;color:#94a3b8;font-family:monospace;">SKU: ${item.sku}</span>` : ''}</td>
+    <td>${hsn ? `<span class="hsn-badge">${hsn}</span>` : '<span style="color:#94a3b8;">—</span>'}</td>
+    <td style="font-size:10px;color:#475569;">${hsnDesc || '<span style="color:#94a3b8;">—</span>'}</td>
+    <td style="text-align:right;">${item.quantity}</td>
+    <td style="text-align:right;">${formatMoney(item.price)}</td>
+    <td style="text-align:center;">${item.taxRate || invoice.globalTaxRate || 0}%</td>
+    <td style="text-align:right;font-weight:900;">${formatMoney(amt)}</td>
+  </tr>`;
 }).join('')}
 </tbody>
 </table>
 
-<div class="section">
-<h4>HSN Summary</h4>
-<table class="table">
-<tr>
-<th>HSN</th>
-<th>Taxable</th>
-<th>CGST</th>
-<th>SGST</th>
-<th>IGST</th>
-</tr>
+<div class="totals-wrap">
+  <div class="totals-box">
+    <div class="gst-box">
+      <div class="gst-box-title">HSN / Tax Summary</div>
+      <table class="gst-table">
+      <thead>
+        <tr>
+          <th>HSN</th>
+          <th style="text-align:right;">Taxable</th>
+          ${resolvedGstType === 'intra'
+            ? '<th style="text-align:right;color:#86efac;">CGST</th><th style="text-align:right;color:#86efac;">SGST</th>'
+            : resolvedGstType === 'inter'
+            ? '<th style="text-align:right;color:#fde68a;">IGST</th>'
+            : '<th style="text-align:right;">CGST</th><th style="text-align:right;">SGST</th>'}
+        </tr>
+      </thead>
+      <tbody>
+        ${Object.entries(hsnSummary).map(([hsn, val]) => `
+        <tr>
+          <td>${hsn !== 'N/A' ? `<span class="hsn-badge" style="font-size:9px;">${hsn}</span>` : '<span style="color:#94a3b8;">N/A</span>'}</td>
+          <td style="text-align:right;">${formatMoney(val.taxable)}</td>
+          ${resolvedGstType === 'intra'
+            ? `<td style="text-align:right;color:#16a34a;">${formatMoney(val.cgst)}</td><td style="text-align:right;color:#16a34a;">${formatMoney(val.sgst)}</td>`
+            : resolvedGstType === 'inter'
+            ? `<td style="text-align:right;color:#b45309;">${formatMoney(val.igst)}</td>`
+            : `<td style="text-align:right;">${formatMoney(val.cgst)}</td><td style="text-align:right;">${formatMoney(val.sgst)}</td>`}
+        </tr>`).join('')}
+      </tbody>
+      </table>
+    </div>
 
-${Object.entries(hsnSummary).map(([hsn, val]) => `
-<tr>
-<td>${hsn}</td>
-<td>${formatMoney(val.taxable)}</td>
-<td>${formatMoney(val.cgst)}</td>
-<td>${formatMoney(val.sgst)}</td>
-<td>${formatMoney(val.igst)}</td>
-</tr>
-`).join('')}
-</table>
+    <div class="t-row"><span style="color:#64748b;">Subtotal</span><span>${formatMoney(subtotal)}</span></div>
+    ${resolvedGstType === 'intra' ? `
+    <div class="t-row"><span style="color:#16a34a;">CGST</span><span style="color:#16a34a;">${formatMoney(Object.values(hsnSummary).reduce((a,v)=>a+v.cgst,0))}</span></div>
+    <div class="t-row"><span style="color:#16a34a;">SGST</span><span style="color:#16a34a;">${formatMoney(Object.values(hsnSummary).reduce((a,v)=>a+v.sgst,0))}</span></div>`
+    : resolvedGstType === 'inter' ? `
+    <div class="t-row"><span style="color:#b45309;">IGST</span><span style="color:#b45309;">${formatMoney(Object.values(hsnSummary).reduce((a,v)=>a+v.igst,0))}</span></div>`
+    : `<div class="t-row"><span style="color:#64748b;">Tax</span><span>${formatMoney(taxTotal)}</span></div>`}
+    ${Number(invoice.discount || 0) > 0 ? `<div class="t-row"><span style="color:#dc2626;">Discount</span><span style="color:#dc2626;">- ${formatMoney(invoice.discount)}</span></div>` : ''}
+    <div class="grand-row"><span>Total Payable</span><span>${formatMoney(grandTotal)}</span></div>
+  </div>
 </div>
 
-<div class="section">
-<b>Total: ${formatMoney(invoice.totalAmount)}</b><br/>
-${amountInWords(invoice.totalAmount)}
+<div class="amount-words">
+  <div class="words-label">Amount in Words</div>
+  <div class="words-text">${amountInWords(grandTotal)}</div>
 </div>
 
-<div class="section">
-<img src="${qrCode}" width="120"/>
+${invoice.notes ? `<div class="notes-box"><div class="notes-label">Notes / Terms</div><div style="font-size:11px;color:#475569;margin-top:4px;">${invoice.notes}</div></div>` : ''}
+
+<div class="footer">
+  <div>
+    <div class="footer-text" style="font-weight:700;color:#1e293b;margin-bottom:2px;">Thank you for your business!</div>
+    <div class="footer-text">${profile.email || ''}${profile.phone ? ' | Ph: ' + profile.phone : ''}</div>
+    ${profile.gstNumber ? `<div class="footer-text">GSTIN: ${profile.gstNumber}</div>` : ''}
+    <div class="footer-text" style="margin-top:6px;">This is a computer-generated invoice.</div>
+    <div style="margin-top:12px;"><img src="${qrCode}" width="80"/></div>
+  </div>
+  <div class="sig-area">
+    <div class="sig-line"></div>
+    <div class="sig-label">Authorised Signatory</div>
+    <div class="sig-sub">${profile.businessName || ''}</div>
+  </div>
 </div>
 
 </body>
-</html>
-`;
+</html>`;
 
     const win = window.open('', '_blank');
     win.document.write(html);
     win.document.close();
-    win.print();
+    setTimeout(() => win.print(), 500);
 
   } catch (err) {
     console.error(err);
-    toast.error("Print failed");
+    toast.error('Print failed');
   }
 };
   return (

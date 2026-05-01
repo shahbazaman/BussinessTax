@@ -71,9 +71,7 @@ const CreateInvoice = () => {
     const taxAmount  = invoice.items.reduce((a, i) => a + (i.quantity * i.price * (i.taxRate / 100)), 0);
     const totalAmount = (subtotal + taxAmount + Number(invoice.shipping || 0)) - Number(invoice.discount || 0);
 
-    const client    = dbClients.find(c => c._id === invoice.client);
-   const client = dbClients.find(c => c._id === invoice.client);
-const buyerState = client?.billingAddress?.state || '';
+    const buyerState = (dbClients.find(c => c._id === invoice.client))?.billingAddress?.state || '';
 
     let gstType = 'none', cgst = 0, sgst = 0, igst = 0;
     if (sellerState && buyerState) {
@@ -145,24 +143,27 @@ items[idx] = {
   };
 
   // ── Save ──────────────────────────────────────────────────────────
-  const handleSave = async () => {
-    if (!invoice.client)  return toast.error('Please select a client');
-    if (!invoice.dueDate) return toast.error('Please select a due date');
-    try {
-      const client    = dbClients.find(c => c._id === invoice.client);
-      const client = dbClients.find(c => c._id === invoice.client);
-      const buyerState = client?.billingAddress?.state || '';
-      await api.post('/invoices', {
-        ...invoice,
-        clientId: invoice.client,
-        gstType: totals.gstType,
-        sellerState, buyerState,
-      });
-      toast.success('🚀 Invoice saved!');
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Save failed');
-    }
-  };
+const handleSave = async () => {
+  if (!invoice.client)  return toast.error('Please select a client');
+  if (!invoice.dueDate) return toast.error('Please select a due date');
+  try {
+    const client = dbClients.find(c => c._id === invoice.client);
+    const buyerState = client?.billingAddress?.state || '';
+    await api.post('/invoices', {
+      ...invoice,
+      client: invoice.client,      
+      buyerState,
+      gstType:  totals.gstType,
+      cgst:     totals.cgst,     
+      sgst:     totals.sgst,
+      igst:     totals.igst,
+      sellerState,
+    });
+    toast.success('🚀 Invoice saved!');
+  } catch (err) {
+    toast.error(err.response?.data?.message || 'Save failed');
+  }
+};
 
   // ── PDF data builder ──────────────────────────────────────────────
   const buildPdfData = () => {

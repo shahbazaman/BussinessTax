@@ -23,8 +23,8 @@ const invoiceSchema = new mongoose.Schema({
   price: { type: Number, default: 0 },
   sku: String,
   barcode: String,
-  hsnCode: String,        // ✅ ADD THIS
-  taxRate: Number         // ✅ ADD THIS (you already use it in UI)
+  hsnCode: String,        
+  taxRate: Number         
 }],
 
   subtotal:      { type: Number, default: 0 },
