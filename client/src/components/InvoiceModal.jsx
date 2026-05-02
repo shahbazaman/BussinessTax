@@ -40,9 +40,13 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
   // useRef MUST be here — never after a conditional return
   const hsnInputRefs = useRef({});
 
-  useEffect(() => {
-    api.get('/auth/profile').then(r => setSellerState(r.data.state || '')).catch(() => {});
-  }, []);
+  const [profileState, setProfileState] = useState('');
+useEffect(() => {
+  api.get('/auth/profile').then(r => {
+    setSellerState(r.data.state || '');
+    setProfileState(r.data.state || '');
+  }).catch(() => {});
+}, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -78,7 +82,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
           status: 'Pending',
           partialAmount: '',
           paidDate: '',
-          buyerState: '',
+          buyerState: profileState,
         });
         api.get(`/invoices/next-number?type=${type}`).then(res => {
           setFormData(prev => ({
@@ -434,13 +438,11 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
               </div>
             </div>
               <div>
-  <label className="text-xs font-bold">Buyer State</label>
+  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Buyer State</label>
   <select
     value={formData.buyerState}
-    onChange={(e) =>
-      setFormData({ ...formData, buyerState: e.target.value })
-    }
-    className="w-full p-2 rounded border"
+    onChange={(e) => setFormData({ ...formData, buyerState: e.target.value })}
+    className="w-full bg-slate-50 border border-slate-200 px-4 py-3 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer"
   >
     <option value="">Select State</option>
                   <option value="Andhra Pradesh">Andhra Pradesh</option>

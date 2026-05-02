@@ -433,14 +433,51 @@ if (wasJustCancelled) {
   }
 };
 
-// ─── GET invoices ─────────────────────────────────────────────────────────────
+// ─── GET invoices 
 export const getInvoices = async (req, res) => {
   try {
-    const invoices = await Invoice.find({ user: req.user._id })
-      .populate('client', 'name email')
-      .populate('paidIntoAccount', 'bankName accountType')
-      .sort({ createdAt: -1 });
-    res.json(invoices);
+    const {
+      page    = 1,
+      limit   = 20,
+      type,           
+      status,         
+      search,         
+    } = req.query;
+
+    const pageNum  = Math.max(1, parseInt(page));
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit))); 
+    const skip     = (pageNum - 1) * limitNum;
+    const filter = { user: req.user._id };
+    if (type)   filter.type   = type;
+    if (status) filter.status = status;
+    if (search) {
+      const regex = new RegExp(search, 'i');
+      filter.$or = [
+        { clientName:     regex },
+        { invoiceNumber:  regex },
+        { purchaseNumber: regex },
+        { referenceNumber: regex },
+      ];
+    }
+
+    const [invoices, total] = await Promise.all([
+      Invoice.find(filter)
+        .populate('client', 'name email phone taxId billingAddress shippingAddress')
+        .populate('paidIntoAccount', 'bankName accountType')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .lean(),                      
+      Invoice.countDocuments(filter), 
+    ]);
+
+    res.json({
+      data:       invoices,
+      total,
+      page:       pageNum,
+      totalPages: Math.ceil(total / limitNum),
+      limit:      limitNum,
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching invoices', error: error.message });
   }

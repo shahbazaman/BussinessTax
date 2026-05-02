@@ -53,7 +53,14 @@ const expenseSchema = new mongoose.Schema({
   date: { 
     type: Date, 
     default: Date.now 
-  }
+  },
+  hsnCode:    { type: String, default: '' },
+gstRate:    { type: Number, default: 0 },
+cgst:       { type: Number, default: 0 },
+sgst:       { type: Number, default: 0 },
+igst:       { type: Number, default: 0 },
+gstType:    { type: String, enum: ['intra','inter','none'], default: 'none' },
+vendorGstin:{ type: String, default: '' },
 }, { 
   timestamps: true 
 });

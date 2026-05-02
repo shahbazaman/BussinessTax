@@ -147,8 +147,7 @@ const handleSave = async () => {
   if (!invoice.client)  return toast.error('Please select a client');
   if (!invoice.dueDate) return toast.error('Please select a due date');
   try {
-    const client = dbClients.find(c => c._id === invoice.client);
-    const buyerState = client?.billingAddress?.state || '';
+    const buyerState = dbClients.find(c => c._id === invoice.client)?.billingAddress?.state || '';
     await api.post('/invoices', {
       ...invoice,
       client: invoice.client,      

@@ -120,16 +120,24 @@ export const payEmployee = async (req, res) => {
     const account = await Account.findOne({ _id: accountId, userId });
     if (!account) return res.status(404).json({ message: "Selected account not found." });
 
-    // Calculate the salary amount due
-    let amount = 0;
-    if (employee.salaryType === 'Daily') {
-      amount = Number(employee.workingDays) * Number(employee.dailyRate);
-    } else if (employee.salaryType === 'Weekly') {
-      amount = Number(employee.dailyRate); // dailyRate stores the weekly pay rate
-    } else {
-      // Monthly
-      amount = Number(employee.dailyRate); // dailyRate stores the monthly pay rate
-    }
+    // Calculate the salary amount due based on actual working days attended
+let amount = 0;
+const workingDays = Number(employee.workingDays);
+const rate = Number(employee.dailyRate);
+
+if (employee.salaryType === 'Daily') {
+  // dailyRate = rate per day, multiply by days worked
+  amount = workingDays * rate;
+} else if (employee.salaryType === 'Weekly') {
+  // dailyRate stores the weekly rate, prorate: (weeklyRate / 7) * daysWorked
+  amount = (rate / 7) * workingDays;
+} else {
+  // Monthly: dailyRate stores the monthly rate, prorate: (monthlyRate / 30) * daysWorked
+  amount = (rate / 30) * workingDays;
+}
+
+// Round to 2 decimal places to avoid floating point mess
+amount = Math.round(amount * 100) / 100;
 
     if (amount <= 0) {
       return res.status(400).json({ message: "No payable amount for this employee." });
@@ -211,14 +219,22 @@ export const closeMonth = async (req, res) => {
       return res.status(400).json({ message: "No employees have a payment due right now." });
     }
 
-    // Compute individual amounts
-    const payrollItems = dueEmployees.map(emp => ({
-      emp,
-      amount: emp.salaryType === 'Daily'
-        ? Number(emp.workingDays) * Number(emp.dailyRate)
-        : Number(emp.dailyRate)
-    }));
+    const payrollItems = dueEmployees.map(emp => {
+  const days = Number(emp.workingDays);
+  const rate = Number(emp.dailyRate);
+  let amount = 0;
 
+  if (emp.salaryType === 'Daily') {
+    amount = days * rate;
+  } else if (emp.salaryType === 'Weekly') {
+    amount = (rate / 7) * days;
+  } else {
+    // Monthly
+    amount = (rate / 30) * days;
+  }
+
+  return { emp, amount: Math.round(amount * 100) / 100 };
+});
     const totalPayroll = payrollItems.reduce((sum, item) => sum + item.amount, 0);
 
     if (totalPayroll <= 0) {

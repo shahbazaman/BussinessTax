@@ -10,7 +10,7 @@ import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import InvoiceModal from '../components/InvoiceModal'; 
-import HSN_CODES from '../utils/hsnCodes';
+import {HSN_CODES} from '../utils/hsnCodes';
 import QRCode from 'qrcode';
 const Invoices = () => {
   const location = useLocation();

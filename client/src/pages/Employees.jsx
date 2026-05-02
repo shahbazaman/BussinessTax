@@ -39,13 +39,12 @@ const getDueDate = (emp) => {
   dueDate.setDate(dueDate.getDate() + cycleDays);
   return dueDate;
 };
-
-/**
- * Compute how much is owed to an employee right now.
- */
 const computeSalary = (emp) => {
-  if (emp.salaryType === 'Daily') return Number(emp.workingDays) * Number(emp.dailyRate);
-  return Number(emp.dailyRate); // weekly / monthly rate is stored in dailyRate field
+  const days = Number(emp.workingDays);
+  const rate = Number(emp.dailyRate);
+  if (emp.salaryType === 'Daily') return days * rate;
+  if (emp.salaryType === 'Weekly') return Math.round((rate / 7) * days * 100) / 100;
+  return Math.round((rate / 30) * days * 100) / 100; // Monthly
 };
 // ─── Payment Modal ──────────────────────────────────────────────────────────
 
