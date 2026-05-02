@@ -53,18 +53,22 @@ const Invoices = () => {
     setLoading(true);
     try {
       const [invRes, clientRes, profileRes, accRes, prodRes] = await Promise.all([
-        api.get('/invoices'),
-        api.get('/clients'),
-        api.get('/auth/profile'),
-        api.get('/accounts'),
-        api.get('/products')
-      ]);
-      
-      const sortedInvoices = invRes.data.sort((a, b) => 
-        new Date(b.invoiceDate || b.createdAt) - new Date(a.invoiceDate || a.createdAt)
-      );
-      
-      setInvoices(sortedInvoices);
+  api.get('/invoices?limit=1000'),  // fetch all for client-side filtering
+  api.get('/clients'),
+  api.get('/auth/profile'),
+  api.get('/accounts'),
+  api.get('/products')
+]);
+
+const rawInvoices = Array.isArray(invRes.data)
+  ? invRes.data
+  : (invRes.data?.data || []);
+
+const sortedInvoices = rawInvoices.sort((a, b) => 
+  new Date(b.invoiceDate || b.createdAt) - new Date(a.invoiceDate || a.createdAt)
+);
+
+setInvoices(sortedInvoices);
       setClients(clientRes.data);
       setCurrencySymbol(profileRes.data.currency === 'USD' ? '$' : '₹');
       setAccounts(accRes.data);
