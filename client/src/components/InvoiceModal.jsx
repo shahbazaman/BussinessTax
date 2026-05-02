@@ -126,15 +126,24 @@ useEffect(() => {
         <div className="max-h-56 overflow-y-auto divide-y divide-slate-50">
           {(hsnResults[idx] || []).map((h, i) => (
             <button
-              key={i} type="button"
-              onMouseDown={() => selectHsn(idx, h)}
-              className="w-full text-left px-4 py-3 hover:bg-indigo-50 flex items-start gap-3 transition-colors"
-            >
-              <span className="text-[11px] font-black text-white bg-indigo-500 px-2 py-1 rounded-lg shrink-0 min-w-[52px] text-center leading-tight">
-                {h.code}
-              </span>
-              <span className="text-[11px] text-slate-700 font-medium leading-snug mt-0.5">{h.description}</span>
-            </button>
+  key={i} type="button"
+  onMouseDown={() => selectHsn(idx, h)}
+  className="w-full text-left px-4 py-3 hover:bg-indigo-50 flex items-center gap-3 transition-colors"
+>
+  <span className="text-[11px] font-black text-white bg-indigo-500 px-2 py-1 rounded-lg shrink-0 min-w-[52px] text-center leading-tight">
+    {h.code}
+  </span>
+  <div className="flex flex-col min-w-0">
+    <span className="text-[11px] text-slate-800 font-bold leading-tight truncate">
+      {h.description.split('(')[0].trim()}
+    </span>
+    {h.description.includes('(') && (
+      <span className="text-[10px] text-slate-400 font-medium leading-tight truncate">
+        {h.description.match(/\(([^)]+)\)/)?.[1]}
+      </span>
+    )}
+  </div>
+</button>
           ))}
         </div>
       </div>,
