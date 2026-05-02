@@ -218,9 +218,10 @@ export const uploadProfilePhoto = async (req, res) => {
     // Save URL to user
     const user = await User.findById(req.user._id);
     user.profilePhoto = result.secure_url;
+    user.logo = result.secure_url; 
     await user.save();
 
-    res.json({ profilePhoto: result.secure_url });
+    res.json({ profilePhoto: result.secure_url, logo: result.secure_url });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Upload failed' });

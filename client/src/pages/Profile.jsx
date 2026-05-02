@@ -58,8 +58,8 @@ const Profile = () => {
       });
       const newPhoto = res.data.profilePhoto;
       setFormData(prev => ({ ...prev, profilePhoto: newPhoto }));
-      updateUser({ profilePhoto: newPhoto }); // update sidebar + persist to localStorage
-      toast.success('Profile photo updated!');
+      updateUser({ profilePhoto: newPhoto });
+      toast.success('Profile photo updated! Also synced as business logo.');
     } catch {
       toast.error('Photo upload failed');
     } finally {
