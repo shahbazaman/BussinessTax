@@ -32,7 +32,12 @@ export const searchHSN = (query, category = '') => {
   }
 
   const exact = pool.filter(h => h.code.startsWith(q));
-  const desc  = pool.filter(h => !h.code.startsWith(q) && h.description.toLowerCase().includes(q));
+  const desc  = pool.filter(
+  h => !h.code.startsWith(q) && (
+    h.description.toLowerCase().includes(q) ||
+    h.category?.toLowerCase().includes(q)
+  )
+);
   return [...exact, ...desc].slice(0, 30);
 };
 
