@@ -84,9 +84,9 @@ const Dashboard = () => {
         api.get('/dashboard/stats'),
         api.get('/dashboard/accounts'),
         api.get('/clients'),
-        api.get('/accounts/transactions'),
+        api.get('/transactions'),
         api.get('/auth/profile'),
-        api.get('/invoices'),
+        api.get('/invoices?limit=1000'),
         api.get('/products'),
       ]);
 
@@ -95,7 +95,8 @@ const Dashboard = () => {
       setUserTaxRate(Number(profileRes.data.taxRate) || 20);
       setAccounts(accountsRes.data);
       setClients(clientsRes.data);
-      setTransactions(transactionsRes.data);
+      const rawTransactions = Array.isArray(transactionsRes.data) ? transactionsRes.data : [];
+      setTransactions(rawTransactions);
       const rawInvoices = Array.isArray(invoicesRes.data) ? invoicesRes.data : (invoicesRes.data?.data || []);
       setInvoices(rawInvoices);
       setProducts(productsRes.data);
