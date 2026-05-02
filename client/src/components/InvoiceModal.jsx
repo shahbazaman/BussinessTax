@@ -4,7 +4,7 @@ import { X, Trash2, Hash } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../utils/api';
 import Select from 'react-select';
-import { searchHSN } from '../utils/hsnCodes';
+import { searchHSN, HSN_CATEGORIES } from '../utils/hsnCodes';
 
 const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts, invoices, editData, initialType }) => {
 
@@ -30,7 +30,7 @@ const InvoiceModal = ({ isOpen, onClose, onRefresh, clients, products, accounts,
     paidDate: '',
     buyerState: ''
   });
-
+  const [hsnCategory, setHsnCategory] = useState('');
   const [loading, setLoading]         = useState(false);
   const [sellerState, setSellerState] = useState('');
   const [hsnQuery, setHsnQuery]       = useState({});
@@ -143,6 +143,11 @@ useEffect(() => {
       </span>
     )}
   </div>
+  {h.category && (
+  <span className="text-[9px] text-indigo-400 font-bold bg-indigo-50 px-1.5 py-0.5 rounded-md shrink-0">
+    {h.category}
+  </span>
+)}
 </button>
           ))}
         </div>
@@ -196,7 +201,7 @@ useEffect(() => {
     setFormData(prev => ({ ...prev, items: newItems }));
     setHsnQuery(p => ({ ...p, [idx]: val }));
     if (val.trim().length >= 2) {
-      setHsnResults(p => ({ ...p, [idx]: searchHSN(val) }));
+      setHsnResults(p => ({ ...p, [idx]: searchHSN(val, hsnCategory) }));
       setShowHsnDrop(p => ({ ...p, [idx]: true }));
     } else {
       setHsnResults(p => ({ ...p, [idx]: [] }));
@@ -205,12 +210,16 @@ useEffect(() => {
   };
 
   const selectHsn = (idx, hsn) => {
-    const newItems = [...formData.items];
-    newItems[idx] = { ...newItems[idx], hsnCode: hsn.code };
-    setFormData(prev => ({ ...prev, items: newItems }));
-    setHsnQuery(p => ({ ...p, [idx]: hsn.code }));
-    setShowHsnDrop(p => ({ ...p, [idx]: false }));
-  };
+  const newItems = [...formData.items];
+  newItems[idx] = { ...newItems[idx], hsnCode: hsn.code };
+  setFormData(prev => ({
+    ...prev,
+    items: newItems,
+    globalTaxRate: hsn.taxRate ?? prev.globalTaxRate  // ← add this
+  }));
+  setHsnQuery(p => ({ ...p, [idx]: hsn.code }));
+  setShowHsnDrop(p => ({ ...p, [idx]: false }));
+};
 
   // ── Product select ────────────────────────────────────────────────
   const handleProductSelect = (selectedOption) => {
@@ -505,6 +514,7 @@ useEffect(() => {
             {/* Line Items */}
             <div>
               <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4">Line Items</h3>
+
               <div className="mb-6 relative z-10">
                 <Select
                   options={productOptions}
@@ -518,7 +528,19 @@ useEffect(() => {
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
                       <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase">Item</th>
-                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase w-44">HSN / SAC</th>
+                      <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase w-52">
+                        <div className="flex flex-col gap-1">
+                          <span>HSN / SAC</span>
+                          <select
+                            value={hsnCategory}
+                            onChange={e => setHsnCategory(e.target.value)}
+                            className="bg-white border border-slate-200 px-2 py-1 rounded-lg text-[9px] font-bold outline-none cursor-pointer normal-case tracking-normal text-slate-600 w-full"
+                          >
+                            <option value="">All Categories</option>
+                            {HSN_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                        </div>
+                      </th>
                       <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase w-24">Qty</th>
                       <th className="px-4 py-3 text-[10px] font-black text-slate-400 uppercase w-32">Rate</th>
                       <th className="px-4 py-3 w-10"></th>
@@ -541,7 +563,7 @@ useEffect(() => {
                               onFocus={() => {
                                 const val = hsnQuery[idx] !== undefined ? hsnQuery[idx] : (item.hsnCode || '');
                                 if (val.length >= 2) {
-                                  setHsnResults(p => ({ ...p, [idx]: searchHSN(val) }));
+                                  setHsnResults(p => ({ ...p, [idx]: searchHSN(val, hsnCategory) }));
                                   setShowHsnDrop(p => ({ ...p, [idx]: true }));
                                 }
                               }}

@@ -17,6 +17,8 @@ const Clients = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const { symbol } = useContext(CurrencyContext);
   const [editingClient, setEditingClient] = useState(null);  
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const navigate = useNavigate();
   const initialFormState = {
     name: '',
@@ -48,6 +50,7 @@ const Clients = () => {
   useEffect(() => {
     fetchClients();
   }, []);
+  useEffect(() => { setCurrentPage(1); }, [searchTerm]);
   const handleOpenAddModal = () => {
     setEditingClient(null);
     setFormData(initialFormState);
@@ -127,7 +130,8 @@ const Clients = () => {
     c.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.businessName?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-
+  const totalPages = Math.ceil(filteredClients.length / itemsPerPage);
+  const paginatedClients = filteredClients.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   return (
     <div className="p-4 lg:p-8 bg-slate-50 min-h-screen">
       <div className="max-w-6xl mx-auto">
@@ -181,7 +185,7 @@ const Clients = () => {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-50">
-          {filteredClients.length > 0 ? filteredClients.map((client) => (
+          {filteredClients.length > 0 ? paginatedClients.map((client) => (
             <tr key={client._id} className="hover:bg-slate-50/50 transition-colors group">
               <td className="px-6 py-4">
                 <div className="flex items-center gap-3">
@@ -244,6 +248,20 @@ const Clients = () => {
         </tbody>
       </table>
     </div>
+    {filteredClients.length > itemsPerPage && (
+  <div className="flex justify-center gap-2 py-4">
+    <button onClick={() => setCurrentPage(p => Math.max(p-1, 1))} disabled={currentPage === 1}
+      className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-200 disabled:opacity-40">Prev</button>
+    {Array.from({length: totalPages}, (_, i) => i+1).map(page => (
+      <button key={page} onClick={() => setCurrentPage(page)}
+        className={`px-3 py-1 rounded-lg text-xs font-bold ${page === currentPage ? 'bg-green-500 text-white' : 'bg-slate-200'}`}>
+        {page}
+      </button>
+    ))}
+    <button onClick={() => setCurrentPage(p => Math.min(p+1, totalPages))} disabled={currentPage === totalPages}
+      className="px-3 py-1 rounded-lg text-xs font-bold bg-slate-200 disabled:opacity-40">Next</button>
+  </div>
+)}
   </div>
 )}
       </div>
