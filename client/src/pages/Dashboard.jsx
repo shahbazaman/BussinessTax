@@ -96,7 +96,8 @@ const Dashboard = () => {
       setAccounts(accountsRes.data);
       setClients(clientsRes.data);
       setTransactions(transactionsRes.data);
-      setInvoices(invoicesRes.data);
+      const rawInvoices = Array.isArray(invoicesRes.data) ? invoicesRes.data : (invoicesRes.data?.data || []);
+      setInvoices(rawInvoices);
       setProducts(productsRes.data);
 
     } catch (err) {

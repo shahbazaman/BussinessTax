@@ -21,40 +21,42 @@ const Accounts = () => {
     try {
       setLoading(true);
       const [accRes, expRes, invRes, transRes] = await Promise.all([
-        api.get('/accounts'),
-        api.get('/expenses'),
-        api.get('/invoices'),
-        api.get('/transactions') // Internal transfers
-      ]);
+  api.get('/accounts'),
+  api.get('/expenses'),
+  api.get('/invoices?limit=1000'),  // paginated now — fetch all for feed
+  api.get('/transactions')
+]);
 
-      setAccounts(accRes.data);
+setAccounts(accRes.data);
 
-      // Create a unified activity feed
-      const combinedFeed = [
-        ...expRes.data.map(e => ({ 
-        ...e, 
-        feedType: 'expense', 
-        displayTitle: e.title,
-        finalAmount: e.amount,
-        date: e.date || e.createdAt
-      })),
-      ...invRes.data.map(i => ({ 
-        ...i, 
-        feedType: 'invoice', 
-        displayTitle: i.customerName || i.clientName || i.client?.name || 'Invoice',
-        finalAmount: i.grandTotal || i.total || i.totalAmount || 0,
-        date: i.invoiceDate || i.date || i.createdAt
-      })),
-      ...transRes.data.map(t => ({ 
-        ...t, 
-        feedType: 'transfer', 
-        displayTitle: `Transfer: ${t.fromAccount?.bankName || 'Source'} → ${t.toAccount?.bankName || 'Dest'}`,
-        finalAmount: t.amount || 0,
-        date: t.transferDate || t.date || t.createdAt
-      }))
-      ].sort((a, b) => new Date(b.date) - new Date(a.date));
+// invoices now returns { data: [], total, ... } — extract safely
+const invoiceList = Array.isArray(invRes.data) ? invRes.data : (invRes.data?.data || []);
 
-      setActivity(combinedFeed.slice(0, 8)); // Showing top 8 for a fuller list
+const combinedFeed = [
+  ...expRes.data.map(e => ({ 
+    ...e, 
+    feedType: 'expense', 
+    displayTitle: e.title,
+    finalAmount: e.amount,
+    date: e.date || e.createdAt
+  })),
+  ...invoiceList.map(i => ({ 
+    ...i, 
+    feedType: 'invoice', 
+    displayTitle: i.customerName || i.clientName || i.client?.name || 'Invoice',
+    finalAmount: i.grandTotal || i.total || i.totalAmount || 0,
+    date: i.invoiceDate || i.date || i.createdAt
+  })),
+  ...transRes.data.map(t => ({ 
+    ...t, 
+    feedType: 'transfer', 
+    displayTitle: `Transfer: ${t.fromAccount?.bankName || 'Source'} → ${t.toAccount?.bankName || 'Dest'}`,
+    finalAmount: t.amount || 0,
+    date: t.transferDate || t.date || t.createdAt
+  }))
+].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+setActivity(combinedFeed.slice(0, 8));
     } catch (err) {
       toast.error("Financial sync failed. Please check your connection.");
     } finally {

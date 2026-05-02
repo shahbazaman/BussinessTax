@@ -111,7 +111,8 @@ useEffect(() => { if (activeTab === 'gst') fetchGst(); }, [activeTab, gstFrom, g
         if (profileRes.data?.currency) {
           setCurrency(profileRes.data.currency);
         }
-setInvoices(invoicesRes.data || []);
+const rawInvoices = Array.isArray(invoicesRes.data) ? invoicesRes.data : (invoicesRes.data?.data || []);
+setInvoices(rawInvoices);
 const arRes = await api.get('/clients/ar-aging');
 setArAging(arRes.data || []);
       } catch (err) {
@@ -133,8 +134,9 @@ setArAging(arRes.data || []);
         const totalExpenses = exp.reduce((s,r) => s + r.totalDebit,  0);
         setPlData({ revenue: rev, expenses: exp, totalRevenue, totalExpenses, netProfit: totalRevenue - totalExpenses });
         // Fetch tax data
-const [invRes, expRes] = await Promise.all([api.get('/invoices'), api.get('/expenses')]);
-const taxCollected = (invRes.data || [])
+const [invRes, expRes] = await Promise.all([api.get('/invoices?limit=1000'), api.get('/expenses')]);
+const invList = Array.isArray(invRes.data) ? invRes.data : (invRes.data?.data || []);
+const taxCollected = invList
   .filter(i => i.type === 'Sale')
   .reduce((s, i) => s + Number(i.taxAmount || 0), 0);
 const taxDeductible = (expRes.data || [])
@@ -143,7 +145,7 @@ setTaxData({
   collected: taxCollected,
   deductible: taxDeductible,
   netOwed: taxCollected - taxDeductible,
-  invoices: (invRes.data || []).filter(i => i.type === 'Sale')
+  invoices: invList.filter(i => i.type === 'Sale')
 });
 const cfRes = await api.get('/ledger-accounts/reports/cash-flow');
 setCfData(cfRes.data);
