@@ -12,16 +12,16 @@ export const getMonthlyReport = async (req, res) => {
 
     // Income = all Sale-type invoices that are Paid
     const totalIncome = invoices
-      .filter(inv => inv.type === 'Sale' && inv.status === 'Paid')
-      .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
+  .filter(inv => inv.type === 'Sale' && inv.status === 'Paid' && !inv.isReturned)
+  .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
 
     // Expenses = actual Expense records + Purchase-type invoices
     const totalExpenseRecords = expenses
       .reduce((acc, exp) => acc + Number(exp.amount || 0), 0);
 
     const totalPurchaseInvoices = invoices
-      .filter(inv => inv.type === 'Purchase')
-      .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
+  .filter(inv => inv.type === 'Purchase' && !inv.isReturned)
+  .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
 
     const totalExpenses = totalExpenseRecords + totalPurchaseInvoices;
     const netProfit = totalIncome - totalExpenses;

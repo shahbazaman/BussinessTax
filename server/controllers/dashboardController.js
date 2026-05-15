@@ -15,24 +15,23 @@ export const getDashboardStats = async (req, res) => {
       Expense.find({ user: userId })
     ]);
 
-    // 2. Income = sum of all PAID invoices (using totalAmount, not amount)
-    const totalIncome = invoices
-      .filter(inv => inv.status === 'Paid')
-      .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
+  const totalIncome = invoices
+  .filter(inv => inv.status === 'Paid' && !inv.isReturned)
+  .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
 
     // 3. Expenses = all recorded expenses + Unpaid/Overdue invoice totals
     const totalExpenseRecords = expenses
       .reduce((acc, exp) => acc + Number(exp.amount || 0), 0);
 
     const totalUnpaidInvoices = invoices
-      .filter(inv => inv.status === 'Pending' || inv.status === 'Overdue')
-      .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
+  .filter(inv => (inv.status === 'Pending' || inv.status === 'Overdue') && !inv.isReturned)
+  .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
 
     const totalExpenses = totalExpenseRecords + totalUnpaidInvoices;
 
     // 4. Unpaid bills count (for the stat card)
     const unpaidBillsCount = invoices.filter(
-      inv => inv.status === 'Pending' || inv.status === 'Overdue'
+      inv => (inv.status === 'Pending' || inv.status === 'Overdue') && !inv.isReturned
     ).length;
 
     const netProfit = totalIncome - totalExpenses;
@@ -49,12 +48,12 @@ export const getDashboardStats = async (req, res) => {
       const targetYear  = d.getFullYear();
 
       const monthlyIncome = invoices
-        .filter(inv => {
-          const invDate = new Date(inv.invoiceDate || inv.createdAt);
-          return invDate.getMonth() === targetMonth &&
-                 invDate.getFullYear() === targetYear &&
-                 inv.status === 'Paid';
-        })
+  .filter(inv => {
+    const invDate = new Date(inv.invoiceDate || inv.createdAt);
+    return invDate.getMonth() === targetMonth &&
+           invDate.getFullYear() === targetYear &&
+           inv.status === 'Paid' && !inv.isReturned;
+  })
         .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
 
       // Monthly expenses = recorded expenses + unpaid invoices for that month
@@ -70,8 +69,8 @@ export const getDashboardStats = async (req, res) => {
         .filter(inv => {
           const invDate = new Date(inv.invoiceDate || inv.createdAt);
           return invDate.getMonth() === targetMonth &&
-                 invDate.getFullYear() === targetYear &&
-                 (inv.status === 'Pending' || inv.status === 'Overdue');
+                invDate.getFullYear() === targetYear &&
+                (inv.status === 'Pending' || inv.status === 'Overdue') && !inv.isReturned;
         })
         .reduce((acc, inv) => acc + Number(inv.totalAmount || 0), 0);
 

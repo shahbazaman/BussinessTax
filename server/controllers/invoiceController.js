@@ -314,7 +314,10 @@ export const updateInvoice = async (req, res) => {
   try {
     const invoice = await Invoice.findById(req.params.id).session(session);
     if (!invoice) { await session.abortTransaction(); return res.status(404).json({ message: 'Invoice not found' }); }
-
+    if (invoice.isReturned || invoice.status === 'Returned') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Cannot edit a returned invoice.' });
+    }
     const oldStatus    = invoice.status;
     const oldAmount    = invoice.totalAmount;
     const oldAccountId = invoice.paidIntoAccount;
@@ -493,8 +496,7 @@ export const deleteInvoice = async (req, res) => {
 
     const isSale = invoice.type === 'Sale';
 
-    // Revert account balance
-    if (invoice.paidIntoAccount) {
+    if (invoice.paidIntoAccount && !invoice.isReturned) {
       if (isSale && invoice.status === 'Paid') {
         await adjustAccount(invoice.paidIntoAccount, req.user._id, invoice.totalAmount, 'debit', session);
       } else if (!isSale) {
@@ -502,7 +504,7 @@ export const deleteInvoice = async (req, res) => {
       }
     }
 
-    // Revert stock
+  if (!invoice.isReturned) {
     for (const item of invoice.items) {
       const revertQty = invoice.type === 'Purchase' ? -item.quantity : item.quantity;
       await Product.updateOne(
@@ -510,6 +512,7 @@ export const deleteInvoice = async (req, res) => {
         { $inc: { 'variants.$.stock': revertQty } }
       ).session(session);
     }
+  }
     await reverseJournalEntries({
       userId: req.user._id,
       sourceId: invoice._id,
