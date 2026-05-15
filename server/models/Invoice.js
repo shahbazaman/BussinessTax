@@ -41,7 +41,7 @@ const invoiceSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ['Paid', 'Pending', 'Partially Paid', 'Cancelled'],
+    enum: ['Paid', 'Pending', 'Partially Paid', 'Cancelled', 'Returned'],
     default: 'Pending'
   },
 
@@ -51,6 +51,12 @@ const invoiceSchema = new mongoose.Schema({
   paidDate:        { type: Date, default: null },
   paymentMethod:   { type: String, default: '' },
   paymentNote:     { type: String, default: '' },
+
+  // Return tracking
+  isReturned:      { type: Boolean, default: false },
+  returnDate:      { type: Date, default: null },
+  returnNote:      { type: String, default: '' },
+  returnedAmount:  { type: Number, default: 0 },
 }, { timestamps: true });
 invoiceSchema.pre('save', async function () {
   // 1. Cleanup Numbers

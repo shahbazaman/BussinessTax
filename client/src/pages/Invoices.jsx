@@ -4,7 +4,7 @@ import api from '../utils/api';
 import { 
   Plus, Search, Trash2, Edit2, Loader2,Printer, 
   ShoppingCart, ShoppingBag, CreditCard, CheckCircle,
-  TrendingUp, PieChart, ChevronDown, FileText
+  TrendingUp, PieChart, ChevronDown, FileText, RotateCcw
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
@@ -93,6 +93,45 @@ setInvoices(sortedInvoices);
         { position: 'top-center', autoClose: 5000 }
       );
     }
+  };
+
+  const handleReturn = (invoice) => {
+    let returnNote = '';
+    toast(
+      ({ closeToast }) => (
+        <div>
+          <p className="font-bold text-sm mb-1">Return this {invoice.type} invoice?</p>
+          <p className="text-xs text-slate-500 mb-2">
+            This will reverse all ledger entries, revert stock, and mark the invoice as <strong>Returned</strong>.
+          </p>
+          <p className="text-xs font-bold text-slate-700 mb-1">Amount to be reversed: <span className="text-indigo-600">{formatValue(invoice.totalAmount)}</span></p>
+          <input
+            type="text"
+            placeholder="Return reason (optional)"
+            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-xs mb-3 outline-none"
+            onChange={(e) => { returnNote = e.target.value; }}
+          />
+          <div className="flex gap-2">
+            <button onClick={async () => {
+              closeToast();
+              try {
+                await api.put(`/invoices/${invoice._id}/return`, { returnNote });
+                toast.success('Invoice returned. Ledger & stock reverted.', { position: 'top-center' });
+                fetchData();
+              } catch (err) {
+                toast.error(err.response?.data?.message || 'Return failed', { position: 'top-center' });
+              }
+            }} className="bg-orange-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg">
+              Confirm Return
+            </button>
+            <button onClick={closeToast} className="bg-slate-100 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg">
+              Cancel
+            </button>
+          </div>
+        </div>
+      ),
+      { autoClose: false, closeButton: false }
+    );
   };
 
   const formatValue = (value) => {
@@ -633,6 +672,7 @@ ${invoice.notes ? `<div class="notes-box"><div class="notes-label">Notes / Terms
               <option value="Paid">Paid</option>
               <option value="Pending">Pending</option>
               <option value="Partially Paid">Partial</option>
+              <option value="Returned">Returned</option>
             </select>
         </div>
 
@@ -685,16 +725,26 @@ ${invoice.notes ? `<div class="notes-box"><div class="notes-label">Notes / Terms
                         <button 
                           onClick={(e) => {
                             e.stopPropagation();
-                            setActiveStatusDropdown(activeStatusDropdown === inv._id ? null : inv._id);
+                            if (!inv.isReturned && inv.status !== 'Returned') {
+                              setActiveStatusDropdown(activeStatusDropdown === inv._id ? null : inv._id);
+                            }
                           }}
-                          className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border-2 ${inv.status === 'Paid' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-amber-50 border-amber-100 text-amber-600'}`}
+                          className={`flex items-center gap-2 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border-2 ${
+                            inv.status === 'Paid' ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
+                            inv.status === 'Returned' ? 'bg-orange-50 border-orange-200 text-orange-600 cursor-default' :
+                            inv.status === 'Cancelled' ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-default' :
+                            'bg-amber-50 border-amber-100 text-amber-600'
+                          }`}
                         >
+                          {inv.status === 'Returned' && <RotateCcw size={10} />}
                           {inv.status}
-                          <ChevronDown size={12} className={`transition-transform ${activeStatusDropdown === inv._id ? 'rotate-180' : ''}`} />
+                          {!inv.isReturned && inv.status !== 'Returned' && inv.status !== 'Cancelled' && (
+                            <ChevronDown size={12} className={`transition-transform ${activeStatusDropdown === inv._id ? 'rotate-180' : ''}`} />
+                          )}
                         </button>
 
                         {activeStatusDropdown === inv._id && (
-                          <div className="absolute left-8 mt-2 w-40 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden py-1" onClick={(e) => e.stopPropagation()}>
+                          <div className="absolute left-8 mt-2 w-44 bg-white border border-slate-100 rounded-2xl shadow-2xl z-50 overflow-hidden py-1" onClick={(e) => e.stopPropagation()}>
                             {['Paid', 'Pending', 'Partially Paid', 'Cancelled'].map((st) => (
                                 <button 
                                     key={st}
@@ -710,20 +760,29 @@ ${invoice.notes ? `<div class="notes-box"><div class="notes-label">Notes / Terms
 
                       <td className="px-8 py-6">
                         <div className="flex items-center justify-end gap-2">
-                          {inv.status !== 'Paid' && (
-                            activeTab === 'Sale' ? (
-                              <button onClick={() => handlePayNow(inv)} disabled={paymentLoading} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Online Payment">
-                                <CreditCard size={16} />
+                          {!inv.isReturned && inv.status !== 'Returned' && inv.status !== 'Cancelled' && (
+                            <>
+                              {inv.status !== 'Paid' && (
+                                activeTab === 'Sale' ? (
+                                  <button onClick={() => handlePayNow(inv)} disabled={paymentLoading} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-600 hover:text-white transition-all shadow-sm" title="Online Payment">
+                                    <CreditCard size={16} />
+                                  </button>
+                                ) : (
+                                  <button onClick={() => handleUpdateStatus(inv._id, 'Paid')} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm" title="Mark Paid">
+                                    <CheckCircle size={16} />
+                                  </button>
+                                )
+                              )}
+                              <button onClick={() => handleReturn(inv)} className="p-2.5 bg-orange-50 text-orange-600 rounded-xl hover:bg-orange-600 hover:text-white transition-all shadow-sm" title="Return Invoice">
+                                <RotateCcw size={16} />
                               </button>
-                            ) : (
-                              <button onClick={() => handleUpdateStatus(inv._id, 'Paid')} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm" title="Mark Paid">
-                                <CheckCircle size={16} />
-                              </button>
-                            )
+                            </>
                           )}
-                          <button onClick={() => { setSelectedInvoice(inv); setShowModal(true); }} className={`p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm`}>
-                            <Edit2 size={16} />
-                          </button>
+                          {!inv.isReturned && inv.status !== 'Returned' && (
+                            <button onClick={() => { setSelectedInvoice(inv); setShowModal(true); }} className={`p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-slate-900 hover:text-white transition-all shadow-sm`}>
+                              <Edit2 size={16} />
+                            </button>
+                          )}
                           <button onClick={() => printPDF(inv)} className="p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:bg-violet-600 hover:text-white transition-all shadow-sm" title="Print Invoice">
                             <Printer size={16} />
                           </button>

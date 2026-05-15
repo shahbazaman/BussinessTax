@@ -543,6 +543,12 @@ export const updateInvoiceStatus = async (req, res) => {
     const accountId = invoice.paidIntoAccount || req.body.accountId;
     const isSale    = invoice.type === 'Sale';
 
+    // Returned status must go through /return endpoint
+    if (newStatus === 'Returned') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Use the /return endpoint to mark an invoice as returned.' });
+    }
+
     // Only touch balance if account is linked
     if (accountId && isSale) {
       const wasAlreadyPaid = oldStatus === 'Paid';
@@ -575,6 +581,127 @@ export const updateInvoiceStatus = async (req, res) => {
   } catch (err) {
     await session.abortTransaction();
     res.status(500).json({ message: 'Status update failed: ' + err.message });
+  } finally {
+    session.endSession();
+  }
+};
+
+// ─── RETURN invoice ───────────────────────────────────────────────────────────
+export const returnInvoice = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+  try {
+    const invoice = await Invoice.findOne({ _id: req.params.id, user: req.user._id }).session(session);
+    if (!invoice) {
+      await session.abortTransaction();
+      return res.status(404).json({ message: 'Invoice not found' });
+    }
+
+    if (invoice.isReturned || invoice.status === 'Returned') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Invoice is already returned' });
+    }
+
+    if (invoice.status === 'Cancelled') {
+      await session.abortTransaction();
+      return res.status(400).json({ message: 'Cannot return a cancelled invoice' });
+    }
+
+    const { returnNote } = req.body;
+    const isSale = invoice.type === 'Sale';
+    const amount = invoice.totalAmount;
+    const accountId = invoice.paidIntoAccount;
+    const wasPaid = invoice.status === 'Paid';
+
+    // 1. Reverse all journal entries (debit/credit swap)
+    await reverseJournalEntries({
+      userId: req.user._id,
+      sourceId: invoice._id,
+      sourceType: 'Invoice',
+      date: new Date(),
+      session,
+    });
+
+    // 2. Reverse account balance if invoice was paid
+    if (accountId && wasPaid) {
+      if (isSale) {
+        // Was credited on payment → reverse by debiting
+        const result = await adjustAccount(accountId, req.user._id, amount, 'debit', session);
+        if (!result.ok) {
+          await session.abortTransaction();
+          return res.status(400).json({ message: result.message });
+        }
+      } else {
+        // Was debited on payment → reverse by crediting
+        const result = await adjustAccount(accountId, req.user._id, amount, 'credit', session);
+        if (!result.ok) {
+          await session.abortTransaction();
+          return res.status(400).json({ message: result.message });
+        }
+      }
+    }
+
+    // 3. Post a dedicated Return journal entry
+    if (isSale) {
+      // Dr Sales Returns (contra-revenue) / Cr Accounts Receivable
+      const salesReturnsAccount = await getSystemAccount(req.user._id, ACCOUNTS.SALES_RETURNS, 'Revenue', session);
+      const arAccount = await getSystemAccount(req.user._id, ACCOUNTS.ACCOUNTS_RECEIVABLE, 'Asset', session);
+      await createJournalEntry({
+        userId: req.user._id,
+        debitAccountId: salesReturnsAccount._id,
+        creditAccountId: arAccount._id,
+        amount,
+        date: new Date(),
+        description: `Sales Return: ${invoice.invoiceNumber || invoice._id}`,
+        narration: `Return from ${invoice.clientName || 'Customer'}`,
+        sourceType: 'Invoice',
+        sourceId: invoice._id,
+        entrySequence: 10,
+        session,
+      });
+    } else {
+      // Dr Accounts Payable / Cr Purchase Returns (contra-expense)
+      const apAccount = await getSystemAccount(req.user._id, ACCOUNTS.ACCOUNTS_PAYABLE, 'Liability', session);
+      const purchaseReturnsAccount = await getSystemAccount(req.user._id, ACCOUNTS.PURCHASE_RETURNS, 'Expense', session);
+      await createJournalEntry({
+        userId: req.user._id,
+        debitAccountId: apAccount._id,
+        creditAccountId: purchaseReturnsAccount._id,
+        amount,
+        date: new Date(),
+        description: `Purchase Return: ${invoice.purchaseNumber || invoice._id}`,
+        narration: `Return to ${invoice.clientName || 'Vendor'}`,
+        sourceType: 'Invoice',
+        sourceId: invoice._id,
+        entrySequence: 10,
+        session,
+      });
+    }
+
+    // 4. Revert stock
+    for (const item of invoice.items) {
+      // Sale return → stock comes back; Purchase return → stock goes out
+      const revertQty = isSale ? item.quantity : -item.quantity;
+      await Product.updateOne(
+        { _id: item.productId, 'variants._id': item.variantId },
+        { $inc: { 'variants.$.stock': revertQty } }
+      ).session(session);
+    }
+
+    // 5. Mark invoice as Returned
+    invoice.status = 'Returned';
+    invoice.isReturned = true;
+    invoice.returnDate = new Date();
+    invoice.returnNote = returnNote || '';
+    invoice.returnedAmount = amount;
+    await invoice.save({ session });
+
+    await session.commitTransaction();
+    res.json({ message: 'Invoice returned successfully', invoice });
+
+  } catch (err) {
+    await session.abortTransaction();
+    res.status(500).json({ message: 'Return failed: ' + err.message });
   } finally {
     session.endSession();
   }
